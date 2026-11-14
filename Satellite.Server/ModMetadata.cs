@@ -16,7 +16,7 @@ public record ModMetadata : IModMetadata, IModBlazorMetadata
     public Dictionary<string, SemanticVersioning.Range>? ModDependencies { get; init; }
     public string? Url { get; init; }
     public bool? IsBundleMod { get; init; } = false;
-    public string License { get; init; } = "MIT";
+    public string License { get; init; } = "CC-BY-NC-4.0";
 
     // Lists the map under Mod Pages in the launcher and on SPT's web page.
     public string? WWWRootUrl { get; init; }
