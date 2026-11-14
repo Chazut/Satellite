@@ -1713,6 +1713,8 @@
   // with its inner shapes cut out, or 's' in outline].
   const ring = (x, y, r) => 'M' + (x - r) + ' ' + y + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0z';
   const ICONS = {
+    // a five-pointed star, put in the middle by its points (a font's ★ sits a little off, and differently in each)
+    star: [['M12 2.5L14.78 9.18L21.99 9.76L16.49 14.46L18.17 21.5L12 17.73L5.83 21.5L7.51 14.46L2.01 9.76L9.22 9.18Z', 'f']],
     // a cross
     meds: [['M9 3h6v6h6v6h-6v6H9v-6H3V9h6z', 'f']],
     // a cartridge, stood up
@@ -2518,7 +2520,7 @@
           note(quest, T('Quest'), z.p);
           const s = onScreen(z.p[0], z.p[1]);
           if (!s) { if (want) questOff.push({ p: z.p, t: quest }); continue; }
-          put(s, z.p, badge('★', LAYERS.quest.col, '#0c0c12', '#0c0c12', 'round', size * 1.1));
+          put(s, z.p, badge('i:star', LAYERS.quest.col, '#0c0c12', '#0c0c12', 'round', size * 1.1));
           if (want || zoom >= 3) label(quest, 11 * scale, s[0], s[1] + size * 0.7, s[1] - size * 0.7, LAYERS.quest.col, away(z.p) ? 0.5 : 1);
           thingsDrawn.push({ x: s[0], y: s[1], r: size * 0.6, tip: { title: quest, lines: [goal, want && want[0].trader ? T('From {trader}', { trader: want[0].trader }) : '', want ? '' : T('Not a quest you have started')] } });
         }
@@ -3395,12 +3397,42 @@
   // menu and the Raid list) points to each, in its kind's colour, with how far it is from the player. It can be
   // pointed at and pressed like the marker itself.
   const EDGE = ['Enemy Player', 'Friendly Player', 'Boss', 'Goon', 'Airdrop'];
+  // What's seen of the map: the screen inside the bar (and on a phone the menu over it), less the menu and the Raid
+  // list where they stand over it. Those are only as tall as what's in them: below a short Raid list the map is seen
+  // right to the screen's side, and arrows go there (covers: the panels, as boxes on the screen).
   function seen() {
-    const open = el => !phone.matches && !el.hidden ? el.offsetWidth + 8 : 0;
-    const menu = open($('panel')), list = open($('side'));
     const bare = document.body.classList.contains('bare');
-    const l = bare ? 0 : prefs.swap ? menu : list, r = bare ? 0 : phone.matches ? cover.r : prefs.swap ? list : menu;
-    return { l: l + 8, t: bare ? 8 : 50, r: vw - r - 8, b: vh - (phone.matches ? cover.b : 0) - 8 };
+    const covers = [];
+    if (!bare && !phone.matches) {
+      for (const el of [$('panel'), $('side')]) {
+        if (el.hidden || !el.offsetWidth) continue;
+        const b = el.getBoundingClientRect();
+        covers.push({ l: b.left - 8, t: b.top - 8, r: b.right + 8, b: b.bottom + 8 });
+      }
+    }
+    return { l: 8, t: bare ? 8 : 50, r: vw - (phone.matches ? cover.r : 0) - 8, b: vh - (phone.matches ? cover.b : 0) - 8, covers };
+  }
+  const covered = (box, x, y, pad = 0) => box.covers.some(c => x > c.l - pad && x < c.r + pad && y > c.t - pad && y < c.b + pad);
+  const inSight = (box, at) => at[0] >= box.l && at[0] <= box.r && at[1] >= box.t && at[1] <= box.b && !covered(box, at[0], at[1]);
+  // Where an arrow to something off the map seen goes: on the line from the middle of what's seen to it, where that
+  // line leaves the screen; or, when that's under a panel, where it reaches the panel's side.
+  function edgeAt(box, at, pad) {
+    // the middle of what's seen: the screen's, less the panels standing at its sides from top to bottom
+    let l = box.l, r = box.r;
+    for (const c of box.covers) {
+      if (c.l <= box.l + 8 && c.r < box.r) l = Math.max(l, c.r);
+      else if (c.r >= box.r - 8 && c.l > box.l) r = Math.min(r, c.l);
+    }
+    const cx = (l + r) / 2, cy = (box.t + box.b) / 2, dx = at[0] - cx, dy = at[1] - cy;
+    const reach = (left, top, right, bottom) => {
+      const kx = dx > 0 ? (right - cx) / dx : dx < 0 ? (left - cx) / dx : Infinity;
+      const ky = dy > 0 ? (bottom - cy) / dy : dy < 0 ? (top - cy) / dy : Infinity;
+      const k = Math.max(0, Math.min(kx, ky));
+      return [cx + dx * k, cy + dy * k];
+    };
+    let p = reach(box.l + pad, box.t + pad, box.r - pad, box.b - pad);
+    if (covered(box, p[0], p[1], pad)) p = reach(l + pad, box.t + pad, r - pad, box.b - pad);
+    return [p[0], p[1], Math.atan2(dy, dx)];
   }
   // Where COMET sends the bots of a squad acting together: a dashed line from each to its place, amber once it's
   // doing it and pale while it only means to. Faint for all that are doing it; plain, and with the ones still
@@ -3764,18 +3796,14 @@
     const box = seen();
     if (box.r - box.l < 120 || box.b - box.t < 120) return;
     const pad = 16 * scale;
-    const cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
-    const hw = (box.r - box.l) / 2 - pad, hh = (box.b - box.t) / 2 - pad;
     // The player's quests: off the screen, the quest's own sign at the edge (a yellow star in a round badge, not an
     // arrow, so it isn't taken for a player), with a small tip on the edge's side showing which way.
     if (prefs.edgeQuests && inRaidHere()) {
       const col = LAYERS.quest.col, r = 7.5 * scale;
       for (const q of questOff) {
         const at = toScreen(q.p[0], q.p[1]);
-        if (at[0] >= box.l && at[0] <= box.r && at[1] >= box.t && at[1] <= box.b) continue;
-        const dx = at[0] - cx, dy = at[1] - cy;
-        const k = Math.min(hw / Math.abs(dx || 1e-6), hh / Math.abs(dy || 1e-6));
-        const x = cx + dx * k, y = cy + dy * k, turn = Math.atan2(dy, dx);
+        if (inSight(box, at)) continue;
+        const [x, y, turn] = edgeAt(box, at, pad);
         ctx.save();
         ctx.translate(x, y);
         ctx.lineJoin = 'round';
@@ -3802,10 +3830,10 @@
         ctx.strokeStyle = col;
         ctx.stroke();
         ctx.fillStyle = col;
-        ctx.font = 'bold ' + Math.round(r * 1.3) + 'px ' + FONT;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('★', 0, r * 0.06);
+        const k = r * 1.5 / 24;
+        ctx.translate(-12 * k, -12 * k);
+        ctx.scale(k, k);
+        ctx.fill(new Path2D(ICONS.star[0][0]));
         ctx.restore();
         const far = me ? Math.hypot(q.p[0] - me.cx, q.p[1] - me.cy) : NaN;
         if (Number.isFinite(far)) {
@@ -3824,11 +3852,8 @@
       if (!EDGE.includes(m.c) && m.id !== chased) continue;
       if (m.c === 'Corpse' || m.c === 'Main Player' || inArea(m) || isHidden(m.c || 'None') || !Number.isFinite(m.cx)) continue;
       const at = toScreen(m.cx, m.cy);
-      if (at[0] >= box.l && at[0] <= box.r && at[1] >= box.t && at[1] <= box.b) continue;
-      // where the line from the middle of what's seen to it crosses the edge
-      const dx = at[0] - cx, dy = at[1] - cy;
-      const k = Math.min(hw / Math.abs(dx || 1e-6), hh / Math.abs(dy || 1e-6));
-      const x = cx + dx * k, y = cy + dy * k, turn = Math.atan2(dy, dx);
+      if (inSight(box, at)) continue;
+      const [x, y, turn] = edgeAt(box, at, pad);
       const kind = KINDS[m.c] || OTHER, r = 7 * scale * kind.size;
       ctx.save();
       ctx.translate(x, y);
@@ -3950,7 +3975,42 @@
   const inRaid = () => connected() && !!report.raid;
   const inRaidHere = () => inRaid() && !!map && map.loc === shownLoc(report.loc);
 
-  function take(message) {
+  // ---- Smooth over a slow connection (prefs.smooth) ----
+  // Where things are is played back a moment late (HOLD_MS), at the pace the game sent it: reports that come late
+  // or bunched up (over the internet, say) are then spread out as they were sent, instead of the map stopping and
+  // jumping. Two lines of reports, each kept in order: the game's, and in a Fika raid shown from its host, where the
+  // player is, from their own game ("own"). Unset: on when the page is opened from outside this network.
+  const HOLD_MS = 120;
+  const held = [[], []], heldNext = [0, 0], heldGap = [100, 100], heldTimes = [[], []];
+  const nearby = h => /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|[^.]+$)/.test(h);
+  const smoothing = () => typeof prefs.smooth === 'boolean' ? prefs.smooth : !nearby(location.hostname);
+  function hold(message, now) {
+    const which = message.d.own ? 1 : 0, q = held[which];
+    // how often this line's reports are sent: how many came in the last two seconds, however bunched up they came
+    const times = heldTimes[which];
+    times.push(now);
+    while (times.length && now - times[0] > 2000) times.shift();
+    if (times.length >= 4) heldGap[which] = Math.min(1000, Math.max(15, (now - times[0]) / (times.length - 1)));
+    let at = Math.max(now + HOLD_MS, heldNext[which] + heldGap[which]);
+    // fallen far behind (the page was out of sight, or a long stall): caught up, not kept behind
+    if (at - now > HOLD_MS * 4 || q.length > 60) {
+      while (q.length) take(q.shift()[1], true);
+      at = now + HOLD_MS;
+    }
+    heldNext[which] = at;
+    q.push([at, message]);
+  }
+  function playHeld() {
+    const now = performance.now();
+    for (const q of held) while (q.length && q[0][0] <= now) take(q.shift()[1], true);
+  }
+  function dropHeld() {
+    for (const q of held) q.length = 0;
+    for (const times of heldTimes) times.length = 0;
+    heldNext[0] = heldNext[1] = 0;
+  }
+
+  function take(message, replayed) {
     const now = performance.now();
     const d = message.d;
     if (!d || message.age > 5000) return;
@@ -3972,7 +4032,10 @@
     if (streamFor !== (prefs.player ? prefs.player.sid : sid)) listen();
     if (message.sid !== sid) return;
     heard = now;
-    if (d.t === 'fast' || d.t === 'full') speedHeard(now);
+    const moving = d.t === 'fast' || d.t === 'full';
+    if (moving && !replayed) speedHeard(now);
+    if (!replayed && d.t === 'idle') dropHeld();
+    if (moving && !replayed && smoothing()) { hold(message, now); return; }
 
     // what lies about in the raid changed: asked for
     if (d.t === 'things') {
@@ -3982,6 +4045,17 @@
 
     if (d.t === 'fast') {
       if (!report) return;
+      // In a Fika raid shown from its host's game, where the player is comes from their own game, as it comes
+      // ("own"): only they move by it, and how often the host reports (the others' timing) is left as it is
+      const rows = d.m || [];
+      if (d.own) {
+        if (d.me) wantMe(d.me);
+        for (const row of rows) {
+          const m = liveById.get(row[0]);
+          if (m) { m.p[0] = row[1]; m.p[1] = row[2]; m.p[2] = row[3]; m.r = row[4]; m.fx = m.cx; m.fy = m.cy; m.t0 = now; }
+        }
+        return;
+      }
       // how often the game reports: things are moved from one report's place to the next's in that time
       if (now - told > 20 && now - told < 1000) period += (now - told - period) * 0.2;
       told = now;
@@ -4125,6 +4199,7 @@
   }
   // another game is shown from here on
   function forget() {
+    dropHeld();
     report = null;
     live = [];
     liveById = new Map();
@@ -4164,7 +4239,8 @@
   }
 
   // Whose game: "whoever is playing", or one player by name, remembered here and shown whenever they play.
-  const gameName = g => g.name || T('Game') + ' …' + g.sid.slice(-4);
+  // (hl: in a raid a Fika headless runs, which the map is shown from)
+  const gameName = g => (g.name || T('Game') + ' …' + g.sid.slice(-4)) + (g.hl ? ' (' + T('headless') + ')' : '');
   function listGames() {
     const pick = $('session');
     const rows = games.map(g => ({ sid: g.sid, text: gameName(g) + (g.raid ? ' · ' + T('in raid') : '') }));
@@ -5820,7 +5896,8 @@
 
   function showStatus() {
     const box = $('status'), text = $('statusText');
-    const who = prefs.player ? gameName(prefs.player) : (games.find(g => g.sid === sid) || {}).name || '';
+    const shown = games.find(g => g.sid === (prefs.player ? prefs.player.sid : sid));
+    const who = shown ? gameName(shown) : prefs.player ? gameName(prefs.player) : '';
     let kind = 'gone', says = prefs.player ? T('{who} isn\'t playing', { who }) : T('Game not connected');
     if (serverLost) says = T('Server not reachable');
     else if (connected()) {
@@ -6004,6 +6081,7 @@
   let last = performance.now();
   let sinceStatus = 1;
   function frame(now) {
+    playHeld();
     const began = performance.now();
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
@@ -6629,6 +6707,9 @@
     $(id).onchange = e => { prefs[key] = e.target.checked; save(); dirty = true; rosterPrint = bestPrint = null; tipFor = null; feedPrint = ''; listRoster(); showKills(); };
   }
   $('optAwake').addEventListener('change', keepAwake);
+  // Smooth over a slow connection: as picked, else by where the page was opened from (see smoothing)
+  $('optSmooth').checked = smoothing();
+  $('optSmooth').onchange = e => { prefs.smooth = e.target.checked; dropHeld(); save(); };
   // the Raid list's health bars need the map's: greyed while those are off
   const healthDeps = () => { const off = !prefs.health; $('optRosterHp').disabled = off; $('optRosterHp').closest('label').classList.toggle('unavailable', off); };
   $('optHealth').addEventListener('change', healthDeps);

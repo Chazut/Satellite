@@ -359,7 +359,7 @@ namespace Satellite.Client
                     CompoundItem worn = null;
                     try
                     {
-                        if (player != null && player.IsAI && !string.IsNullOrEmpty(player.ProfileId) && player.Inventory != null)
+                        if (player != null && World.IsBot(player) && !string.IsNullOrEmpty(player.ProfileId) && player.Inventory != null)
                         {
                             worn = player.Inventory.Equipment;
                         }

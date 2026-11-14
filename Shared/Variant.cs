@@ -117,6 +117,11 @@ namespace Satellite.Shared
         {
             var world = Singleton<GameWorld>.Instance;
             var id = world?.MainPlayer?.Location;
+            // (a Fika headless has no player of its own: the world says where it is)
+            if (string.IsNullOrEmpty(id))
+            {
+                id = world?.LocationId;
+            }
             if (string.IsNullOrEmpty(id))
             {
                 return id;

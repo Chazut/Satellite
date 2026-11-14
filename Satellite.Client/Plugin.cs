@@ -83,10 +83,35 @@ namespace Satellite.Client
             _open = Config.Bind("General", "Open the map", new KeyboardShortcut(KeyCode.M, KeyCode.LeftAlt),
                 "Opens the map in your browser, at the server this game is connected to.");
 
-            // a game with no graphics (a Fika headless host) has no player of its own to show
-            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+            // A Fika headless host: nobody plays it, so the server never offers it as a game to watch, but the raid is
+            // shown from what it says (see FikaHost on the server)
+            Headless = BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("com.fika.headless")
+                || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null;
+            try
             {
-                enabled = false;
+                var fika = Type.GetType("Fika.Core.Main.Utils.FikaBackendUtils, Fika.Core", false);
+                _fikaServer = fika?.GetProperty("IsServer", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            }
+            catch (Exception)
+            {
+                _fikaServer = null;
+            }
+        }
+
+        internal static bool Headless;
+        private static System.Reflection.PropertyInfo _fikaServer;
+
+        // this game runs the Fika raid it's in (the headless, or a player hosting it): its bots are the real ones, and
+        // the server shows the raid to the players who joined it from what this game says
+        private static bool FikaHost()
+        {
+            try
+            {
+                return Headless || (_fikaServer != null && _fikaServer.GetValue(null, null) is bool host && host);
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 
@@ -252,7 +277,8 @@ namespace Satellite.Client
 
             if (!watched)
             {
-                to.Append("{\"t\":\"idle\",\"raid\":").Append(raid ? "true" : "false").Append(",\"loc\":");
+                to.Append("{\"t\":\"idle\"").Append(Headless ? ",\"hl\":1" : "").Append(raid && FikaHost() ? ",\"fh\":1" : "")
+                    .Append(",\"raid\":").Append(raid ? "true" : "false").Append(",\"loc\":");
                 World.Text(to, location);
                 AskScenes(to, location);
                 to.Append('}');
@@ -283,6 +309,17 @@ namespace Satellite.Client
             _sinceFull = 0f;
             _lastPrint = print;
             to.Append("{\"t\":\"full\",\"seq\":").Append(++_sequence);
+            // "hl": a Fika headless; "fh": the Fika host of the raid it's in
+            if (Headless)
+            {
+                to.Append(",\"hl\":1");
+            }
+
+            if (raid && FikaHost())
+            {
+                to.Append(",\"fh\":1");
+            }
+
             to.Append(",\"raid\":").Append(raid ? "true" : "false");
             to.Append(",\"loc\":");
             World.Text(to, location);

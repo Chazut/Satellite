@@ -200,9 +200,28 @@ namespace Satellite.Client
         private static void Think(Dot dot)
         {
             var player = dot.Player;
-            if (player == null || !player.IsAI)
+            if (player == null || !IsBot(player))
             {
                 return;
+            }
+
+            // taken for a person when first seen, and found since to be a bot (Fika marks its copies of the host's bots
+            // a moment after they appear)
+            if (dot.Kind == "Friendly Player" && dot.WasKind == null)
+            {
+                var main = Singleton<GameWorld>.Instance?.MainPlayer;
+                var kind = main != null || Plugin.Headless ? KindOf(player, main) : null;
+                if (kind != null && kind != dot.Kind)
+                {
+                    dot.Kind = kind;
+                    dot.Level = 0;
+                    dot.Group = null;
+                    Describe(dot, player);
+                    if (!string.IsNullOrEmpty(player.ProfileId))
+                    {
+                        Kinds[player.ProfileId] = kind;
+                    }
+                }
             }
 
             // a bot on the player's own team (Pit FireTeam) is a friend while it is, whatever it was before
@@ -282,7 +301,13 @@ namespace Satellite.Client
             {
                 var game = Singleton<AbstractGame>.Instance;
                 var world = Singleton<GameWorld>.Instance;
-                return game != null && game.InRaid && world != null && world.MainPlayer != null;
+                if (game == null || world == null)
+                {
+                    return false;
+                }
+
+                // a Fika headless has no player of its own in the raid it runs
+                return Plugin.Headless ? game.InRaid || game.Status == GameStatus.Started : game.InRaid && world.MainPlayer != null;
             }
             catch (Exception)
             {
@@ -323,13 +348,16 @@ namespace Satellite.Client
                 Pickups.Forget();
                 Planes.Forget();
                 KilledByPlayers.Clear();
+                Leaving.Clear();
+                LeftAt.Clear();
                 _btr = null;
                 Drops.Clear();
                 _nextDrops = 0f;
             }
 
+            // (a Fika headless has no player of its own: everyone in the raid is somebody else)
             var main = world != null ? world.MainPlayer : null;
-            if (main == null)
+            if (world == null || (main == null && !Plugin.Headless))
             {
                 return;
             }
@@ -378,23 +406,45 @@ namespace Satellite.Client
             {
                 var dot = Players[player];
                 Players.Remove(player);
-                // died, rather than left the raid; marked when a player (not a bot) did it
-                if (dot.Kind != null && player != null && Dead(player))
+                if (dot.Kind == null || ReferenceEquals(player, null))
                 {
-                    var byPlayer = KilledByPlayer(player, world);
-                    Killed(player, dot);
-                    Still.Add(new Dot { Id = ++_nextId, Kind = "Corpse", Text = dot.Text, At = dot.At, ByPlayer = byPlayer, Profile = player.ProfileId, Was = dot.Kind });
-                    if (byPlayer && !string.IsNullOrEmpty(player.ProfileId))
-                    {
-                        KilledByPlayers.Add(player.ProfileId);
-                    }
+                    continue;
                 }
+
+                // died, rather than left the raid; marked when a player (not a bot) did it
+                if (player != null && Dead(player))
+                {
+                    Died(player, dot, world);
+                }
+                else
+                {
+                    // In a Fika raid joined from another PC, a player may leave the list a moment before the game
+                    // here hears they died: looked at again for a few seconds
+                    Leaving.Add(new KeyValuePair<Player, Dot>(player, dot));
+                    LeftAt[player] = Time.realtimeSinceStartup;
+                }
+            }
+
+            for (var i = Leaving.Count - 1; i >= 0; i--)
+            {
+                var player = Leaving[i].Key;
+                if (player != null && Dead(player))
+                {
+                    Died(player, Leaving[i].Value, world);
+                }
+                else if (player != null && LeftAt.TryGetValue(player, out var left) && Time.realtimeSinceStartup - left < LeavingFor)
+                {
+                    continue;
+                }
+
+                LeftAt.Remove(player);
+                Leaving.RemoveAt(i);
             }
 
             Btr();
             Airdrops();
 
-            if (!_exitsLooked && Started())
+            if (!_exitsLooked && main != null && Started())
             {
                 _exitsLooked = true;
                 LookForExits(world, main);
@@ -418,7 +468,7 @@ namespace Satellite.Client
                     dot.Group = player.GroupId;
                 }
 
-                if (player.IsAI && player.Profile?.Info?.Settings != null)
+                if (IsBot(player) && player.Profile?.Info?.Settings != null)
                 {
                     dot.Difficulty = player.Profile.Info.Settings.BotDifficulty.ToString();
                 }
@@ -564,6 +614,22 @@ namespace Satellite.Client
             }
         }
 
+        // the ones that left the list of the living and may yet turn out dead, and since when
+        private static readonly List<KeyValuePair<Player, Dot>> Leaving = new List<KeyValuePair<Player, Dot>>();
+        private static readonly Dictionary<Player, float> LeftAt = new Dictionary<Player, float>();
+        private const float LeavingFor = 3f;
+
+        private static void Died(Player player, Dot dot, GameWorld world)
+        {
+            var byPlayer = KilledByPlayer(player, world);
+            Killed(player, dot);
+            Still.Add(new Dot { Id = ++_nextId, Kind = "Corpse", Text = dot.Text, At = dot.At, ByPlayer = byPlayer, Profile = player.ProfileId, Was = dot.Kind });
+            if (byPlayer && !string.IsNullOrEmpty(player.ProfileId))
+            {
+                KilledByPlayers.Add(player.ProfileId);
+            }
+        }
+
         // whether whoever dealt the last blow was a person playing (the player, a friend), not a bot
         private static bool KilledByPlayer(Player dead, GameWorld world)
         {
@@ -579,7 +645,7 @@ namespace Satellite.Client
                 {
                     if (player != null && player.ProfileId == killer)
                     {
-                        return !player.IsAI;
+                        return !IsBot(player);
                     }
                 }
 
@@ -587,7 +653,7 @@ namespace Satellite.Client
                 {
                     if (player != null && player.ProfileId == killer)
                     {
-                        return !player.IsAI;
+                        return !IsBot(player);
                     }
                 }
             }
@@ -655,8 +721,8 @@ namespace Satellite.Client
                     return null;
                 }
 
-                var group = main.GroupId;
-                if (!player.IsAI || (!string.IsNullOrEmpty(group) && player.GroupId == group))
+                var group = main != null ? main.GroupId : null;
+                if (!IsBot(player) || (!string.IsNullOrEmpty(group) && player.GroupId == group))
                 {
                     return "Friendly Player";
                 }
@@ -778,15 +844,79 @@ namespace Satellite.Client
                 || role.EndsWith("HelperAgro", StringComparison.OrdinalIgnoreCase);
         }
 
+        // Whether a player is a bot. In a Fika raid joined from another PC, the host's bots are copies Fika keeps in step
+        // ("observed" players), and the game counts those as people; Fika marks them with its own field, IsObservedAI,
+        // read by name so the plugin needs no Fika to run.
+        private static readonly Dictionary<Type, System.Reflection.FieldInfo> ObservedAi = new Dictionary<Type, System.Reflection.FieldInfo>();
+
+        internal static bool IsBot(Player player)
+        {
+            if (player == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (player.IsAI)
+                {
+                    return true;
+                }
+
+                var type = player.GetType();
+                if (!ObservedAi.TryGetValue(type, out var field))
+                {
+                    for (var t = type; t != null && field == null; t = t.BaseType)
+                    {
+                        field = t.GetField("IsObservedAI", Kept | System.Reflection.BindingFlags.DeclaredOnly);
+                    }
+
+                    ObservedAi[type] = field;
+                }
+
+                return field != null && field.GetValue(player) is bool bot && bot;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // The player's name. Playing as a scav, the scav's with the account's after it: "Nikita Berg (fums)".
         private static string NameOf(Player player)
         {
             try
             {
-                return player.Profile?.Nickname ?? "";
+                var name = player.Profile?.Nickname ?? "";
+                if (player.IsYourPlayer && player.Side == EPlayerSide.Savage)
+                {
+                    var own = AccountName();
+                    if (!string.IsNullOrEmpty(own) && own != name)
+                    {
+                        return string.IsNullOrEmpty(name) ? own : name + " (" + own + ")";
+                    }
+                }
+
+                return name;
             }
             catch (Exception)
             {
                 return "";
+            }
+        }
+
+        // the name on the account (its PMC's), as the server knows it
+        private static string AccountName()
+        {
+            try
+            {
+                var app = UnityEngine.Object.FindObjectOfType<EFT.TarkovApplication>();
+                var session = app != null ? app.GetClientBackEndSession() : null;
+                return session?.Profile?.Nickname;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 
@@ -1099,10 +1229,16 @@ namespace Satellite.Client
                 to.Append(",\"pid\":");
                 Text(to, dot.Profile);
             }
-            else if (dot.Player != null && dot.Player.IsAI && !string.IsNullOrEmpty(dot.Player.ProfileId))
+            else if (dot.Player != null && IsBot(dot.Player) && !string.IsNullOrEmpty(dot.Player.ProfileId))
             {
                 // a living bot: what it carries is told by this id
                 to.Append(",\"pid\":");
+                Text(to, dot.Player.ProfileId);
+            }
+            else if (dot.Player != null && !string.IsNullOrEmpty(dot.Player.ProfileId))
+            {
+                // "u": a person's id in this raid, so the server can find a player in their Fika host's report
+                to.Append(",\"u\":");
                 Text(to, dot.Player.ProfileId);
             }
 

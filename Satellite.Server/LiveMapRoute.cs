@@ -82,6 +82,17 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         public readonly Lock EventsLock = new();
         public readonly List<(long Number, string Json)> Events = [];
         public string EventsRaid = "";
+        // Fika (see FikaHost). Headless: a headless host, never offered to a page. IsHost: the host of the raid it's in,
+        // and Host what it last said of it; Own: a player's id in the raid, Me where they are, OwnFull their own last
+        // full report (censored)
+        public volatile bool Headless;
+        public volatile bool IsHost;
+        public volatile HostBots? HostBots;
+        public volatile HostView? Host;
+        public volatile string? Own;
+        public volatile string? OwnName;
+        public volatile string? Me;
+        public volatile string? OwnFull;
     }
 
     // From: the report the answer was made of
@@ -314,6 +325,18 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 session.Raid = raid.GetBoolean();
             }
 
+            session.Headless = IsHeadless(session, root);
+            if (kind.ValueEquals("full") || kind.ValueEquals("idle"))
+            {
+                session.IsHost = session.Raid && Flag(root, "fh");
+            }
+
+            // where the player is, as their own game says (for when the page is shown their Fika host's report)
+            if (root.TryGetProperty("me", out var me) && me.ValueKind == JsonValueKind.Array)
+            {
+                session.Me = me.GetRawText();
+            }
+
             if (session.Raid && root.TryGetProperty("loc", out var loc) && loc.ValueKind == JsonValueKind.String
                 && LocationName().IsMatch(loc.GetString() ?? ""))
             {
@@ -333,25 +356,41 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 text = text.Replace("\r", "").Replace("\n", "");
             }
 
-            if (kind.ValueEquals("full"))
+            // In a Fika raid whose host reports, the page is shown the host's raid with this player's own part (see
+            // FikaHost); a headless's own reports go to no page
+            var host = HostOf(session);
+            if (host != null)
             {
-                session.LastFull = text;
-                Interlocked.Exchange(ref session.LastFullAt, Now);
+                // the player's own full report is kept (Censor: their extracts, name, "me") and goes out with the
+                // host's next one (ToPlayers). Sent now, it would carry the host's last full report, up to a second
+                // old: every bot would jump back to where it was, then on again.
+                if (kind.ValueEquals("fast") && OwnFast(host, session) is { } own)
+                {
+                    Publish(session, own);
+                }
             }
-            else if (kind.ValueEquals("idle"))
+            else if (!session.Headless)
             {
-                // out of sight: the last full report is old news
-                session.LastFull = text;
-                Interlocked.Exchange(ref session.LastFullAt, Now);
+                if (kind.ValueEquals("full") || kind.ValueEquals("idle"))
+                {
+                    // (idle: out of sight, the last full report is old news)
+                    session.LastFull = text;
+                    Interlocked.Exchange(ref session.LastFullAt, Now);
+                }
+
+                Publish(session, text);
             }
 
-            Publish(session, text);
+            if (session.IsHost)
+            {
+                ToPlayers(session, kind.GetString() ?? "", text);
+            }
         }
 
         // the kinds the plugin needn't send at all: the same every time, so written out once (this is answered ten
         // times a second for each game that's watched)
         _offAnswer ??= ",\"off\":" + OffList().ToJsonString() + ",\"layers\":" + LayersOffList().ToJsonString();
-        var answer = new StringBuilder(160).Append("{\"w\":").Append(Watchers(session)).Append(_offAnswer);
+        var answer = new StringBuilder(160).Append("{\"w\":").Append(session.Headless || session.IsHost ? HostWatchers(session) : Watchers(session)).Append(_offAnswer);
         if (location != null)
         {
             answer.Append(",\"loc\":").Append(JsonSerializer.Serialize(location));
@@ -548,12 +587,17 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
 
         _ = long.TryParse(after, out var from);
+        // a player in a Fika raid whose host reports: the host's events, with the player named as on their account
+        var player = session;
+        var from_ = HostOf(session) ?? session;
+        var ownId = from_ != player ? player.Own : null;
+        var ownName = from_ != player ? player.OwnName ?? PlainName(player) : null;
         var answer = new StringBuilder(4096);
-        lock (session.EventsLock)
+        lock (from_.EventsLock)
         {
-            answer.Append("{\"rid\":").Append(JsonSerializer.Serialize(session.EventsRaid)).Append(",\"ev\":[");
+            answer.Append("{\"rid\":").Append(JsonSerializer.Serialize(from_.EventsRaid)).Append(",\"ev\":[");
             var first = true;
-            foreach (var (number, json) in session.Events)
+            foreach (var (number, json) in from_.Events)
             {
                 if (number <= from)
                 {
@@ -566,7 +610,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 }
 
                 first = false;
-                answer.Append(json);
+                answer.Append(RenameIn(json, ownId, ownName));
             }
         }
 
@@ -622,8 +666,32 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 node.Remove("plane");
             }
 
+            // Fika (see FikaHost): a player's own part, kept for when their host's report is shown; without a host
+            // that reports, what a host says its bots are up to, where this game knows nothing
+            if (!session.Headless)
+            {
+                KeepOwn(session, node);
+            }
+
+            if (!session.IsHost && !LayersOff.Contains("brains") && HostOf(session) == null)
+            {
+                AddHostBots(node);
+            }
+
             KeepEvents(session, node);
-            return node.ToJsonString();
+            var censored = node.ToJsonString();
+            if (session.IsHost)
+            {
+                // with its events still in, for the players in its raid
+                KeepHost(session, node, censored);
+            }
+
+            if (!session.Headless)
+            {
+                session.OwnFull = censored;
+            }
+
+            return censored;
         }
 
         var known = session.Blocked;
@@ -716,14 +784,21 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         var list = new JsonArray();
         foreach (var session in _sessions.Values.OrderBy(s => s.Id))
         {
-            if (Now - Interlocked.Read(ref session.SeenAt) < GoneAfter)
+            if (!session.Headless && Now - Interlocked.Read(ref session.SeenAt) < GoneAfter)
             {
-                list.Add(new JsonObject
+                var game = new JsonObject
                 {
                     ["sid"] = session.Id,
                     ["name"] = session.Name is { } name ? JsonNode.Parse(name) : "",
                     ["raid"] = session.Raid
-                });
+                };
+                // in a raid a Fika headless runs: the page says so by the name
+                if (HostOf(session) is { Headless: true })
+                {
+                    game["hl"] = true;
+                }
+
+                list.Add(game);
             }
         }
 
@@ -736,11 +811,11 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
     {
         if (!string.IsNullOrEmpty(wanted))
         {
-            return _sessions.GetValueOrDefault(wanted);
+            return _sessions.GetValueOrDefault(wanted) is { Headless: false } named ? named : null;
         }
 
-        // nobody named: the game heard from last
-        return _sessions.Values.OrderByDescending(s => Interlocked.Read(ref s.SeenAt)).FirstOrDefault();
+        // nobody named: the game heard from last (never a Fika headless)
+        return _sessions.Values.Where(s => !s.Headless).OrderByDescending(s => Interlocked.Read(ref s.SeenAt)).FirstOrDefault();
     }
 
     private async Task Stream(HttpContext context, string? wanted, CancellationToken cancellationToken)
@@ -758,7 +833,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             // what's known already, so the page isn't empty until the next full report
             foreach (var session in _sessions.Values)
             {
-                if ((string.IsNullOrEmpty(wanted) || wanted == session.Id) && session.LastFull is { } last
+                if (!session.Headless && (string.IsNullOrEmpty(wanted) || wanted == session.Id) && session.LastFull is { } last
                     && Now - Interlocked.Read(ref session.SeenAt) < GoneAfter)
                 {
                     var age = Now - Interlocked.Read(ref session.LastFullAt);

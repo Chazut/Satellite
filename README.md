@@ -32,6 +32,9 @@ It only reads. Nothing on the page changes anyone's game.
 
 The browser warns about the certificate the first time. That's SPT's own. Click Advanced, then Continue.
 
+Fika: install it on the server, every player's game and the headless if you use one. The map takes the bots, kills
+and events from whoever hosts the raid, and your own position from your game. The headless never shows as a player.
+
 ## On your phone
 
 1. Close the server. In `SPT_Runtime/SPT_Data/configs/http.json`, set `"ip"` to `"0.0.0.0"`. Leave `"backendIp"` alone.
