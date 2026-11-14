@@ -2,7 +2,11 @@
 
 A live map of your raid in the browser, for SPT 4.1. Use it on a second monitor, a tablet or a phone.
 
+![Satellite in a raid](examples/IngameExample.webp)
+
 ## Features
+
+![Maps, quests and options](examples/FeaturesExample.webp)
 
 - Top-down scans of every base game map. Modded maps come as add-ons.
 - You, your friends and every bot, live.
@@ -36,6 +40,8 @@ Fika: install it on the server, every player's game and the headless if you use 
 and events from whoever hosts the raid, and your own position from your game. The headless never shows as a player.
 
 ## On your phone
+
+![Satellite on a phone](examples/PhoneExample.webp)
 
 1. Close the server. In `SPT_Runtime/SPT_Data/configs/http.json`, set `"ip"` to `"0.0.0.0"`. Leave `"backendIp"` alone.
 2. Start the server. Let SPT.Server.exe through the Windows firewall on Private networks.

@@ -6,6 +6,9 @@ dist/
 # Release notes and mod page drafts
 Satellite Files/
 
+# Raw screen recordings (the README's pictures in examples/ are kept)
+examples/*.mp4
+
 # This PC's SPT folder
 spt-path.txt
 
