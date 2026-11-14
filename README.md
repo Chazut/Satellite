@@ -83,7 +83,7 @@ Needs the .NET 10 SDK and an SPT 4.1 folder.
 
 - Made by Fums.
 - The mod and its map scans are [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/): use, share and change
-  them with credit, but don't sell them. See `LICENSE` and `LICENSE-MAPS.md`.
+  them with credit, but don't sell them. See `LICENSE.md` and `LICENSE-MAPS.md`.
 - QR codes: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase, MIT. "QR Code"
   is a registered trademark of DENSO WAVE INCORPORATED.
 - Cursors: [Cursor Pack](https://kenney.nl/assets/cursor-pack) by Kenney, CC0.

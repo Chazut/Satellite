@@ -71,7 +71,7 @@ Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $mod -Recurse
 Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $mod
 # config.jsonc isn't packed: the server writes the default the first time it starts, so an update never overwrites
 # the owner's own
-Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $mod
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE.md') -Destination $mod
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE-MAPS.md') -Destination $mod
 $plugin = Join-Path $stage "BepInEx\plugins\$name"
 New-Item -ItemType Directory -Force $plugin | Out-Null
