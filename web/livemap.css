@@ -1,0 +1,1289 @@
+:root {
+  /* the logo's colours: navy, its map's blues, teal for what's switched on (orange is the player's own) */
+  --bg: #0c0c12;
+  /* the controls and panels: dark navy glass over the map */
+  --panel: rgba(20, 20, 28, 0.86);
+  --panel-solid: rgba(20, 20, 28, 0.97);
+  --line: rgba(200, 205, 255, 0.09);
+  --line-strong: rgba(123, 156, 255, 0.55);
+  --hover: rgba(200, 205, 255, 0.07);
+  --text: #e5e6ec;
+  --bright: #ffffff;
+  --dim: #8a8c9a;
+  --accent: #7b9cff;
+  --accent-soft: rgba(123, 156, 255, 0.15);
+  --ink: #0c0c12;
+  --on: #3ddc5a;
+  --off: #ff4d43;
+  --radius: 10px;
+  --radius-small: 7px;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --font: "Bender", "Jura", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.35 var(--font);
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Cursors: Kenney's Cursor Pack (www.kenney.nl, CC0), see cursors/License.txt. The arrow everywhere, the hand
+   while the map is dragged and over what can be clicked. */
+html, body, #stage { cursor: url("cursors/idle.png") 2 2, default; }
+#stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+#stage.canOpen { cursor: url("cursors/hand.png") 7 6, pointer; }
+#stage.dragging { cursor: url("cursors/hand.png") 7 6, grabbing; }
+
+/* the map's tiles: moved and zoomed as one, each placed in metres */
+#layers {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  /* no will-change here: with it the browser keeps the tiles as they were first drawn, at that zoom, and only
+     stretches them after: zoomed in on a small map (the Icebreaker) everything was a blur */
+}
+#layers img {
+  position: absolute;
+  /* every tile's box is this, whatever its picture's size: it's put in its place and sized by a transform
+     (layTile in livemap.js, TILE_BOX) */
+  left: 0;
+  top: 0;
+  width: 1024px;
+  height: 1024px;
+  transform-origin: 0 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+/* a floor of one building: its own tiles, cut to the building's shape; the rest of the map dims behind it */
+#floorLayer {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+#floorLayer[hidden] { display: none; }
+/* a building on a map that has its buildings worked out: one of these for each floor seen in it, cut to where that
+   floor is the one seen; a floor other than the one shown is a little darker */
+#floorLayer .floorPart {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+#floorLayer .floorPart.other { filter: brightness(0.7) saturate(0.85); }
+#layers.dim > img { filter: brightness(0.42) saturate(0.55); }
+
+#floorBadge {
+  position: fixed;
+  left: 50%;
+  top: max(56px, calc(env(safe-area-inset-top) + 56px));
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 4px 12px;
+  border: 1px solid rgba(123, 156, 255, 0.7);
+  border-radius: 999px;
+  background: rgba(10, 30, 40, 0.88);
+  color: #c9d6ff;
+  font-weight: bold;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+}
+#floorBadge[hidden] { display: none; }
+#floorText { padding: 0 2px; cursor: pointer; min-width: 7.6em; text-align: center; font-variant-numeric: tabular-nums; }
+#floorText.picked { color: var(--accent); }
+#floorBadge button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(123, 156, 255, 0.15);
+  color: #c9d6ff;
+  font-size: 11px;
+  line-height: 24px;
+  cursor: pointer;
+}
+#floorBadge button:hover { background: rgba(123, 156, 255, 0.34); }
+#floorBadge button:disabled { opacity: 0.3; cursor: default; background: transparent; }
+
+/* /map/?debug: what the floor display goes by, for finding why a building's inside isn't shown */
+#debugLine {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 4px 10px;
+  border-radius: var(--radius-small);
+  background: rgba(0, 0, 0, 0.78);
+  color: #e6ebf2;
+  font: 12px/1.4 monospace;
+  pointer-events: none;
+  white-space: pre;
+}
+#debugLine[hidden] { display: none; }
+
+/* what's pointed at: a container's contents, a lock's key, an item's worth */
+#tip {
+  position: fixed;
+  z-index: 3;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+#tip[hidden] { display: none; }
+/* its name, with its worth (or a spawn point's chance) at the right */
+#tip { min-width: 180px; padding: 0; overflow: hidden; }
+.tipHead { display: flex; align-items: baseline; gap: 10px; padding: 7px 10px; background: rgba(255, 255, 255, 0.045); border-bottom: 1px solid var(--line); }
+.tipHead strong { flex: 1; min-width: 0; color: var(--bright); font-size: 12.5px; }
+.tipHead .worth { font-weight: 700; }
+.tipHead .more { color: var(--dim); }
+/* what's in it: a row each, the dearest first; name, chance, worth in columns */
+.tipList { display: flex; flex-direction: column; padding: 4px 0; }
+.tipRow { display: flex; align-items: baseline; gap: 8px; padding: 1.5px 10px; }
+.tipRow:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+.tipRow .dot { flex: none; align-self: center; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.tipRow .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.tipRow .name em { color: var(--bright); font-style: normal; font-weight: 700; }
+#tip .worth, #tip .chance { flex: none; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tipRow .worth { min-width: 5.6em; }
+.tipRow .chance { min-width: 3.2em; color: var(--dim); }
+.tipRow .more { flex: none; color: var(--dim); }
+#tip .tag { flex: none; padding: 0 5px; border-radius: 999px; background: #ffe14d; color: var(--ink); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 15px; }
+/* a heading inside it ("Can hold"), and plain lines (its key, "Empty", "and 4 more") */
+.tipSub { padding: 6px 10px 2px; border-top: 1px solid var(--line); color: var(--accent); font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
+.tipSub:first-child, .tipHead + .tipSub { border-top: 0; }
+.tipNote { padding: 3px 10px; color: var(--dim); }
+.tipNote.key { color: #ffb98a; }
+.tipNote:last-child, .tipList:last-child { padding-bottom: 6px; }
+
+#markers {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ui { transition: opacity 0.15s; }
+body.bare .ui { opacity: 0; pointer-events: none; }
+
+/* ---- the bar along the top ---- */
+#bar {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+#bar > * { pointer-events: auto; }
+
+#status, button, select, #findBox {
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  padding: 0 11px;
+}
+#bar > * {
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+#status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--bright);
+}
+/* the name in the bar: the logo, the word and the version as a small tag (who made it: #credit, bottom left) */
+#brand { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 2px; color: var(--bright); white-space: nowrap; }
+#brand img { border-radius: 6px; flex: none; }
+#brand .word { font-size: 15px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+#brand .ver { padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em; }
+#dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+#status.raid #dot { background: var(--on); box-shadow: 0 0 7px var(--on); }
+#status.menu #dot { background: var(--accent); }
+#status.gone #dot { background: var(--off); }
+/* in a raid, looking at another map: the status takes you back, as the button beside it does */
+#status.away { cursor: pointer; }
+#backRaid { flex: none; border-color: var(--line-strong); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+#backRaid[hidden] { display: none; }
+
+button { cursor: url("cursors/hand.png") 7 6, pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+button:disabled { color: var(--dim); cursor: url("cursors/idle.png") 2 2, default; opacity: 0.6; }
+button:hover:not(:disabled), select:hover { border-color: var(--line-strong); color: var(--bright); }
+button.on { background: var(--accent-soft); border-color: var(--line-strong); color: var(--accent); }
+select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
+/* the search box: what it finds is counted beside it. Its width is fixed, so the count and the cross appearing take
+   room from the text and never push the rest of the bar along */
+#findBox {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  width: 250px;
+  max-width: 46vw;
+  padding: 0 10px;
+}
+#findBox::before { content: '⌕'; color: var(--dim); font-size: 16px; line-height: 1; }
+#findBox:focus-within { border-color: var(--line-strong); }
+#find {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+#find::placeholder { color: var(--dim); }
+#findCount { color: #ffe14d; white-space: nowrap; }
+#findCount:empty { display: none; }
+/* the search cleared: back to the map as it was */
+#findClear {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 22px;
+}
+#findClear:hover { background: var(--accent-soft); color: var(--bright); }
+#findClear[hidden] { display: none; }
+/* the browser's own little cross: there's one of ours */
+#find::-webkit-search-cancel-button { display: none; }
+/* what the search finds, under the box: a row each, pressed to go there (again: the next one) */
+#findList {
+  position: fixed;
+  z-index: 3;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+#findList[hidden] { display: none; }
+#findList .hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: url("cursors/hand.png") 7 6, pointer;
+}
+#findList .hit:hover { background: var(--hover); color: var(--bright); }
+#findList .hit b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; }
+#findList .hit small { flex: none; color: var(--dim); }
+#findList .hit em { flex: none; min-width: 2.2em; text-align: right; color: #ffe14d; font-style: normal; font-variant-numeric: tabular-nums; }
+#findList .none { padding: 8px 10px; color: var(--dim); }
+
+/* the options are on the right, where their panel opens */
+#options { margin-left: auto; }
+select option { background: #1a1a24; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+#levels {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+#levels button {
+  text-align: left;
+  height: 30px;
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#levels:empty, body.blocked #levels { display: none; }
+
+/* ---- the menu: one panel on the right, a tab each for the raid, its loot, the quests, the map and the settings ---- */
+#panel {
+  position: fixed;
+  top: max(50px, calc(env(safe-area-inset-top) + 50px));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  width: min(350px, calc(100vw - 16px));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: var(--shadow);
+  /* clicking a switch or its words doesn't select them */
+  -webkit-user-select: none;
+  user-select: none;
+}
+#panel[hidden], #panelBody > section[hidden] { display: none; }
+/* ---- the Raid list: a panel of its own on the left, as tall as who's in it (on a phone it's in the menu) ---- */
+#side {
+  position: fixed;
+  top: max(50px, calc(env(safe-area-inset-top) + 50px));
+  left: max(8px, env(safe-area-inset-left));
+  max-height: calc(100% - max(50px, calc(env(safe-area-inset-top) + 50px)) - max(8px, env(safe-area-inset-bottom)));
+  width: min(330px, calc(100vw - 16px));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: var(--shadow);
+  -webkit-user-select: none;
+  user-select: none;
+}
+#side[hidden] { display: none; }
+#sideHead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 3px 5px 3px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+#sideHead b { flex: 1; font-weight: 600; }
+#sideClose { flex: none; width: 28px; height: 28px; padding: 0; border-color: transparent; background: transparent; font-size: 18px; line-height: 1; color: var(--dim); }
+#sideClose:hover { background: var(--hover); }
+/* the Raid list's buttons, in its title bar: a matching pair, the one switched on highlighted */
+#sideHead #squadBtn, #sideHead #sideSort { flex: none; height: 22px; margin: 0 4px 0 0; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-small);
+  background: transparent; color: var(--dim); font-size: 11.5px; letter-spacing: normal; text-transform: none; }
+#sideHead #squadBtn:hover, #sideHead #sideSort:hover { background: var(--hover); color: var(--bright); }
+#sideHead #squadBtn.on, #sideHead #sideSort.on { background: var(--accent-soft); border-color: var(--line-strong); color: var(--accent); }
+#sideHead #squadBtn[hidden] { display: none; }
+#sideBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 8px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+#listBtn.on { border-color: var(--line-strong); color: var(--accent); }
+/* swapped: the menu on the left, the Raid list on the right */
+@media (min-width: 701px) and (min-height: 521px) {
+  body.swap #panel { right: auto; left: max(8px, env(safe-area-inset-left)); }
+  body.swap #side { left: auto; right: max(8px, env(safe-area-inset-right)); }
+}
+#panelHead {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 5px 5px 0 6px;
+  border-bottom: 1px solid var(--line);
+}
+#tabs { flex: 1; display: flex; min-width: 0; }
+#tabs button {
+  /* as wide as its word needs, the room left over shared out: a long word ("Einstellungen") takes more */
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+#tabs button:hover { background: var(--hover); color: var(--bright); }
+#tabs button.on { border-bottom-color: var(--accent); color: var(--accent); background: transparent; }
+#panelClose, #sideSort { height: 28px; border-color: transparent; background: transparent; }
+#panelClose { flex: none; width: 28px; margin-top: 2px; padding: 0; font-size: 18px; line-height: 1; color: var(--dim); }
+#sideSort { flex: none; margin-left: auto; padding: 0 9px; font-size: 12px; color: var(--dim); }
+#sideSort.on { background: var(--accent-soft); border-color: var(--line-strong); color: var(--accent); }
+#panelClose:hover, #sideSort:hover { background: var(--hover); }
+#panelBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 12px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+#panelBody::-webkit-scrollbar { width: 8px; }
+#panelBody::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(255, 255, 255, 0.16); }
+#panel p { margin: 6px 0; color: var(--dim); font-size: 12px; line-height: 1.45; }
+#panel p.credit { font-size: 11px; }
+#panel p.credit a { color: inherit; cursor: url("cursors/hand.png") 7 6, pointer; }
+#about { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+#about img { border-radius: 7px; flex: none; }
+#about div { line-height: 1.3; }
+#about .ver { color: var(--dim); font-size: 11px; }
+#about small { color: var(--dim); font-size: 11px; }
+#about small b { color: var(--accent); font-weight: 600; }
+#panel details.group > p { margin: 0 0 4px; }
+/* a tab's own tools, over its list */
+.tabTools { display: flex; align-items: center; gap: 6px; min-height: 30px; margin-bottom: 2px; }
+/* a row of buttons of which one is on, and under it what that one means */
+.segHead { margin: 4px 2px 5px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: var(--radius-small); overflow: hidden; }
+.seg button {
+  /* as wide as its words need, the room left over shared out */
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.seg button:first-child { border-left: 0; }
+.seg button.on { background: var(--accent); color: var(--ink); font-weight: 600; }
+.seg button.on:hover { color: var(--ink); }
+#panel .seg + p { min-height: 2.9em; margin: 5px 2px 6px; }
+#bestRealBox[hidden], #bestCanBox[hidden] { display: none; }
+/* a tab in parts: the row of its parts, under the tabs */
+.subTabs { display: flex; gap: 6px; margin: 2px 0 10px; }
+.subTabs button { flex: 1 1 0; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--dim); font-size: 12px; white-space: nowrap; }
+.subTabs button.on { border-color: transparent; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.view[hidden] { display: none; }
+/* a few switches boxed together */
+#panel .card { margin: 0 0 8px; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.025); }
+#panel .card + .legend { margin: 0 2px 12px; }
+/* nothing to list: said in a box of its own, not a stray line */
+#questList:not(:has(> details)), #bestNone { padding: 18px 12px; border: 1px dashed var(--line); border-radius: var(--radius-small); text-align: center; }
+/* on a phone: the lists of maps and players and the spare buttons, at the top of the Map tab */
+#quick { display: flex; flex-wrap: wrap; gap: 6px; }
+#quick:empty { display: none; }
+#quick select { flex: 1 1 140px; max-width: none; min-width: 0; }
+#quick button { flex: 1 1 auto; }
+#quick [hidden] { display: none; }
+
+/* a panel's groups: each opens and shuts by its title */
+details.group { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+details.group:last-child { border-bottom: 0; }
+details.group:not([open]) { padding-bottom: 0; }
+details.group > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 10px 2px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  cursor: url("cursors/hand.png") 7 6, pointer;
+}
+details.group > summary:hover { color: var(--bright); }
+details.group > summary::-webkit-details-marker { display: none; }
+/* a chevron: pointing right while shut, down while open */
+details.group > summary::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border: solid var(--dim);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+details.group[open] > summary::after { transform: rotate(45deg); }
+
+/* ---- the options' rows ---- */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border-radius: 6px;
+  cursor: url("cursors/hand.png") 7 6, pointer;
+}
+.row:hover { background: var(--hover); }
+.row > span { flex: 1; min-width: 0; }
+.row small { color: var(--dim); font-variant-numeric: tabular-nums; }
+/* a switch: off to the left, on (in the accent) to the right */
+.row input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 28px;
+  height: 16px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: inherit;
+  transition: background 0.15s;
+}
+.row input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #cfd2d6;
+  transition: transform 0.15s, background 0.15s;
+}
+.row input[type="checkbox"]:checked { background: var(--accent); }
+.row input[type="checkbox"]:checked::after { transform: translateX(12px); background: var(--ink); }
+.row input[type="checkbox"]:disabled { opacity: 0.4; }
+.row.blocked { color: var(--dim); cursor: not-allowed; }
+.row.blocked:hover { background: transparent; }
+.swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.row > .swatch + span { flex: 1; }
+.row.blocked .swatch { opacity: 0.4; }
+/* a row with a slider or a list: only those are pressed, so the arrow over its words, the hand over them */
+.row.range { justify-content: space-between; cursor: url("cursors/idle.png") 2 2, default; }
+.row.range input, .row.range select, input[type="range"] { cursor: url("cursors/hand.png") 7 6, pointer; }
+#find { cursor: url("cursors/idle.png") 2 2, text; }
+.row.range:hover { background: transparent; }
+.row.range > span { flex: none; }
+.row.range input, .row.range select { flex: 1; min-width: 60px; max-width: 170px; accent-color: var(--accent); }
+/* a long name shrinks rather than push its slider off the panel */
+.row.range > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.range select { height: 28px; padding: 0 6px; background: rgba(255, 255, 255, 0.05); }
+.row.sub { padding-left: 30px; min-height: 26px; font-size: 13px; color: var(--dim); }
+.row.range.sub { padding-left: 30px; }
+/* a setting that goes with a switch that is off: put away */
+.row[hidden] { display: none; }
+.filterHead { margin: 10px 0 3px 2px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); }
+.filterGrid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+/* a section of the grid: its title across both columns, a hairline over it */
+.filterGrid .filterHead.sect { grid-column: 1 / -1; margin: 8px 0 2px; padding: 7px 2px 0; border-top: 1px solid var(--line); color: var(--text); }
+.filterGrid .filterHead.sect:first-child { margin-top: 2px; padding-top: 2px; border-top: 0; }
+/* small words to press in a heading (All, None) */
+.linkBtn { margin-left: 6px; padding: 0 4px; height: auto; border: 0; background: none; color: var(--accent); font: inherit; letter-spacing: 0.04em; cursor: url("cursors/hand.png") 7 6, pointer; }
+.linkBtn:hover { text-decoration: underline; background: none; }
+/* the Raid list without who's alive: ? or Dead */
+.sideRow small.far.fog { color: var(--dim); text-align: center; }
+.sideRow small.far.fog.dead { color: #ff8d84; }
+.filterGrid .row { min-height: 27px; gap: 8px; font-size: 13px; }
+/* a switch under another: in line with that one's name, smaller */
+.filterGrid .row.sub { grid-column: 1 / -1; gap: 8px; min-height: 24px; padding-left: 52px; margin-top: -3px; font-size: 12.5px; }
+.row.sub input[type="checkbox"] { width: 24px; height: 14px; }
+.row.sub input[type="checkbox"]::after { width: 10px; height: 10px; }
+.row.sub input[type="checkbox"]:checked::after { transform: translateX(10px); }
+
+/* what each picture on the map is */
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin: 4px 0 6px; font-size: 12.5px; color: var(--text); }
+.legend span { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.legend b {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.04);
+  font-size: 13px; font-weight: normal;
+}
+.legend b.letter { width: auto; padding: 0 5px; font-size: 11px; font-weight: bold; color: var(--bright); }
+.legend b.star { color: #ffe14d; }
+.legend b.quest {
+  border: 0; background: #ffe14d; color: var(--ink); font-weight: bold;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+/* the Loot tab's key: a filled dot, a ring, a round badge */
+.legend b.dot, .legend b.ring { border: 0; background: none; }
+.legend b.dot::before, .legend b.ring::before {
+  content: ''; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1.5px #000;
+  background: var(--col);
+}
+.legend b.ring::before { width: 8px; height: 8px; background: rgba(20, 20, 28, 0.55); border: 2px solid var(--col); }
+.legend b.round { border-radius: 50%; }
+.legend b.quest.can { background: #4a4214; color: #ffe14d; }
+.legend b.pic { border: 0; background: none; }
+.legend b.pic img { display: block; }
+/* the corpse in the key: a cross, as on the map */
+.legend b.corpse { color: #aab4c0; font-weight: bold; }
+
+/* the quests */
+#questList { color: var(--dim); font-size: 13px; }
+#panel details.quest > summary {
+  margin: 6px 0 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: url("cursors/hand.png") 7 6, pointer;
+}
+#panel details.quest.here > summary { color: #ffe14d; }
+.goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0 3px 14px;
+  color: var(--dim);
+  font-size: 12.5px;
+}
+.goal button { flex: none; height: 24px; padding: 0 8px; font-size: 11.5px; background: rgba(255, 255, 255, 0.05); }
+.goalNote { flex: none; font-size: 11.5px; color: var(--dim); font-style: italic; }
+
+/* ---- the raid's lists: who is in it, and the best loot ---- */
+#roster, #bestLoot, #bestCan { color: var(--dim); font-size: 12.5px; }
+/* how many of each kind there are */
+#rosterSum { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.sideRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 27px;
+  padding: 0 7px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+}
+.sideRow:hover:not(:disabled) { background: var(--hover); color: var(--bright); }
+.sideRow > span:not(.chips) { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sideRow small { flex: none; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+/* how far off they are */
+.sideRow small.far { color: #a9c4d8; }
+.sideRow small.far:empty { display: none; }
+/* in the list of who's here, how far and what level stand in columns of their own, whoever has them */
+#roster .sideRow small { min-width: 34px; text-align: right; }
+#roster .sideRow small.far { min-width: 44px; }
+#roster .sideRow small.far:empty { display: block; }
+/* a bot's row: what it's like and is up to, as tags under its name */
+.sideRow { position: relative; }
+.sideRow.two { height: auto; flex-wrap: wrap; row-gap: 2px; padding: 3px 7px 5px; }
+/* how much health is left: a thin bar along the bottom of the row */
+.hpBar { position: absolute; left: 25px; right: 7px; bottom: 1px; height: 2px; border-radius: 1px; background: rgba(200, 205, 255, 0.09); overflow: hidden; text-decoration: none; }
+.hpBar b { display: block; height: 100%; border-radius: 1px; }
+/* one line each: the name, then what it's doing */
+.sideRow.slim > span:not(.chips) { flex: 1 1 42%; }
+.sideRow.slim > .chip { flex: 0 1 auto; max-width: 40%; display: block; }
+.sideRow.slim.open { height: auto; flex-wrap: wrap; padding: 4px 7px 5px; }
+/* a group's title: pressed, folds the group away */
+button.filterHead.fold { display: flex; align-items: center; gap: 5px; width: 100%; height: auto; margin: 7px 0 2px; padding: 2px; border: 0; border-radius: 4px; background: transparent; text-align: left; }
+button.filterHead.fold::before { content: ''; flex: none; width: 5px; height: 5px; margin: 0 3px 2px 1px; border: solid var(--dim); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+button.filterHead.fold.shut::before { transform: rotate(-45deg); margin-bottom: 0; }
+button.filterHead.fold:hover { color: var(--bright); background: var(--hover); }
+#rosterSum .chip.count { cursor: url("cursors/hand.png") 7 6, pointer; }
+#rosterSum .chip.count.shut { opacity: 0.45; }
+/* a panel within a panel: a box of its own, with a smaller title */
+details.group.sub { margin: 8px 0 2px; padding: 0 10px 6px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.025); }
+details.group.sub:not([open]) { padding-bottom: 0; }
+details.group.sub:last-child { border: 1px solid var(--line); }
+details.group.sub[hidden] { display: none; }
+details.group.sub > summary { padding: 8px 2px 7px; font-size: 10.5px; color: var(--dim); }
+details.group.sub > p { margin: 0 0 6px; font-size: 11.5px; color: var(--dim); }
+/* the one the map follows, and the one whose gear is set out */
+.sideRow.chased { border-left-color: #5fd4ff; background: rgba(95, 212, 255, 0.08); }
+.sideRow.open { background: rgba(255, 255, 255, 0.05); }
+/* in a fight: a red edge */
+.sideRow.fight { border-left-color: #ff5148; background: rgba(255, 81, 72, 0.07); }
+/* its tags: what it's up to is written out in full, on a line of its own when there's no room beside the others; its worth is always at the right */
+/* always in the same places, at the same sizes: difficulty | personality | worth, then a line of what it's doing
+   (and its squad's part beside it), cut short with an ellipsis; the full text is in each tag's hint */
+/* all on one line: difficulty | personality | what it's doing (and its squad's part) | worth */
+.chips { flex: 0 0 100%; display: grid; grid-template-columns: 66px 62px minmax(0, 1fr) auto; align-items: center; gap: 3px; min-width: 0; height: 18px; padding-left: 18px; }
+.chips .chip { display: block; min-width: 0; padding: 0 5px; text-align: center; }
+.chips .chip.df { grid-column: 1; }
+.chips .chip.ps { grid-column: 2; }
+.chips .chip.loot { grid-column: 4; text-align: right; }
+.chips .doing { grid-column: 3; display: flex; gap: 3px; min-width: 0; height: 18px; }
+.chips.noPs .doing { grid-column: 2 / 4; }
+.chips .doing .chip { flex: 1 1 0; text-align: left; }
+/* what the one pressed wears and carries: where it's worn, what it is, what it's worth */
+.gear {
+  flex: 0 0 100%;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 2px 8px;
+  min-width: 0;
+  margin: 3px 0 1px 18px;
+  padding: 5px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.gear i { color: var(--dim); font-style: normal; }
+.gear span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.gear em { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--dim);
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* how hard the bot is */
+.chip.df-easy { color: #8fe39a; background: rgba(61, 220, 90, 0.13); }
+.chip.df-normal { color: #cfd2d6; }
+.chip.df-hard { color: #ffbe5c; background: rgba(255, 177, 61, 0.14); }
+.chip.df-impossible { color: #ff8d84; background: rgba(255, 81, 72, 0.16); }
+/* its SAIN personality: the bold ones warm, the timid ones cool */
+.chip.ps { color: #dcc0ff; background: rgba(199, 125, 255, 0.15); }
+.chip.ps.hot { color: #ffb08a; background: rgba(255, 122, 61, 0.16); }
+.chip.ps.meek { color: #9be0d6; background: rgba(51, 214, 192, 0.13); }
+/* who decides for it now */
+.chip.bySAIN { color: #ff8d84; border-color: rgba(255, 81, 72, 0.45); background: transparent; }
+.chip.bySAIN.fight { color: #fff; border-color: #ff5148; background: #d63a32; }
+.chip.byCOMET { color: #ffc56e; border-color: rgba(255, 177, 61, 0.5); background: transparent; }
+.chip.byCOMET.fight { color: #1b1408; border-color: #ffb13d; background: #f0a030; }
+/* what COMET has its squad doing together: solid once the bot is doing it */
+.chip.bySquad { color: #ffe2a8; border: 1px dashed rgba(255, 177, 61, 0.6); background: transparent; }
+.chip.bySquad.fight { color: #1b1408; border: 1px solid #ffb13d; background: #ffcf7a; }
+.chip.byORBIT { color: #9fd8ff; border-color: rgba(74, 168, 255, 0.45); background: transparent; }
+
+.chip.byEFT { color: var(--dim); border-color: var(--line); background: transparent; }
+/* what it carries: in its worth's colour */
+.chip.loot { background: rgba(255, 255, 255, 0.06); font-variant-numeric: tabular-nums; }
+/* a count of one kind, with its colour */
+.chip.count { color: var(--text); font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.chip.count b { width: 8px; height: 8px; border-radius: 2px; }
+/* PMCs that came in together */
+.sideGroup { margin: 3px 0; padding: 2px 0 2px 4px; border-left: 2px solid rgba(255, 81, 72, 0.7); border-radius: 2px; }
+.sideGroup > small { display: block; padding: 0 7px; color: var(--dim); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.sideGroup.acting { border-left-color: #ffb13d; }
+.sideGroup > small.tactic { color: #ffe2a8; text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 600; }
+.sideGroup > small.tactic.going { color: #ffb13d; }
+/* what squads did, as it changed */
+.squadLog { margin: 10px 0 4px; border-top: 1px solid var(--line); padding-top: 6px; }
+.squadLog > summary { cursor: pointer; padding: 2px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); }
+.squadEvent { display: grid; grid-template-columns: 38px 1fr; gap: 0 6px; width: 100%; height: auto; padding: 3px 4px; border-color: transparent; background: transparent; text-align: left; font-size: 12px; line-height: 1.3; }
+.squadEvent:hover { background: var(--hover); }
+.squadEvent > time { grid-row: span 2; color: var(--dim); font-variant-numeric: tabular-nums; }
+.squadEvent > b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.squadEvent > span { color: #ffc56e; min-width: 0; }
+/* a switch for a mod the game hasn't: greyed, not pressed */
+label.row.unavailable { opacity: 0.42; cursor: not-allowed; }
+label.row.unavailable input { cursor: not-allowed; }
+.seg > button[hidden] { display: none; }
+.seg > button:disabled { cursor: default; }
+/* the squad's events, beside the Raid list */
+#squadBtn { height: 24px; padding: 0 9px; font-size: 11.5px; }
+#squadBtn[hidden] { display: none; }
+#squadBtn.on { border-color: var(--line-strong); color: var(--bright); }
+#squadPane { position: fixed; z-index: 2; width: 290px; max-height: min(480px, calc(100% - 120px)); display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); box-shadow: var(--shadow); }
+#squadPane[hidden] { display: none; }
+#squadHead { display: flex; align-items: center; padding: 7px 8px 6px 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+#squadHead b { flex: 1; font-weight: 600; }
+#squadHead button { width: 24px; height: 24px; padding: 0; border-color: transparent; background: transparent; font-size: 16px; }
+/* a panel picked up by its head (see draggable): it follows the pointer, a little see-through, over everything */
+@media (min-width: 701px) and (min-height: 521px) {
+  .dragHandle { cursor: grab; touch-action: none; }
+  .dragHandle button { cursor: pointer; }
+}
+/* (panelMoving, not dragging: that one is the map's own while it's panned) */
+.panelMoving { z-index: 50 !important; transition: none !important; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.panelMoving, .panelMoving * { cursor: grabbing !important; user-select: none; }
+/* the grid a panel is put down on (see snapPanel's GRID), faint over the map while one is moved */
+body.gridOn::after { content: ''; position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 20px 20px; }
+/* only the list gives way when the panel is full: the head and the tabs keep their height */
+#squadHead, #squadKinds { flex: none; }
+#squadBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 6px 6px; }
+.tacticSquad { display: grid; width: calc(100% - 4px); height: auto; text-align: left; cursor: pointer; border: 0; border-left: 2px solid var(--line-strong); }
+.tacticSquad:hover { background: var(--hover); }
+.tacticSquad small { color: var(--text); }
+.tacticSquad small.plan { color: var(--dim); }
+.tacticSquad.going small.plan { color: #ffc56e; }
+.tacticBack { margin: 2px 2px 6px; }
+/* the kill feed: in the bottom corner by the menu */
+#killFeed { position: fixed; z-index: 2; bottom: 10px; right: 10px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px; max-width: min(520px, calc(100vw - 24px)); pointer-events: none; }
+#killFeed { max-height: calc(100% - 70px); }
+#killList { min-height: 0; overflow: hidden; }
+#killList .kill { flex: none; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 1px #000; }
+#killList .kill small, #killList .kill time { color: #c9d2dd; }
+#killFeed.toLeft { align-items: flex-start; }
+#killFeed.toLeft #killList { align-items: flex-start; }
+#killFeed[hidden] { display: none; }
+/* at the top of the screen: the Kills button first, the newest kill nearest it */
+#killFeed.toTop { flex-direction: column-reverse; justify-content: flex-end; max-height: calc(100% - 120px); }
+/* put where it was dragged to: the Kills button on the far side from the window's edge, so the kills themselves can
+   sit right against it */
+#killFeed.free { flex-direction: column-reverse; }
+#killFeed.free.toTop { flex-direction: column; justify-content: flex-start; }
+/* its count (pressed: folds the kills away and back) and its × (turns the feed off) */
+#killHead { display: flex; gap: 4px; pointer-events: auto; }
+#killCount, #killClose { pointer-events: auto; height: 20px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--line); background: rgba(12, 12, 18, var(--feed-bg, 0.3));
+  color: var(--dim); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+#killClose { width: 20px; padding: 0; font-size: 13px; line-height: 1; letter-spacing: 0; }
+#killClose:hover { color: var(--text); border-color: var(--dim); }
+#killList { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; max-width: 100%; }
+#killList[hidden] { display: none; }
+/* all in one box (Map > Kill feed > All in one box) */
+#killList.box { align-items: stretch; padding: 5px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(12, 12, 18, var(--feed-bg, 0.3)); }
+#killList.box .kill { background: transparent; }
+.kill { display: flex; align-items: baseline; gap: 7px; max-width: 100%; padding: 2px 10px; border-radius: 6px; background: rgba(12, 12, 18, var(--feed-bg, 0.3));
+  font-size: 12.5px; line-height: 1.5; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.kill b { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kill i { font-style: normal; color: #d3dbe5; font-size: 11.5px; padding: 0 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); }
+.kill small { color: var(--dim); font-size: 11px; }
+.kill time { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 34px; }
+.chip.byQuestingBots, .chip.byPhobos { color: #b7e3a1; border-color: rgba(120, 200, 90, 0.45); background: transparent; }
+.chips .doing .chip.cheat { flex: 0 0 auto; color: #fff; border-color: #ff3b30; background: #b3261e; }
+#squadKinds { margin: 6px 6px 2px; }
+#squadKinds button { height: 22px; font-size: 11px; padding: 0 6px; }
+#squadBody { font-size: 12px; color: var(--dim); }
+.moreBtn { width: 100%; height: 26px; margin-top: 4px; border-color: transparent; background: var(--hover); color: var(--dim); font-size: 12px; }
+
+/* ---- bottom left: the scale, and where the pointer and the player are ---- */
+#readout {
+  position: fixed;
+  /* clear of whichever panel is open on the left */
+  left: calc(var(--left-cover, 0px) + max(10px, env(safe-area-inset-left)));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 11.5px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+/* each keeps its line while it has nothing to say, so the scale above stays where it is */
+#cursorAt, #playerAt { min-height: 1.35em; white-space: nowrap; }
+/* so many metres, as long as they are on the screen */
+#scaleBar {
+  min-width: 20px;
+  margin-bottom: 3px;
+  padding: 0 4px 1px;
+  border: solid rgba(255, 255, 255, 0.85);
+  border-width: 0 1.5px 1.5px;
+  color: var(--bright);
+  text-align: center;
+  white-space: nowrap;
+  filter: drop-shadow(0 0 2px #000);
+}
+#scaleBar[hidden] { display: none; }
+/* whose map this is, the way a map says it: small, in the corner under the scale. Pressed: the credits */
+#credit {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-shadow: inherit;
+  opacity: 0.85;
+  pointer-events: auto;
+}
+#credit:hover { color: var(--text); opacity: 1; }
+/* "Show speed numbers": frames, page work and the game's reports, under the bar */
+#speedLine {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  top: max(100px, calc(env(safe-area-inset-top) + 100px));
+  z-index: 3;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre;
+  pointer-events: none;
+}
+#speedLine[hidden] { display: none; }
+/* the language picker: a small button saying which language it is (EN, DE); the list it opens is the select's own,
+   laid over the button unseen, so it's the phone's or browser's own list */
+#langBox, #findBox, #status { box-sizing: border-box; }
+#langBox {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--panel);
+  color: var(--text);
+  white-space: nowrap;
+}
+#langBox:hover, #langBox:focus-within { border-color: var(--line-strong); color: var(--bright); }
+#langBox select { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; padding: 0; border: 0; opacity: 0; }
+@media (hover: none), (pointer: coarse) { #langBox { height: 40px; } }
+/* Chinese, Japanese and Korean have no capitals, and letters spaced apart read badly in them */
+:lang(zh) *, :lang(ja) *, :lang(ko) * { letter-spacing: 0 !important; }
+
+#hint {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  font-size: 11.5px;
+  color: var(--dim);
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+body.rightOn #hint { display: none; }
+/* the kinds of loot spawn point on the map, and what each usually holds: in the Loot tab */
+#spawnIndex[hidden] { display: none; }
+#spawnKinds { font-size: 12px; }
+#spawnKinds .kind { padding: 5px 0; border-top: 1px solid var(--line); }
+#spawnKinds .kind:first-child { border-top: 0; }
+#spawnKinds b { color: var(--bright); }
+#spawnKinds em { float: right; color: #ffe14d; font-style: normal; font-variant-numeric: tabular-nums; }
+#spawnKinds p { margin: 2px 0 0; color: var(--dim); line-height: 1.35; }
+
+#notice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: min(520px, calc(100vw - 32px));
+  z-index: 1;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  text-align: center;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#notice[hidden] { display: none; }
+#notice.soft {
+  top: auto;
+  bottom: max(40px, calc(env(safe-area-inset-bottom) + 40px));
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  pointer-events: none;
+}
+/* about an add-on the player is missing (or a map no add-on has): stands out, and its words can be copied */
+#notice.warn {
+  border-color: var(--accent);
+  background: rgba(12, 40, 44, 0.97);
+  color: var(--bright);
+}
+#notice.soft.warn {
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13.5px;
+  pointer-events: auto;
+}
+
+/* following set aside while the map is dragged about */
+button.paused { border-color: var(--line-strong); color: var(--accent); }
+
+/* what's been spotted: said at the top, each gone after a while or when pressed */
+#toasts {
+  position: fixed;
+  left: 50%;
+  top: max(96px, calc(env(safe-area-inset-top) + 96px));
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+.toast {
+  height: auto;
+  min-height: 34px;
+  padding: 6px 14px;
+  border-width: 1px 1px 1px 4px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  color: var(--bright);
+  font-weight: 600;
+  white-space: normal;
+  text-align: left;
+  pointer-events: auto;
+}
+
+/* ---- touch screens: bigger things to press, nothing that needs a mouse ---- */
+button, select, input, summary, .row { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+@media (hover: none), (pointer: coarse) {
+  #hint, #cursorAt { display: none; }
+  #status, button, select, #findBox { height: 40px; }
+  #tabs button { height: 42px; }
+  #panelClose { width: 40px; height: 40px; }
+  #sideSort { height: 36px; }
+  .seg button { height: 40px; }
+  .row { min-height: 40px; }
+  .filterGrid .row { min-height: 38px; }
+  .filterGrid .row.sub { min-height: 34px; }
+  .row input[type="checkbox"] { width: 38px; height: 22px; }
+  .row input[type="checkbox"]::after { width: 18px; height: 18px; }
+  .row input[type="checkbox"]:checked::after { transform: translateX(16px); }
+  .row.sub input[type="checkbox"] { width: 32px; height: 18px; }
+  .row.sub input[type="checkbox"]::after { width: 14px; height: 14px; }
+  .row.sub input[type="checkbox"]:checked::after { transform: translateX(14px); }
+  .row.range input[type="range"] { height: 28px; }
+  .row.range select { height: 36px; }
+  details.group > summary { padding: 13px 2px 11px; }
+  .goal button { height: 34px; padding: 0 12px; }
+  .sideRow { height: 38px; font-size: 14px; }
+  .sideRow.two { height: auto; padding: 7px 7px 8px; }
+  .chip { font-size: 11.5px; line-height: 19px; }
+  .moreBtn { height: 38px; }
+  .toast { min-height: 40px; }
+  /* 16px keeps a phone from zooming the page in when the search box is tapped */
+  #find { font-size: 16px; }
+}
+
+/* ---- phones, upright or on their side: one short bar (who's playing, search, follow, the menu); the rest is in
+   the menu, which is a sheet ---- */
+@media (max-width: 700px), (max-height: 520px) {
+  /* no frosted glass on a phone (it's slow there): the panels are plain, and darker so what's behind doesn't show */
+  :root { --panel: var(--panel-solid); }
+  #bar > *, #panel, #side { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  #side, #listBtn { display: none; }
+  /* the kill feed: bottom right, above the menu's sheet when it's open (or beside it, the phone on its side) */
+  #killFeed { bottom: calc(var(--cover-b, 0px) + max(10px, env(safe-area-inset-bottom))); right: calc(var(--cover-r, 0px) + max(10px, env(safe-area-inset-right))); max-height: 45%; }
+  #bar { flex-wrap: wrap; gap: 5px; }
+  #status { flex: 1 1 0; min-width: 0; padding: 0 9px; }
+  #statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #follow, #options { flex: none; padding: 0 12px; }
+  #brand { flex: none; padding: 0 2px; }
+  #brand .word, #brand .ver { display: none; }
+  #options { margin-left: 0; font-size: 17px; }
+  #options span { display: none; }
+  /* the search box: a button until it's pressed or has something in it */
+  #findBox { flex: none; width: 40px; max-width: none; padding: 0; justify-content: center; gap: 0; }
+  #findBox #find { width: 0; flex: 0 0 0; padding: 0; opacity: 0; }
+  #findBox:focus-within, #findBox.has { justify-content: flex-start; gap: 6px; padding: 0 10px; }
+  #findBox:focus-within #find, #findBox.has #find { flex: 1; width: auto; min-width: 0; max-width: none; opacity: 1; }
+  /* bottom left on a phone: only the maker's line, above the menu's sheet when it's open */
+  #readout { bottom: calc(var(--cover-b, 0px) + max(8px, env(safe-area-inset-bottom))); }
+  #readout > :not(#credit) { display: none; }
+  #tip { max-width: calc(100vw - 16px); font-size: 13px; }
+  #panel { background: var(--panel-solid); }
+  #tabs button { letter-spacing: 0.03em; }
+}
+/* upright: the menu comes up from the bottom, over the lower half at most */
+@media (max-width: 700px) {
+  /* the search box, open: a row of its own under the bar */
+  #findBox:focus-within, #findBox.has { order: 9; flex: 1 0 100%; }
+  #panel {
+    top: auto;
+    left: max(0px, env(safe-area-inset-left));
+    right: max(0px, env(safe-area-inset-right));
+    bottom: 0;
+    width: auto;
+    /* the same height whichever tab is open: a short tab doesn't make the sheet jump */
+    height: 52vh;
+    border-radius: 14px 14px 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #notice.soft { bottom: auto; top: max(104px, calc(env(safe-area-inset-top) + 104px)); }
+}
+/* on its side: the menu down the right, the full height; the bar keeps to the left of it */
+@media (max-height: 520px) and (min-width: 701px) {
+  #findBox:focus-within, #findBox.has { flex: 1 1 160px; width: auto; }
+  #panel {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: min(340px, 46vw);
+    border-radius: 14px 0 0 14px;
+    border-width: 0 0 0 1px;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) 0;
+  }
+  body.menu #toasts { left: calc(50% - min(170px, 23vw)); }
+  body.menu #bar { right: calc(min(340px, 46vw) + max(8px, env(safe-area-inset-right))); }
+  body.menu #floorBadge { left: calc(50% - min(170px, 23vw)); }
+  .filterGrid { column-gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui, button, .row input[type="checkbox"], .row input[type="checkbox"]::after, details.group > summary::after { transition: none; }
+}
+
+/* Settings, Colours: a row for each kind of marker, its colour picked or typed as a hex code */
+#colorList .filterHead { margin-top: 8px; }
+.colRow { gap: 9px; min-height: 30px; font-size: 13px; }
+.colRow > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colRow .sw { position: relative; flex: none; width: 26px; height: 20px; border-radius: 5px; }
+.colRow .sw:focus-within { outline: 1px solid var(--accent); outline-offset: 2px; }
+.colRow input[type="color"] {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer;
+}
+.colRow input.hex {
+  flex: none; width: 76px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px;
+  background: rgba(0, 0, 0, 0.25); color: var(--text); font: 12px/1.4 ui-monospace, Consolas, monospace;
+  -webkit-user-select: text; user-select: text;
+}
+.colRow input.hex:focus { outline: none; border-color: var(--accent); }
+.colRow input.hex.bad { border-color: var(--off); }
+.colRow.changed > span { color: var(--bright); }
+.colRow .linkBtn { flex: none; width: 18px; }
+.colRow .linkBtn[hidden] { display: inline-block; visibility: hidden; }
+#colorReset { margin-top: 8px; }
+#resetAll { display: block; margin-top: 12px; }
+/* Settings > On your phone: the code to scan, the address under it */
+#phoneBox { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 4px 0 8px; }
+#phoneBox[hidden] { display: none; }
+#phoneBox { position: relative; }
+#phoneBox.veiled #phoneCode, #phoneBox.veiled #phoneUrl, #phoneBox.veiled #phoneOthers { filter: blur(9px); pointer-events: none; user-select: none; }
+#phoneVeil { display: none; position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; background: transparent;
+  color: var(--bright); font-weight: 600; text-shadow: 0 0 4px #000, 0 0 10px #000; white-space: normal; }
+#phoneBox.veiled #phoneVeil { display: block; }
+#phoneCode canvas { display: block; width: 168px; height: 168px; border-radius: 6px; image-rendering: pixelated; }
+#phoneAddr { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#phoneUrl { color: var(--bright); font-size: 13px; user-select: all; word-break: break-all; }
+#phoneOthers { display: flex; gap: 4px 12px; flex-wrap: wrap; justify-content: center; }
+#panel .phoneHelp { color: var(--dim); font-size: 11.5px; }
+#prefsFile { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; }
+/* the headings inside a tab's part (legend, best loot): each starts a section, so it stands out over what it heads */
+.view .filterHead:not(.fold), #spawnIndex .filterHead.sect {
+  margin: 14px 0 6px; padding: 10px 2px 0; border-top: 1px solid var(--line-strong);
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent);
+}
+.view > .filterHead:first-child, .view > div:first-of-type > .filterHead:first-child, .view > p[hidden] + div > .filterHead:first-child { margin-top: 2px; padding-top: 2px; border-top: 0; }
+.view details .filterHead:not(.fold), .view .filterGrid .filterHead { margin: 10px 0 3px 2px; padding: 0; border-top: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; color: var(--dim); }
+.view .filterGrid .filterHead.sect { margin: 8px 0 2px; padding: 7px 2px 0; border-top: 1px solid var(--line); color: var(--text); }
+/* a legend's pictures are taller than its lines of text: room between the rows so their rims don't touch */
+.legend { row-gap: 10px; margin: 8px 0 10px; }
+/* the same headings and dividers through the whole menu: a section's title bold in the accent colour, a clear line
+   between sections; the titles inside a section (PMC, Scavs…) a step quieter, with a line of their own */
+#panel details.group:not(.sub) { border-bottom-color: var(--line-strong); }
+#panel details.group:not(.sub) > summary { font-size: 12px; font-weight: 700; }
+#panel .segHead { margin: 14px 0 6px; padding: 10px 2px 0; border-top: 1px solid var(--line-strong); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
+#panel section > .segHead:first-child, #panel .view > .segHead:first-child, #panel .subTabs + .view > .segHead:first-child { margin-top: 2px; padding-top: 2px; border-top: 0; }
+#panel .view > details.group:first-of-type, #panel .row.range + details.group { border-top: 1px solid var(--line-strong); margin-top: 8px; }
+#panel .filterGrid .filterHead.sect { margin: 10px 0 3px; padding: 8px 2px 0; border-top: 1px solid rgba(200, 205, 255, 0.2); font-size: 11px; font-weight: 700; color: var(--bright); }
+#panel .filterGrid .filterHead.sect:first-child { margin-top: 2px; padding-top: 2px; border-top: 0; }
+/* the page starting again by itself (another language, a reset): faded out, and in again once it's whole */
+body { transition: opacity 0.16s; }
+html.swap body { opacity: 0; transition: none; }
+/* a switch with one or two short ones under it: a row of its own, those side by side on the next line */
+.filterGrid .row.wide { grid-column: 1 / -1; }
+.filterGrid .subLine { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0 18px; margin: -2px 0 2px; padding-left: 52px; }
+.filterGrid .subLine .row.sub { padding-left: 0; margin-top: 0; }
+/* the squad tactic view, in the events panel */
+#squadPane { width: 320px; }
+#squadBody .tacticNone { margin: 10px 6px; color: var(--dim); font-size: 12px; line-height: 1.45; }
+.tacticWho { padding: 4px 6px 0; color: var(--bright); font-size: 14px; font-weight: 700; }
+.tacticSum { padding: 0 6px 6px; color: var(--dim); font-size: 11.5px; }
+.tacticCard { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; margin: 0 2px 6px; padding: 7px 10px; border-left: 2px solid var(--line-strong); border-radius: 4px; background: rgba(255, 255, 255, 0.04); }
+.tacticCard.going { border-left-color: #ffb13d; }
+.tacticCard b { color: var(--bright); font-size: 12.5px; }
+.tacticCard span { color: var(--dim); font-size: 11.5px; }
+.tacticCard.going span { color: #ffc56e; }
+.tacticCard small { grid-column: 1 / -1; color: var(--dim); font-size: 11px; }
+.tacticBot { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; height: auto; margin: 0 0 5px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius-small); background: transparent; text-align: left; }
+.tacticBot.on { border-color: var(--line-strong); }
+.tacticBot .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.tacticBot b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bright); font-size: 12.5px; }
+.tacticBot i { flex: none; font-style: normal; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.tacticBot .part { color: #ffc56e; font-size: 12px; }
+.tacticBot small { color: var(--dim); font-size: 11.5px; }
+/* a switch with the picture of what it switches */
+.filterGrid .row > img { flex: none; width: 24px; height: 24px; }
+#lootKinds .row, #boxKinds .row { min-height: 31px; }
+/* on a phone the bar has no room for it: pressing the status does the same */
+@media (max-width: 700px), (max-height: 520px) { #backRaid { display: none !important; } }

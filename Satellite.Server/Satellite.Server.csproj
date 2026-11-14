@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- Server mod: serves the web map page and the captured maps, and relays what the game plugin sees. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>Satellite.Server</RootNamespace>
+        <AssemblyName>Satellite.Server</AssemblyName>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <OutputType>Library</OutputType>
+        <Version>1.0.0</Version>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <DebugType>none</DebugType>
+        <!-- Don't put this PC's folder path into the built DLL. -->
+        <PathMap>$(MSBuildProjectDirectory)=/_/</PathMap>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="SPTarkov.Common" Version="4.1.0" />
+        <PackageReference Include="SPTarkov.DI" Version="4.1.0" />
+        <!-- Only to keep the map's own requests out of SPT's request log (QuietRequests). -->
+        <PackageReference Include="SPTarkov.Reflection" Version="4.1.0" />
+        <PackageReference Include="SPTarkov.Server.Core" Version="4.1.0" />
+        <!-- Only for the map's link in the launcher's Mod Pages. -->
+        <PackageReference Include="SPTarkov.Server.Web" Version="4.1.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The default config.jsonc, written into the mod's folder when the server starts without one. -->
+        <EmbeddedResource Include="..\config.jsonc" LogicalName="Satellite.config.jsonc" />
+    </ItemGroup>
+
+</Project>

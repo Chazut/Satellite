@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0c0c12"/>
+  <g transform="translate(276 322) scale(1 0.6) rotate(45)">
+    <rect x="-150" y="-150" width="300" height="300" rx="30" fill="#1a1a24"/>
+    <g stroke="#474a5a" stroke-linecap="round" fill="none">
+      <path d="M-20 -140 V140" stroke-width="22"/>
+      <path d="M-140 -55 H40" stroke-width="13"/>
+      <path d="M-140 45 H140" stroke-width="13"/>
+      <path d="M-20 45 L-120 145" stroke-width="11"/>
+      <path d="M40 -55 C80 -50 100 -25 100 5 C100 30 90 45 70 45" stroke-width="8"/>
+    </g>
+    <path d="M-20 -32 L18 62 L-20 40 L-58 62 Z" fill="#ffb253" transform="translate(0 2)"/>
+  </g>
+  <g stroke="#7b9cff" stroke-width="12" stroke-linecap="round" fill="none">
+    <path d="M196 196 A40 40 0 0 1 232 236" opacity="0.75"/>
+    <path d="M182 170 A68 68 0 0 1 258 246" opacity="0.4"/>
+  </g>
+  <defs>
+    <filter id="lift" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <g transform="translate(150 132) rotate(-35)" filter="url(#lift)">
+    <rect x="-86" y="-22" width="54" height="44" rx="6" fill="#3f6fd8"/>
+    <rect x="32" y="-22" width="54" height="44" rx="6" fill="#3f6fd8"/>
+    <g stroke="#9cc0ff" stroke-width="3"><path d="M-68 -22 V22 M-50 -22 V22 M50 -22 V22 M68 -22 V22"/></g>
+    <rect x="-34" y="-5" width="68" height="10" fill="#c9d1da"/>
+    <rect x="-22" y="-26" width="44" height="52" rx="10" fill="#e9edf2"/>
+    <path d="M-14 26 L0 44 L14 26 Z" fill="#c9d1da"/>
+    <circle r="8" fill="#ffb253"/>
+  </g>
+</svg>

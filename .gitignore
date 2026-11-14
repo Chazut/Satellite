@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+dist/
+
+# Release notes and mod page drafts
+Satellite Files/
+
+# This PC's SPT folder
+spt-path.txt
+
+# Other people's code, kept for reading
+_References/
+
+# Editor settings
+.vs/
+.vscode/
+*.user

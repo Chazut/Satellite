@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The game plugin: reports the raid to the server mod, which shows it in the browser over the map's picture.
+       (The pictures are taken by the separate map scanner, Satellite.Scanner.) Build it with build.ps1, which
+       passes your SPT folder. -->
+  <PropertyGroup>
+    <SharedDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shared'))</SharedDir>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>Satellite.Client</AssemblyName>
+    <RootNamespace>Satellite.Client</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Version>1.0.0</Version>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <!-- Don't put this PC's folder path into the built DLL. -->
+    <PathMap>$(MSBuildProjectDirectory)=/_/,$(SharedDir)=/_shared/</PathMap>
+
+    <!-- your SPT folder: pass -p:SPTPath=D:\SPT (build.ps1 does) -->
+    <Managed>$(SPTPath)\EscapeFromTarkov_Data\Managed</Managed>
+    <BepInExCore>$(SPTPath)\BepInEx\core</BepInExCore>
+    <SptPlugins>$(SPTPath)\BepInEx\plugins\spt</SptPlugins>
+  </PropertyGroup>
+
+  <!-- what the scanner uses too: compiled into both -->
+  <ItemGroup>
+    <Compile Include="$(SharedDir)\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx" HintPath="$(BepInExCore)\BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExCore)\0Harmony.dll" Private="false" />
+    <Reference Include="Assembly-CSharp" HintPath="$(Managed)\Assembly-CSharp.dll" Private="false" />
+    <!-- only because the game's Player class names it -->
+    <Reference Include="DissonanceVoip" HintPath="$(Managed)\DissonanceVoip.dll" Private="false" />
+    <!-- only because the game's airdrop class is built on it -->
+    <Reference Include="Sirenix.Serialization" HintPath="$(Managed)\Sirenix.Serialization.dll" Private="false" />
+    <Reference Include="Comfort" HintPath="$(Managed)\Comfort.dll" Private="false" />
+    <Reference Include="Comfort.Unity" HintPath="$(Managed)\Comfort.Unity.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(Managed)\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(Managed)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AIModule" HintPath="$(Managed)\UnityEngine.AIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(Managed)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TerrainModule" HintPath="$(Managed)\UnityEngine.TerrainModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(Managed)\UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="Newtonsoft.Json" HintPath="$(Managed)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="System.Net.Http" HintPath="$(Managed)\System.Net.Http.dll" Private="false" />
+    <Reference Include="spt-common" HintPath="$(SptPlugins)\spt-common.dll" Private="false" />
+  </ItemGroup>
+
+</Project>

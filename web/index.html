@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0c0c12">
+<title>Satellite</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="livemap.css">
+<script>
+// the page started again by itself (another language picked, or every setting reset): kept unseen until it's whole
+try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); var h = document.documentElement; h.classList.add('swap'); h.style.opacity = '0'; h.style.visibility = 'hidden'; window.swapDone = function () { h.style.transition = 'opacity 0.16s'; h.style.visibility = ''; h.style.opacity = ''; h.classList.remove('swap'); }; setTimeout(window.swapDone, 3000); } } catch (e) {}
+</script>
+</head>
+<body>
+<div id="stage">
+  <div id="layers"></div>
+  <canvas id="markers"></canvas>
+</div>
+
+<div id="notice" hidden></div>
+<div id="floorBadge" hidden><button id="floorDown" type="button" title="Floor down ( [ )" aria-label="Floor down">&#9660;</button><span id="floorText" title="Gold: a floor picked by hand. Press to go back to the floor it would show by itself"></span><button id="floorUp" type="button" title="Floor up ( ] )" aria-label="Floor up">&#9650;</button></div>
+<div id="debugLine" hidden></div>
+<div id="tip" hidden></div>
+<div id="toasts"></div>
+
+<header id="bar" class="ui">
+  <button id="brand" type="button" title="Satellite 1.0.0, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.0</span></button>
+  <div id="status" title=""><span id="dot"></span><span id="statusText">Connecting…</span></div>
+  <button id="backRaid" type="button" title="Show the map of the raid again, following the player" hidden>Back to the raid</button>
+  <select id="session" title="Whose game to show" hidden></select>
+  <select id="map" title="Map"></select>
+  <label id="findBox" title="Find loot, containers holding it, locks by their key, and quests, by name (/ to type here, Escape clears). It finds what the Loot tab is set to show: what's in this raid, what can spawn, or both."><input id="find" type="search" placeholder="Find loot, key or quest…" autocomplete="off" spellcheck="false"><small id="findCount"></small><button id="findClear" type="button" title="Clear the search: back to the map as it was (Escape)" aria-label="Clear the search" hidden>&#10005;</button></label>
+  <button id="listBtn" type="button" title="Who is in the raid: the list beside the map (P)">Raid list</button>
+  <button id="follow" type="button" title="Keep the player in the middle (;)">Follow</button>
+  <button id="fit" type="button" title="Show the whole map (0)">Whole map</button>
+  <button id="reveal" type="button" title="Outline every building that can be pressed to look inside. They stay outlined until you press a building, or this again (B). Held: only while held." hidden>Buildings</button>
+  <button id="full" type="button" title="Full screen (F)">Full screen</button>
+  <label id="langBox" title="Language"><span id="langCode" aria-hidden="true"></span><select id="lang" aria-label="Language"></select></label>
+  <button id="options" type="button" title="The raid, its loot, quests, what's on the map and settings (M)" aria-label="Menu">&#9776;<span> Menu</span></button>
+</header>
+<div id="findList" class="ui" hidden></div>
+
+<aside id="side" class="ui" hidden>
+  <div id="sideHead"><b>Raid</b><button id="sideClose" type="button" aria-label="Close">×</button></div>
+  <div id="sideBody"></div>
+</aside>
+
+<aside id="panel" class="ui" hidden>
+  <div id="panelHead">
+    <nav id="tabs">
+      <button type="button" data-tab="raid" title="Who's shown, and what the Raid list says of them">Raid</button>
+      <button type="button" data-tab="loot" title="Loot: what's shown, and the best of it (L)">Loot</button>
+      <button type="button" data-tab="quests" title="Quests (Q)">Quests</button>
+      <button type="button" data-tab="map" title="The view, and what's drawn on the map">Map</button>
+      <button type="button" data-tab="settings" title="Settings">Settings</button>
+    </nav>
+    <button id="panelClose" type="button" aria-label="Close">×</button>
+  </div>
+  <div id="panelBody">
+    <section data-tab="raid" hidden>
+      <div class="tabTools" id="rosterTools"><div id="rosterSum"></div><button id="sideSort" type="button" title="List who's here nearest first, instead of by kind (N)">Nearest</button></div>
+      <div id="roster"></div>
+      <details class="group" data-group="who" open>
+        <summary>Who's shown</summary>
+        <p>On the map and in this list. Off: no marker and no row.</p>
+        <div id="filtersPeople" class="filterGrid"></div>
+        <details class="group sub" data-group="areas" open>
+          <summary>Rough area only</summary>
+          <p>For each kind switched on here: no marker, name or row saying where they are. Only a circle they are somewhere in, while they have been moving.</p>
+          <div id="areaKinds" class="filterGrid"></div>
+          <label class="row range" title="How big the circle is that one of them is somewhere in."><span>Area size <small id="areaRText"></small></span><input type="range" id="optAreaR" min="30" max="200" step="10"></label>
+        </details>
+      </details>
+      <details class="group" data-group="rosterMore" open>
+        <summary>List details</summary>
+        <label class="row" title="How hard each bot is (Easy, Normal, Hard, Impossible): in the Raid list and by the pointer."><input type="checkbox" id="optBotDiff"><span>Bot difficulty</span></label>
+        <label class="row" id="optBotSAINRow"><input type="checkbox" id="optBotSAIN"><span>SAIN details</span></label>
+        <label class="row" id="optBotORBITRow"><input type="checkbox" id="optBotORBIT"><span>ORBIT details</span></label>
+        <label class="row" id="optBotCOMETRow"><input type="checkbox" id="optBotCOMET"><span>COMET details</span></label>
+        <label class="row" title="What each living bot wears and carries, and what it's worth: in the Raid list and by the pointer. Off unless you turn it on."><input type="checkbox" id="optBotLoot"><span>Bot loot</span></label>
+        <label class="row" title="The Raid list names everyone seen in the raid, but not who's still alive: a ? by each, Dead only for those a player killed or whose body you've been close to. Where they are, how far and what they're doing aren't shown."><input type="checkbox" id="optFog"><span>Raid list: hide who's alive</span></label>
+        <details class="group sub" data-group="rosterRows" open>
+          <summary>Rows of the list</summary>
+          <label class="row" title="What each bot is doing now, and its squad's part, as a tag."><input type="checkbox" id="optRosterDoing"><span>What each is doing</span></label>
+          <label class="row" title="A thin bar along the bottom of each row: how much health they have left. Needs Health bars on, under Map."><input type="checkbox" id="optRosterHp"><span>Health bars</span></label>
+          <label class="row" title="Each row on one line: the name, then what it's doing. No difficulty or personality tags."><input type="checkbox" id="optRosterSlim"><span>One line each</span></label>
+          <label class="row range" title="The bots ORBIT has parked far from every player. A group of their own: at the bottom of the list, folded away until you press its title."><span>ORBIT ghosts</span><select id="optRosterGhosts">
+            <option value="in">With their kind, like any bot</option><option value="own">A group of their own</option><option value="hide">Not listed</option></select></label>
+          <p>Press a group's title in the list (Bosses, Scavs) to fold it away, or its count at the top.</p>
+        </details>
+      </details>
+    </section>
+
+    <section data-tab="loot" hidden>
+      <nav class="subTabs"><button type="button" data-view="filters">Filters</button><button type="button" data-view="best">Best loot</button><button type="button" data-view="legend">Legend</button></nav>
+      <div class="view" data-view="filters">
+      <div class="segHead">Loot shown in a raid</div>
+      <div class="seg" id="lootMode"></div>
+      <p id="lootModeSays"></p>
+      <label class="row range" title="Loose loot, containers and bodies worth less than this are left off the map. Quest items are always shown."><span>Worth at least</span><select id="optWorth">
+        <option value="0">Anything</option><option value="5000">5,000 ₽</option><option value="10000">10,000 ₽</option>
+        <option value="20000">20,000 ₽</option><option value="50000">50,000 ₽</option><option value="100000">100,000 ₽</option>
+        <option value="200000">200,000 ₽</option></select></label>
+      <details class="group" data-group="lootKinds" open>
+        <summary>Kinds of loot</summary>
+        <div class="filterHead">Switch <button type="button" class="linkBtn" id="lootKindsAll">All on</button> <button type="button" class="linkBtn" id="lootKindsNone">All off</button></div>
+      <div class="filterGrid" id="lootKinds"></div>
+      </details>
+      <details class="group" data-group="boxKinds" open>
+        <summary>Kinds of container</summary>
+        <div class="filterGrid" id="boxKinds"></div>
+      </details>
+      <details class="group" data-group="lootMore" open>
+        <summary>More</summary>
+        <div id="filtersLoot" class="filterGrid"></div>
+        <label class="row" title="What's in containers, bodies and airdrops, and what bots wear and carry, by the pointer, in the Raid list and in Best loot. Off: you only see what's lying about. Containers then show only up close, all alike."><input type="checkbox" id="optPeek"><span>Show what's inside things</span></label>
+        <label class="row" title="The short name of each piece of loose loot, once zoomed in close enough"><input type="checkbox" id="optItemNames"><span>Item names</span></label>
+        <label class="row range" title="Containers and bodies worth less than that only show once you've zoomed in this close (the screen's short side this many metres across or fewer). Item names show from there too. Further right: from further out."><span>Show all within <small id="closeText"></small></span><input type="range" id="optClose" step="5"></label>
+        <label class="row range" title="Opacity of loot, containers and locks on another floor than the player. All the way left: hidden."><span>Other floors <small id="otherLootText"></small></span><input type="range" id="optOtherLoot" min="0" max="100" step="5"></label>
+        <label class="row range" title="With Rough areas only on, under Loose loot: how big each area is. Its worth is rounded (394,000 is shown as ~400k)."><span>Rough area size <small id="lootCellText"></small></span><input type="range" id="optLootCell" min="20" max="150" step="10"></label>
+        <details class="group sub" data-group="lootRoofs" open>
+          <summary>Buildings</summary>
+          <label class="row" title="Looking at a building from above (its inside not shown): the loot in it is drawn at full strength, whatever floor it's on. Off: loot on another floor than you is faint, as Other floors sets."><input type="checkbox" id="optRoofLoot"><span>Loot under roofs at full strength</span></label>
+          <label class="row" title="Over each building seen from above: what the loot in it is worth, of what's shown (loose loot, and containers worth looking in). Point at it for more."><input type="checkbox" id="optRoofTotals"><span>Loot totals over buildings</span></label>
+          <label class="row sub" title="Also over bunkers and tunnels under the ground: what the loot down there is worth. Off: only buildings you can see from above."><input type="checkbox" id="optRoofTotalsUnder"><span>Also what's under the ground</span></label>
+        </details>
+      </details>
+      </div>
+      <div class="view" data-view="best" hidden>
+      <p id="bestNone" hidden>Loot is switched off. Pick what's shown under Filters.</p>
+      <div id="bestRealBox">
+        <div class="filterHead">Best in this raid</div>
+        <div id="bestLoot"></div>
+      </div>
+      <div id="bestCanBox">
+        <div class="filterHead">Best that can spawn here</div>
+        <div id="bestCan"></div>
+      </div>
+      </div>
+      <div class="view" data-view="legend" hidden>
+        <div class="filterHead">What it is</div>
+        <div class="legend" id="keyForms"></div>
+        <div class="filterHead">Its colour: what it's worth</div>
+        <div class="legend" id="keyWorth"></div>
+        <p>A spawn point and a container are coloured by the dearest thing they can have; a container in a raid, by what's in it.</p>
+        <div class="filterHead">Spawn points, by what they mostly spawn</div>
+        <div class="legend" id="keyKinds"></div>
+        <p>Each has its picture once you've zoomed in; from further out it's a ring.</p>
+        <div id="spawnIndex" hidden>
+          <div class="filterHead sect">Spawn kinds on this map</div>
+          <div id="spawnKinds"></div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="quests" hidden>
+      <div class="segHead">Shown on the map</div>
+      <div class="card">
+      <label class="row"><input type="checkbox" id="optQuestItems"><span>Quest items</span></label>
+      <label class="row sub" title="Off: every quest's items, started or not."><input type="checkbox" id="optMyQuestItems"><span>Only my quests' items</span></label>
+      <label class="row"><input type="checkbox" id="optQuestPlaces"><span>Quest places</span></label>
+      <label class="row sub" title="Off: the places of every quest, started or not."><input type="checkbox" id="optMyQuestPlaces"><span>Only my quests' places</span></label>
+      </div>
+      <div class="legend"><span><b class="star">★</b>Quest place</span><span><b class="quest">!</b>Quest item</span></div>
+      <div class="segHead">My quests</div>
+      <div id="questList"></div>
+    </section>
+
+    <section data-tab="map" hidden>
+      <nav class="subTabs"><button type="button" data-view="options">Options</button><button type="button" data-view="legend">Legend</button></nav>
+      <div class="view" data-view="options">
+      <details class="group" data-group="show" open>
+        <summary>On the map</summary>
+        <div id="filtersMap" class="filterGrid"></div>
+      </details>
+      <div id="quick"></div>
+      <details class="group" data-group="view" open>
+        <summary>View</summary>
+        <label class="row" title="Keeps the player in the middle. Dragging the map, or pressing somebody in the Raid list to look at them, sets it aside for a few seconds. Pressing a bot (on the map or in the Raid list) follows that bot instead, until you drag the map or press somewhere else; then it comes back to the player at the zoom you had."><input type="checkbox" id="optFollow"><span>Follow the player</span></label>
+      <label class="row range" title="What the zoom does while the map follows you. Auto: closer inside a building, wider out in the open (the two sliders below; zooming yourself sets them). Back to where it was: after you look elsewhere, the zoom you had comes back. Keep what I set: the zoom is never changed for you."><span>Zoom while following</span><select id="optZoomMode">
+        <option value="auto">Auto, indoors and out</option><option value="back">Back to where it was</option><option value="keep">Keep what I set</option></select></label>
+      <label class="row range" title="While following indoors: how much of the map is on the screen, across its short side. Zooming by hand indoors sets it too."><span>Indoors <small id="spanInText"></small></span><input type="range" id="optSpanIn" step="5"></label>
+      <label class="row range" title="While following outdoors: how much of the map is on the screen, across its short side. Zooming by hand outdoors sets it too."><span>Outdoors <small id="spanOutText"></small></span><input type="range" id="optSpanOut" step="5"></label>
+      <label class="row" title="While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all."><input type="checkbox" id="optInsideMine"><span>Show the inside of my building</span></label>
+      <label class="row" title="While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed."><input type="checkbox" id="optInsideLook"><span>Open buildings when zoomed in</span></label>
+      <label class="row range sub" id="lookSpanRow" title="How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer."><span>Opens within <small id="lookSpanText"></small></span><input type="range" id="optLookSpan" step="10"></label>
+      <label class="row" title="Pressing a building on the map opens it to show its inside; pressing off it shuts it. Off: pressing a building does nothing, and the Buildings button is put away."><input type="checkbox" id="optPressOpen"><span>Open a building when pressed</span></label>
+      <label class="row range" id="floorRow" title="Which floor of a building to show, outlined, with the rest of the map dimmed. Auto: the building and floor the player is on, and the view from above while they're out in the open. A floor number: that floor of the building the player is in, or of the one in the middle of the screen." hidden><span>Floor</span><select id="optFloor"></select></label>
+      <label class="row range" title="Which way up this map is. Usual: as the maps people know (tarkov.dev) have it. Kept for each map."><span>Map turned</span><select id="optTurn">
+        <option value="auto">Usual way up</option><option value="0">Game's north up</option><option value="90">A quarter left</option>
+        <option value="180">Upside down</option><option value="270">A quarter right</option></select></label>
+      <label class="row" title="PMCs, friends, bosses, Goons and airdrops that are off the screen: an arrow at the screen's edge points to each, with how far it is from you. Press one to go and look. Only the kinds that are switched on."><input type="checkbox" id="optEdge"><span>Point to who's off the screen</span></label>
+      <label class="row" title="The places and items of the quests you have started that are off the screen: a yellow arrow at the screen's edge points to each, with how far it is from you."><input type="checkbox" id="optEdgeQuests"><span>Point to my quests off screen</span></label>
+      </details>
+      <details class="group" data-group="bots" open>
+        <summary>People and bots</summary>
+        <label class="row" title="A thin line for every shot, from the gun to where the bullet went, for a moment."><input type="checkbox" id="optShots"><span>Shot lines</span></label>
+        <label class="row" title="A small bar over anybody who is hurt: how much health they have left. Also by the pointer."><input type="checkbox" id="optHealth"><span>Health bars</span></label>
+        <label class="row sub" title="The bar over everybody, hurt or not."><input type="checkbox" id="optHealthAll"><span>Also when not hurt</span></label>
+        <label class="row" title="Under each bot's marker, always: what it is doing now, as SAIN, COMET, ORBIT, QuestingBots or Phobos has it (looting, heading for a quest, in a fight). Off: only by the pointer and in the Raid list."><input type="checkbox" id="optMapDoing"><span>What each bot is doing</span></label>
+        <label class="row" title="By each bot of the squad you point at or follow: its part in what COMET has the squad doing (Flanking, Covering a teammate), under its marker."><input type="checkbox" id="optSquadParts"><span>Squad parts on the map</span></label>
+        <details class="group sub" data-group="orbitMap" open>
+          <summary>ORBIT on the map</summary>
+          <label class="row" id="optOrbitLinesRow" title="A thin blue line from every ORBIT bot to the place it is heading for, with a small circle there. Off: only for the bot you point at or follow."><input type="checkbox" id="optOrbitLines"><span>Lines to where all are heading</span></label>
+          <label class="row sub" title="At the end of each line: what the bot is going there for."><input type="checkbox" id="optOrbitNames"><span>Say what for, at the place</span></label>
+          <label class="row" title="A fight between ORBIT's ghosts (bots parked far from every player, fought out without the game): a ⚔ where it was, for half a minute."><input type="checkbox" id="optOrbitFights"><span>Ghost fights</span></label>
+          <label class="row" title="When a ghost hears shots: a big pale blue circle round it, as wide as it could hear, for a few seconds. These can be hundreds of metres across."><input type="checkbox" id="optOrbitHear"><span>Hearing circles</span></label>
+        </details>
+      </details>
+      <details class="group" data-group="feed" open>
+        <summary>Kill feed</summary>
+        <label class="row" title="Who killed whom, in a corner of the screen as it happens. Press its count to fold the kills away and back; its × turns it off."><input type="checkbox" id="optFeed"><span>Kill feed</span></label>
+        <label class="row sub" title="Kills by you and your friends, and your own deaths."><input type="checkbox" id="optFeedMine"><span>Mine and my friends'</span></label>
+        <label class="row sub" title="A PMC dying, whoever did it (a Scav killing a PMC, say)."><input type="checkbox" id="optFeedPmc"><span>PMCs dying</span></label>
+        <label class="row sub" title="A boss, one of its guards, a Goon or a cultist dying."><input type="checkbox" id="optFeedBoss"><span>Bosses dying</span></label>
+        <label class="row sub" title="Scavs, Raiders, Rogues and every other bot dying (a PMC killing a Scav, say)."><input type="checkbox" id="optFeedAi"><span>Other bots dying</span></label>
+        <label class="row range" title="Whose names the feed gives. You and your friends are always named. Not the killer's: 'PMC killed Vasya'. Nobody's: 'PMC killed Scav'."><span>Names</span><select id="optFeedNames">
+          <option value="all">Everyone's</option><option value="victim">Not the killer's</option><option value="kinds">Nobody's, only what they are</option></select></label>
+        <label class="row range" title="How many kills the feed shows at once, at most. The older ones give way."><span>Rows at once</span><select id="optFeedRows">
+          <option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="12">12</option></select></label>
+        <label class="row sub" title="The latest kills stay on the screen, as many as Rows at once, until newer ones take their place. Off: each goes after a few seconds."><input type="checkbox" id="optFeedKeep"><span>Keep the latest on screen</span></label>
+        <label class="row sub" title="The kills together in one box, each with the raid time it happened, instead of a bubble round each."><input type="checkbox" id="optFeedBox"><span>All in one box</span></label>
+        <label class="row range" title="Which corner of the screen the kill feed sits in. By the menu: the bottom corner on the menu's side. On a phone it stays at the bottom, clear of the menu."><span>Position</span><select id="optFeedPos">
+          <option value="auto">By the menu</option><option value="bl">Bottom left</option><option value="br">Bottom right</option><option value="tl">Top left</option><option value="tr">Top right</option><option value="free">Where I put it</option></select></label>
+        <label class="row range" title="How dark the feed's background is. All the way left: none."><span>Background <small id="feedBgText"></small></span><input type="range" id="optFeedBg" min="0" max="100" step="5"></label>
+      </details>
+      </div>
+      <div class="view" data-view="legend" hidden>
+        <div class="legend">
+        <span><b>💰</b>Safe</span><span><b>💵</b>Cash register</span>
+        <span><b>🗄️</b>Drawer</span><span><b>👜</b>Bag</span>
+        <span><b>🧥</b>Jacket</span><span><b>🔧</b>Toolbox</span>
+        <span><b>💻</b>PC block</span><span><b>💊</b>Medical</span>
+        <span><b>🔫</b>Weapon box</span><span><b>💣</b>Grenade box</span>
+        <span><b>🥫</b>Ration box</span><span><b>⛏️</b>Buried cache</span>
+        <span><b>📦</b>Crate</span><span><b class="corpse">✕</b>Corpse</span>
+        <span><b>🔒</b>Locked door</span><span><b>🚙</b>Locked trunk</span>
+        <span><b>💳</b>Keycard door</span>
+        <span><b>🚏</b>BTR stop</span><span><b class="letter">P S B</b>Spawns</span>
+        <span><b class="star">★</b>Quest place</span><span><b class="quest">!</b>Quest item</span>
+      </div>
+      <p>A container's rim is coloured by what's in it. Point at a corpse for what it carries (with Corpse loot on, under Loot). ▲▼ by a marker: a floor above or below you. Point at anything (or tap it) to see what it is. These switches only change this page; a greyed one is off on the server (config.jsonc).</p>
+      <p class="credit">Cursors: <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (Cursor Pack, CC0).</p>
+      </div>
+    </section>
+
+    <section data-tab="settings" hidden>
+      <nav class="subTabs"><button type="button" data-view="options">Options</button><button type="button" data-view="about">About</button></nav>
+      <div class="view" data-view="options">
+      <details class="group" data-group="labels" open>
+        <summary>Markers and names</summary>
+        <label class="row range"><span>Marker size <small id="scaleText"></small></span><input type="range" id="optScale" min="0.6" max="2.4" step="0.1"></label>
+        <label class="row range" title="How big the names and words on the map are, apart from the markers."><span>Text size <small id="textScaleText"></small></span><input type="range" id="optTextScale" min="0.6" max="2.4" step="0.1"></label>
+        <label class="row range" title="Whose name is written under their marker. Bosses include their guards and the Goons. Pointing at a marker always names it."><span>Names under</span><select id="optNames">
+        <option value="some">Bosses and friends</option><option value="players">PMCs, bosses and friends</option><option value="all">Everyone</option></select></label>
+        <label class="row" title="Your name under your own marker. It shows by itself while friends are in the raid with you; this shows it always."><input type="checkbox" id="optMyName"><span>Always show my name</span></label>
+        <label class="row" title="Names written in Cyrillic (scavs, bosses) are shown in Latin letters; the bosses by the names players know them by (Kollontay, Reshala)."><input type="checkbox" id="optLatin"><span>Names in English letters</span></label>
+      </details>
+      <details class="group" data-group="screen" open>
+        <summary>Screen</summary>
+        <label class="row range" title="How bright the map picture is under the markers. Darker: the markers and names stand out more. All the way right: as it was captured."><span>Map brightness <small id="mapLightText"></small></span><input type="range" id="optMapLight" min="30" max="100" step="5"></label>
+        <label class="row" title="On a phone: draw two pixels to a point at most, not the three or four its screen has. Much smoother, a little less sharp. No effect on a computer."><input type="checkbox" id="optPhoneLight"><span>Lighter drawing on a phone</span></label>
+        <label class="row" title="Asks the browser not to let the screen dim or lock while this page is open and in front. Not every browser allows it."><input type="checkbox" id="optAwake"><span>Keep the screen on</span></label>
+        <label class="row" title="A few numbers in the corner, for finding out why the map isn't smooth: frames drawn a second, the slowest one, how long the page works on each, and how evenly the game's reports arrive."><input type="checkbox" id="optSpeed"><span>Show speed numbers</span></label>
+      </details>
+      <details class="group" data-group="colors" open>
+        <summary>Colours</summary>
+        <p>The colour of each kind of marker, on the map and in the lists. Pick one, or type its hex code (#ffb253).</p>
+        <div id="colorList"></div>
+        <button type="button" class="linkBtn" id="colorReset">All back to the usual colours</button>
+      </details>
+      <details class="group" data-group="layout" open>
+        <summary>Layout</summary>
+        <label class="row" title="The menu on the left and the Raid list on the right, instead of the other way round. Not on a phone, where the list is in the menu."><input type="checkbox" id="optSwap"><span>Menu on the left, Raid list on the right</span></label>
+      </details>
+      <details class="group" data-group="alerts" open>
+        <summary>Alerts</summary>
+        <p>Says once a raid that they've been spotted on the map, not where. Works with their markers switched off.</p>
+        <label class="row" title="A short sound with each alert, for when the map is on another screen. Off unless you turn it on."><input type="checkbox" id="optAlertSound"><span>Play a sound</span></label>
+      <div id="alerts" class="filterGrid"></div>
+      </details>
+      <button type="button" class="linkBtn" id="resetAll" title="Every switch, slider, colour and the layout of this page, back as they were the first time it was opened. Nothing on the server or in the game changes.">Reset every setting to its default</button>
+      <div id="prefsFile">
+        <button type="button" class="linkBtn" id="prefsExport" title="Saves every setting of this page to a file, to load in another browser or on another PC.">Export settings</button>
+        <button type="button" class="linkBtn" id="prefsImport" title="Loads settings saved with Export. They replace the ones on this page.">Import settings</button>
+        <input type="file" id="prefsPick" accept=".json,application/json" hidden>
+      </div>
+      </div>
+      <div class="view" data-view="about" hidden>
+      <details class="group" data-group="phone" open>
+        <summary>On your phone</summary>
+        <p>Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.</p>
+        <div id="phoneBox" class="veiled">
+          <button type="button" id="phoneVeil">Press to show the code and the address</button>
+          <div id="phoneCode"></div>
+          <div id="phoneAddr"><b id="phoneUrl"></b><button type="button" class="linkBtn" id="phoneCopy">Copy</button></div>
+          <div id="phoneOthers"></div>
+        </div>
+        <p id="phoneShut" hidden>Only this PC can open the map. In SPT_Data/configs/http.json set "ip" to "0.0.0.0", then restart the server.</p>
+        <p id="phoneNone" hidden>No network address was found for this PC.</p>
+        <p class="phoneHelp">Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.</p>
+      </details>
+      <div id="about">
+        <img src="icon.svg" alt="" width="32" height="32">
+        <div><b>Satellite</b> <span class="ver">1.0.0</span><br><small>by <b>Fums</b></small></div>
+      </div>
+      <p class="credit">Map scans by Fums, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>.</p>
+      <p class="credit">Use, share and change them with credit. Not for sale.</p>
+      <p class="credit">Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.</p>
+      </div>
+    </section>
+  </div>
+</aside>
+
+<footer id="readout" class="ui">
+  <span id="scaleBar" hidden></span>
+  <span id="cursorAt"></span>
+  <span id="playerAt"></span>
+  <button id="credit" type="button" title="Satellite 1.0.0, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
+</footer>
+
+<div id="hint" class="ui">H hide controls · M menu · P raid · L loot · Q quests · / find</div>
+
+<script src="lang.js"></script>
+<script src="livemap.js"></script>
+</body>
+</html>

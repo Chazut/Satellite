@@ -1,0 +1,55 @@
+{
+  // What the web map may show, for everyone who opens the page. The game always reports these. The page starts
+  // with enemy PMCs, scavs, guards and bosses turned off, and each viewer can turn them on for their own page.
+  // false: the server never passes that kind on, so no page can show it. Restart the server after a change.
+  "markers": {
+    "friendlyPlayers": true,
+    "enemyPmcs": true,
+    "scavs": true,
+    // sniper scavs
+    "snipers": true,
+    // bosses' followers
+    "guards": true,
+    // the cultist priest and warriors
+    "cultists": true,
+    // Knight, Big Pipe and Birdeye
+    "goons": true,
+    "bosses": true,
+    "raiders": true,
+    "rogues": true,
+    // none in the game yet: shown once a mod adds them
+    "smugglers": true,
+    // the BlackDiv mod's bots, Wedge among them
+    "blackDivision": true,
+    // the RUAFComeHome mod's soldiers (Manimal's Terminal brings them in too)
+    "ruaf": true,
+    // the RUAF remnant riflemen
+    "ruafRemnant": true,
+    // the people living on Manimal's Terminal
+    "civilians": true,
+    // the infected (the zombie event)
+    "infected": true,
+    // every other bot: event and arena bots, a mod's own
+    "otherAi": true,
+    "corpses": true,
+    "extracts": true,
+    // airdrop crates, coming down and landed (what's in them goes by "containerContents")
+    "airdrops": true
+  },
+  // What else the map may show. false: the game doesn't send it and the server never passes it on.
+  "layers": {
+    // items lying about, quest items among them
+    "looseLoot": true,
+    // what's inside each container
+    "containerContents": true,
+    // doors, car trunks and safes a key opens, and the key each needs
+    "locks": true,
+    // where PMCs, scavs and bosses can spawn
+    "spawnPoints": true,
+    // what each bot is like and is up to: its difficulty, its SAIN personality, whether SAIN or ORBIT is deciding
+    // for it, and whether ORBIT has it parked as a ghost
+    "botDetails": true,
+    // what each living bot wears and carries (a page shows it only once its "Bot loot" switch is turned on)
+    "botLoot": true
+  }
+}
