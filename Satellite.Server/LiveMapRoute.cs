@@ -1609,21 +1609,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         return full.StartsWith(Path.GetFullPath(folder) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ? full : null;
     }
 
-    // map/<location>/<v>/<x>_<y>.jpg: a tile. Its address changes with every capture, so a browser may keep it.
-    private async Task SendTile(HttpContext context, string relative, CancellationToken cancellationToken)
-    {
-        var file = Inside(MapsFolder, Uri.UnescapeDataString(relative));
-        if (file == null || !Path.GetExtension(file).Equals(".jpg", StringComparison.OrdinalIgnoreCase) || !File.Exists(file))
-        {
-            context.Response.StatusCode = 404;
-            return;
-        }
-
-        context.Response.ContentType = "image/jpeg";
-        context.Response.Headers.XContentTypeOptions = "nosniff";
-        context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
-        await context.Response.Body.WriteAsync(await File.ReadAllBytesAsync(file, cancellationToken), cancellationToken);
-    }
+    // (a map's tiles: SendTile, in TilePacks.cs)
 
     // ---- the page ---------------------------------------------------------------------------------------------------
 

@@ -100,6 +100,63 @@ function Label([string] $loc) {
     ($loc -split '~' | ForEach-Object { $_.Substring(0, 1).ToUpper() + $_.Substring(1) }) -join '-'
 }
 
+# A map's tiles in one file, maps/<location>/<v>/tiles.pack, in place of its thousands of .jpg files, so the zip
+# unzips quickly (the server reads either; see Satellite.Server/TilePacks.cs for the layout). Only ever done to the
+# copy in dist\, never to the SPT folder's maps, which captures write to and builds read from. Each pack is read back
+# and checked against the tiles it was made from before they're deleted.
+Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+public static class SatelliteTiles {
+    public static int Pack(string folder) {
+        var files = Directory.GetFiles(folder, "*.jpg").OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
+        if (files.Length == 0) return 0;
+        var names = files.Select(f => Encoding.ASCII.GetBytes(Path.GetFileName(f))).ToArray();
+        long offset = 8 + 4;
+        foreach (var n in names) {
+            if (n.Length > 255) throw new Exception("tile name too long: " + Encoding.ASCII.GetString(n));
+            offset += 1 + n.Length + 8 + 4;
+        }
+        var pack = Path.Combine(folder, "tiles.pack");
+        using (var w = new BinaryWriter(File.Create(pack))) {
+            w.Write(Encoding.ASCII.GetBytes("SATTILE1"));
+            w.Write(files.Length);
+            for (var i = 0; i < files.Length; i++) {
+                var length = new FileInfo(files[i]).Length;
+                w.Write((byte)names[i].Length); w.Write(names[i]); w.Write(offset); w.Write((int)length);
+                offset += length;
+            }
+            foreach (var f in files) w.Write(File.ReadAllBytes(f));
+        }
+        // read it back as the server does: every tile there, byte for byte
+        using (var r = new BinaryReader(File.OpenRead(pack))) {
+            if (Encoding.ASCII.GetString(r.ReadBytes(8)) != "SATTILE1" || r.ReadInt32() != files.Length) throw new Exception("bad pack header: " + pack);
+            for (var i = 0; i < files.Length; i++) {
+                var name = Encoding.ASCII.GetString(r.ReadBytes(r.ReadByte()));
+                var at = r.ReadInt64(); var length = r.ReadInt32();
+                if (name != Path.GetFileName(files[i])) throw new Exception("pack index out of order: " + pack);
+                var back = r.BaseStream.Position;
+                r.BaseStream.Position = at;
+                var bytes = r.ReadBytes(length);
+                r.BaseStream.Position = back;
+                if (!bytes.SequenceEqual(File.ReadAllBytes(files[i]))) throw new Exception("tile differs in pack: " + files[i]);
+            }
+        }
+        foreach (var f in files) File.Delete(f);
+        return files.Length;
+    }
+}
+'@
+function PackTiles([string] $mapsDir) {
+    foreach ($map in Get-ChildItem -LiteralPath $mapsDir -Directory) {
+        $versions = @(Get-ChildItem -LiteralPath $map.FullName -Directory)
+        if ($versions.Count -ne 1) { throw "$($map.Name) has $($versions.Count) capture folders; it should have one." }
+        [SatelliteTiles]::Pack($versions[0].FullName) | Out-Null
+    }
+}
+
 # the game's own locations; any other map (a version of one, after a "~", or a map a mod adds) is an add-on
 $gameMaps = 'bigmap', 'factory4_day', 'factory4_night', 'Interchange', 'laboratory', 'Labyrinth', 'Lighthouse',
     'RezervBase', 'Sandbox', 'Sandbox_high', 'Shoreline', 'TarkovStreets', 'Woods'
@@ -138,10 +195,11 @@ if (-not $NoMaps) {
     $mapsTo = Join-Path $mod 'maps'
     New-Item -ItemType Directory -Force $mapsTo | Out-Null
     foreach ($game in $gameMaps) { Copy-Item -LiteralPath (Join-Path $mapsFrom $game) -Destination $mapsTo -Recurse }
+    PackTiles $mapsTo
     Pack $stage (Join-Path $dist "$name-$version.zip")
 }
 
-# each add-on: only its map's folder, where the mod keeps its maps
+# each add-on: only its map's folder, where the mod keeps its maps, its tiles packed like the game's own maps'
 foreach ($map in $addons) {
     $label = Label $map.Name
     $addonStage = Join-Path $dist "$name-Addon-$label-$version"
@@ -149,6 +207,7 @@ foreach ($map in $addons) {
     $addonMaps = Join-Path $addonStage "SPT_Runtime\user\mods\$name\maps"
     New-Item -ItemType Directory -Force $addonMaps | Out-Null
     Copy-Item -LiteralPath $map.FullName -Destination $addonMaps -Recurse
+    PackTiles $addonMaps
     Pack $addonStage (Join-Path $dist "$name-Addon-$label-$version.zip")
 }
 
@@ -159,6 +218,7 @@ if ($snowMaps.Count) {
     $snowTo = Join-Path $snowStage "SPT_Runtime\user\mods\$name\maps"
     New-Item -ItemType Directory -Force $snowTo | Out-Null
     foreach ($map in $snowMaps) { Copy-Item -LiteralPath $map.FullName -Destination $snowTo -Recurse }
+    PackTiles $snowTo
     Pack $snowStage (Join-Path $dist "$name-Addon-Snow-$version.zip")
 }
 
