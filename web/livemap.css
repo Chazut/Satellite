@@ -19,6 +19,8 @@
   --radius-small: 7px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   --font: "Bender", "Jura", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  /* dark already: see the color-scheme meta in index.html */
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -538,12 +540,6 @@ select option { background: #1a1a24; }
 #panel .card + .legend { margin: 0 2px 12px; }
 /* nothing to list: said in a box of its own, not a stray line */
 #questList:not(:has(> details)), #bestNone { padding: 18px 12px; border: 1px dashed var(--line); border-radius: var(--radius-small); text-align: center; }
-/* on a phone: the lists of maps and players and the spare buttons, at the top of the Map tab */
-#quick { display: flex; flex-wrap: wrap; gap: 6px; }
-#quick:empty { display: none; }
-#quick select { flex: 1 1 140px; max-width: none; min-width: 0; }
-#quick button { flex: 1 1 auto; }
-#quick [hidden] { display: none; }
 
 /* a panel's groups: each opens and shuts by its title */
 details.group { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
@@ -1287,3 +1283,52 @@ html.swap body { opacity: 0; transition: none; }
 #lootKinds .row, #boxKinds .row { min-height: 31px; }
 /* on a phone the bar has no room for it: pressing the status does the same */
 @media (max-width: 700px), (max-height: 520px) { #backRaid { display: none !important; } }
+
+/* ---- on a phone: the map's own buttons (the map list, Buildings, Whole map, Full screen), round, down the right
+   edge under the bar; whose game it is, by pressing the status; the language, in Settings. Elsewhere they're words
+   along the bar (see placeQuick) ---- */
+.ico { display: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#mapTools, #langHome { display: none; }
+@media (max-width: 700px), (max-height: 520px) {
+  #mapTools {
+    position: fixed;
+    z-index: 1;
+    right: max(10px, env(safe-area-inset-right));
+    top: calc(max(8px, env(safe-area-inset-top)) + 52px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  #mapTools > * { pointer-events: auto; }
+  #mapTools button, #mapPick {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--bright);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  }
+  #mapTools button.on { background: var(--accent-soft); border-color: var(--line-strong); color: var(--accent); }
+  #mapTools [hidden] { display: none; }
+  #mapTools .ico { display: block; }
+  #mapTools .lbl { display: none; }
+  #mapPick select { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; padding: 0; border: 0; border-radius: 999px; opacity: 0; }
+  /* whose game: the list is the select's own, laid over the status unseen (only there with more than one game, and
+     not while the status is taking you back to the raid) */
+  #status { position: relative; }
+  #status #session { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; padding: 0; border: 0; opacity: 0; }
+  #status #session[hidden] { display: none; }
+  #status.away #session { pointer-events: none; }
+  #langHome { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 8px; }
+}
+/* on its side, with the menu open down the right: the buttons stay to the left of it */
+@media (max-height: 520px) and (min-width: 701px) {
+  body.menu #mapTools { right: calc(min(340px, 46vw) + max(10px, env(safe-area-inset-right))); }
+}

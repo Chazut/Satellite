@@ -557,7 +557,7 @@ fumsLang({
 "While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all.": "プレイヤーが建物内にいる間：その階の内部を表示。オフ：屋根を含む上からの表示。",
 "Show the inside of my building": "自分のいる建物の内部を表示",
 "Open buildings when zoomed in": "ズームインで建物を開く",
-"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed.": "見回し中（マップを動かした、またはレイド外）で近くまでズームしているとき：画面中央の建物が開いて内部を表示します。オフ：建物は押したときだけ開きます。",
+"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed.": "見回し中（マップを動かした、またはレイド外）で近くまでズームしているとき：マップが止まると、画面中央の建物が開いて内部を表示します。オフ：建物は押したときだけ開きます。",
 "Opens within": "開く距離",
 "How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer.": "建物が自動で開くのに必要なズームの近さ：画面の短辺がこのメートル数以下。",
 "Open a building when pressed": "押して建物を開く",

@@ -577,7 +577,7 @@ fumsLang({
 "While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all.": "Пока игрок внутри здания: показывается его внутренность на том этаже, где он находится. Выкл.: вид сверху, с крышами.",
 "Show the inside of my building": "Показывать внутренность моего здания",
 "Open buildings when zoomed in": "Открывать здания при приближении",
-"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed.": "Когда вы осматриваетесь (карта сдвинута или вне рейда) и приблизили вплотную: здание в центре экрана открывается и показывает внутренность. Выкл.: здание открывается только по нажатию.",
+"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed.": "Когда вы осматриваетесь (карта сдвинута или вне рейда) и приблизили вплотную: здание в центре экрана открывается, когда карта перестаёт двигаться. Выкл.: здание открывается только по нажатию.",
 "Opens within": "Открывается с",
 "How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer.": "Насколько нужно приблизить, чтобы здание открылось само: короткая сторона экрана — столько метров или меньше.",
 "Open a building when pressed": "Открывать здание по нажатию",

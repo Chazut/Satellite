@@ -557,7 +557,7 @@ fumsLang({
 "While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all.": "玩家在建筑内时：显示其内部，在玩家所在楼层。关闭：从上方看，带屋顶。",
 "Show the inside of my building": "显示我所在建筑的内部",
 "Open buildings when zoomed in": "放大时打开建筑",
-"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed.": "四处查看时（拖开地图或不在战局中）且放大到近处：屏幕中央的建筑会打开并显示内部。关闭：建筑只在点击时打开。",
+"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed.": "四处查看时（拖开地图或不在战局中）且放大到近处：地图停止移动后，屏幕中央的建筑会打开并显示内部。关闭：建筑只在点击时打开。",
 "Opens within": "打开距离",
 "How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer.": "放大到多近建筑才会自动打开：屏幕短边不超过这么多米。",
 "Open a building when pressed": "点击打开建筑",

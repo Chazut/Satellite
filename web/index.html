@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0c0c12">
+<!-- the page is dark already: a browser's own dark mode (Chrome, Samsung Internet) is told to leave it alone, as it
+     recolours the map's words and pictures as it goes, turning some black -->
+<meta name="color-scheme" content="dark">
 <title>Satellite</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="livemap.css">
@@ -33,12 +36,15 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
   <label id="findBox" title="Find loot, containers holding it, locks by their key, and quests, by name (/ to type here, Escape clears). It finds what the Loot tab is set to show: what's in this raid, what can spawn, or both."><input id="find" type="search" placeholder="Find loot, key or quest…" autocomplete="off" spellcheck="false"><small id="findCount"></small><button id="findClear" type="button" title="Clear the search: back to the map as it was (Escape)" aria-label="Clear the search" hidden>&#10005;</button></label>
   <button id="listBtn" type="button" title="Who is in the raid: the list beside the map (P)">Raid list</button>
   <button id="follow" type="button" title="Keep the player in the middle (;)">Follow</button>
-  <button id="fit" type="button" title="Show the whole map (0)">Whole map</button>
-  <button id="reveal" type="button" title="Outline every building that can be pressed to look inside. They stay outlined until you press a building, or this again (B). Held: only while held." hidden>Buildings</button>
-  <button id="full" type="button" title="Full screen (F)">Full screen</button>
+  <button id="fit" type="button" title="Show the whole map (0)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6"/></svg><span class="lbl">Whole map</span></button>
+  <button id="reveal" type="button" title="Outline every building that can be pressed to look inside. They stay outlined until you press a building, or this again (B). Held: only while held." hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V9l8-5.5L20 9v12z"/><path d="M9.5 21v-6h5v6"/></svg><span class="lbl">Buildings</span></button>
+  <button id="full" type="button" title="Full screen (F)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3.5h-5v5M15.5 3.5h5v5M8.5 20.5h-5v-5M15.5 20.5h5v-5"/></svg><span class="lbl">Full screen</span></button>
   <label id="langBox" title="Language"><span id="langCode" aria-hidden="true"></span><select id="lang" aria-label="Language"></select></label>
   <button id="options" type="button" title="The raid, its loot, quests, what's on the map and settings (M)" aria-label="Menu">&#9776;<span> Menu</span></button>
 </header>
+<!-- on a phone: the map's own buttons, down its right edge (see placeQuick). The map list is the select's own, laid
+     over the first button unseen, like the language picker -->
+<div id="mapTools" class="ui"><label id="mapPick" title="Map"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/></svg></label></div>
 <div id="findList" class="ui" hidden></div>
 
 <aside id="side" class="ui" hidden>
@@ -174,7 +180,6 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <summary>On the map</summary>
         <div id="filtersMap" class="filterGrid"></div>
       </details>
-      <div id="quick"></div>
       <details class="group" data-group="view" open>
         <summary>View</summary>
         <label class="row" title="Keeps the player in the middle. Dragging the map, or pressing somebody in the Raid list to look at them, sets it aside for a few seconds. Pressing a bot (on the map or in the Raid list) follows that bot instead, until you drag the map or press somewhere else; then it comes back to the player at the zoom you had."><input type="checkbox" id="optFollow"><span>Follow the player</span></label>
@@ -183,7 +188,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <label class="row range" title="While following indoors: how much of the map is on the screen, across its short side. Zooming by hand indoors sets it too."><span>Indoors <small id="spanInText"></small></span><input type="range" id="optSpanIn" step="5"></label>
       <label class="row range" title="While following outdoors: how much of the map is on the screen, across its short side. Zooming by hand outdoors sets it too."><span>Outdoors <small id="spanOutText"></small></span><input type="range" id="optSpanOut" step="5"></label>
       <label class="row" title="While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all."><input type="checkbox" id="optInsideMine"><span>Show the inside of my building</span></label>
-      <label class="row" title="While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed."><input type="checkbox" id="optInsideLook"><span>Open buildings when zoomed in</span></label>
+      <label class="row" title="While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed."><input type="checkbox" id="optInsideLook"><span>Open buildings when zoomed in</span></label>
       <label class="row range sub" id="lookSpanRow" title="How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer."><span>Opens within <small id="lookSpanText"></small></span><input type="range" id="optLookSpan" step="10"></label>
       <label class="row" title="Pressing a building on the map opens it to show its inside; pressing off it shuts it. Off: pressing a building does nothing, and the Buildings button is put away."><input type="checkbox" id="optPressOpen"><span>Open a building when pressed</span></label>
       <label class="row range" id="floorRow" title="Which floor of a building to show, outlined, with the rest of the map dimmed. Auto: the building and floor the player is on, and the view from above while they're out in the open. A floor number: that floor of the building the player is in, or of the one in the middle of the screen." hidden><span>Floor</span><select id="optFloor"></select></label>
@@ -248,6 +253,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
     <section data-tab="settings" hidden>
       <nav class="subTabs"><button type="button" data-view="options">Options</button><button type="button" data-view="about">About</button></nav>
       <div class="view" data-view="options">
+      <!-- on a phone: the language picker, here rather than in the bar (see placeQuick) -->
+      <div id="langHome" class="row"><span>Language</span></div>
       <details class="group" data-group="labels" open>
         <summary>Markers and names</summary>
         <label class="row range"><span>Marker size <small id="scaleText"></small></span><input type="range" id="optScale" min="0.6" max="2.4" step="0.1"></label>

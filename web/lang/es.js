@@ -569,7 +569,7 @@ fumsLang({
 "While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all.": "Mientras el jugador está dentro de un edificio: se muestra su interior, en la planta en la que está. Desactivado: la vista desde arriba, con tejados.",
 "Show the inside of my building": "Mostrar el interior de mi edificio",
 "Open buildings when zoomed in": "Abrir edificios al acercar el zoom",
-"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed.": "Al mirar alrededor (mapa desplazado, o fuera de una incursión) y con el zoom cerca: el edificio del centro de la pantalla se abre para mostrar su interior. Desactivado: un edificio solo se abre al pulsarlo.",
+"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed.": "Al mirar alrededor (mapa desplazado, o fuera de una incursión) y con el zoom cerca: el edificio del centro de la pantalla se abre cuando el mapa deja de moverse. Desactivado: un edificio solo se abre al pulsarlo.",
 "Opens within": "Se abre a",
 "How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer.": "Lo cerca que debe estar el zoom para que un edificio se abra solo: el lado corto de la pantalla con estos metros de ancho o menos.",
 "Open a building when pressed": "Abrir un edificio al pulsarlo",

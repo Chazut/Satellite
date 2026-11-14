@@ -557,7 +557,7 @@ fumsLang({
 "While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all.": "플레이어가 건물 안에 있는 동안: 플레이어가 있는 층의 내부를 표시. 끄기: 지붕까지 위에서 보기.",
 "Show the inside of my building": "내 건물 내부 보기",
 "Open buildings when zoomed in": "확대하면 건물 열기",
-"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed.": "둘러볼 때 (맵을 옮겼거나 레이드 밖) 가까이 확대하면: 화면 가운데 건물이 열려 내부가 보입니다. 끄면: 건물은 눌렀을 때만 열립니다.",
+"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed.": "둘러볼 때 (맵을 옮겼거나 레이드 밖) 가까이 확대하면: 맵이 멈추면 화면 가운데 건물이 열려 내부가 보입니다. 끄면: 건물은 눌렀을 때만 열립니다.",
 "Opens within": "열리는 거리",
 "How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer.": "건물이 저절로 열리려면 얼마나 가까이 확대해야 하는지: 화면의 짧은 변이 이 미터 이하일 때.",
 "Open a building when pressed": "눌러서 건물 열기",

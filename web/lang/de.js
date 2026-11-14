@@ -569,7 +569,7 @@ fumsLang({
 "While the player is inside a building: its inside is shown, on the floor they're on. Off: the view from above, roofs and all.": "Solange der Spieler in einem Gebäude ist: Sein Inneres wird gezeigt, auf der Etage, auf der er ist. Aus: die Ansicht von oben, mit Dächern.",
 "Show the inside of my building": "Das Innere meines Gebäudes zeigen",
 "Open buildings when zoomed in": "Gebäude beim Heranzoomen öffnen",
-"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens to show its inside. Off: a building opens only when pressed.": "Beim Umsehen (Karte weggezogen oder außerhalb eines Raids) und nah herangezoomt: Das Gebäude in der Bildschirmmitte öffnet sich und zeigt sein Inneres. Aus: Ein Gebäude öffnet sich nur beim Anklicken.",
+"While looking about (the map dragged away, or out of a raid) and zoomed in close: the building in the middle of the screen opens once the map has stopped moving. Off: a building opens only when pressed.": "Beim Umsehen (Karte weggezogen oder außerhalb eines Raids) und nah herangezoomt: Das Gebäude in der Bildschirmmitte öffnet sich, sobald die Karte stillsteht. Aus: Ein Gebäude öffnet sich nur beim Anklicken.",
 "Opens within": "Öffnet sich ab",
 "How close the zoom has to be before a building opens by itself: the screen's short side this many metres across or fewer.": "Wie nah gezoomt sein muss, bevor sich ein Gebäude von selbst öffnet: die kurze Bildschirmseite höchstens so viele Meter breit.",
 "Open a building when pressed": "Gebäude beim Anklicken öffnen",

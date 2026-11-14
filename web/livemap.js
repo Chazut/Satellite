@@ -376,8 +376,8 @@
   // The menu: one panel with a tab each for the raid, its loot, the quests, the map and the settings.
   const TABS = ['raid', 'loot', 'quests', 'map', 'settings'];
   let tab = TABS.includes(prefs.tab) ? prefs.tab : 'raid';
-  // A phone, upright or on its side: the menu is a sheet (from the bottom, or down the right), and the map and
-  // player lists and the buttons that aren't needed all the time are in it (see placeQuick).
+  // A phone, upright or on its side: the menu is a sheet (from the bottom, or down the right), and the map's buttons
+  // are round ones down its right edge (see placeQuick).
   const phone = window.matchMedia('(max-width: 700px), (max-height: 520px)');
   // how many pixels are drawn to a point of the screen. A phone's has three or four, and drawing every one each
   // frame is slow there: two at most, unless "Lighter drawing on a phone" is off
@@ -2743,18 +2743,52 @@
   }
 
   // ---- drawing -------------------------------------------------------------------------------------------------
+  // Words on the map are drawn once each into a small picture of their own, and copied onto the map from there.
+  // Written straight onto the map every frame, a phone's browser keeps the letters on its graphics chip, and on some
+  // phones that store breaks after a while (many names, distances changing as you walk): words turn into blocks and
+  // flicker. These pictures are drawn without the graphics chip (willReadFrequently), so it isn't used for letters at
+  // all. The last WORD_PICS words are kept.
+  const WORD_PICS = 900;
+  const wordPics = new Map();
+  let wordRuler = null;
+  function wordPic(text, px, col, ratio) {
+    const key = ratio + '|' + px + '|' + col + '|' + text;
+    let pic = wordPics.get(key);
+    if (pic) {
+      wordPics.delete(key);
+      wordPics.set(key, pic);
+      return pic;
+    }
+    const font = 'bold ' + px + 'px ' + FONT, line = Math.max(2, px * 0.28), pad = Math.ceil(line / 2 + 1);
+    if (!wordRuler) wordRuler = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    wordRuler.font = font;
+    const w = Math.ceil(wordRuler.measureText(text).width + pad * 2), h = Math.ceil(px * 1.4 + pad * 2);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(w * ratio));
+    c.height = Math.max(1, Math.ceil(h * ratio));
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.scale(ratio, ratio);
+    g.font = font;
+    g.textAlign = 'center';
+    g.textBaseline = 'top';
+    g.lineJoin = 'round';
+    g.lineWidth = line;
+    g.strokeStyle = '#000';
+    g.fillStyle = col;
+    g.strokeText(text, w / 2, pad);
+    g.fillText(text, w / 2, pad);
+    pic = { c, w, h, pad };
+    wordPics.set(key, pic);
+    if (wordPics.size > WORD_PICS) wordPics.delete(wordPics.keys().next().value);
+    return pic;
+  }
   function write(text, px, x, y, col, alpha) {
     px *= prefs.textScale;
-    ctx.font = 'bold ' + px + 'px ' + FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(2, px * 0.28);
+    const ratio = pixelRatio(), pic = wordPic(String(text), px, col, ratio);
+    // on whole screen pixels, so the words stay sharp
+    const left = Math.round((x - pic.w / 2) * ratio) / ratio, top = Math.round((y - pic.pad) * ratio) / ratio;
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = '#000';
-    ctx.fillStyle = col;
-    ctx.strokeText(text, x, y);
-    ctx.fillText(text, x, y);
+    ctx.drawImage(pic.c, left, top, pic.w, pic.h);
     ctx.globalAlpha = 1;
   }
 
@@ -4904,10 +4938,7 @@
       const now = liveById.get(m.id);
       rosterOpen = rosterOpen === m.id ? null : m.id;
       rosterPrint = null;
-      if (now && inRaidHere()) {
-        goTo(now.cx, now.cy);
-        chase(m.id);
-      }
+      if (now && inRaidHere()) watch(now);
       listRoster();
     };
     // beside the name: the level, and the kind too when the list isn't in groups (nearest first)
@@ -5223,7 +5254,7 @@
     row.onclick = () => {
       if (!inRaidHere()) return;
       const m = e.p ? live.find(x => x.pid === e.p && x.c !== 'Corpse') : null;
-      if (m && !inArea(m)) { goTo(m.cx, m.cy); chase(m.id); return; }
+      if (m && !inArea(m)) { watch(m); return; }
       // nobody to follow: the place it happened
       const at = Array.isArray(e.d.l) ? e.d.l : Array.isArray(e.d.a) && Array.isArray(e.d.b) ? [(e.d.a[0] + e.d.b[0]) / 2, (e.d.a[1] + e.d.b[1]) / 2] : null;
       if (at) { chase(null); roam(); goTo(at[0], at[1]); }
@@ -5336,7 +5367,7 @@
       if (brain) card.appendChild(el('small', '', brain.text));
       const like = likeOf(m);
       if (like && prefs.botDiff) card.appendChild(el('small', '', like));
-      card.onclick = () => { if (inRaidHere() && !inArea(m)) { goTo(m.cx, m.cy); chase(m.id); } };
+      card.onclick = () => { if (inRaidHere() && !inArea(m)) watch(m); };
       body.appendChild(card);
     }
     if (events.length) {
@@ -5547,7 +5578,7 @@
       row.title = who.textContent + '\n' + what.textContent;
       row.onclick = () => {
         const m = live.find(x => x.pid === e.p && x.c !== 'Corpse');
-        if (m && inRaidHere()) { goTo(m.cx, m.cy); chase(m.id); }
+        if (m && inRaidHere()) watch(m);
       };
       log.appendChild(row);
     }
@@ -5803,10 +5834,11 @@
     document.body.style.setProperty('--cover-r', next.r + 'px');
     dirty = true;
   }
-  // On a phone the lists of maps and players, and the buttons not needed all the time, are in the menu's Map tab;
-  // otherwise along the top.
+  // On a phone: the map list, Buildings, Whole map and Full screen are round buttons down the map's right edge
+  // (#mapTools), whose game it is is picked by pressing the status, and the language is in Settings. Otherwise they're
+  // all along the top.
   function placeQuick() {
-    const bar = $('bar'), quick = $('quick');
+    const bar = $('bar');
     // the Raid list: in the menu's Raid tab on a phone, otherwise in its own panel beside the map
     const home = phone.matches ? $('panelBody').querySelector('section[data-tab="raid"]') : $('sideBody');
     if ($('roster').parentNode !== home) { home.prepend($('rosterTools'), $('roster')); rosterPrint = null; }
@@ -5818,9 +5850,10 @@
       if (!el || el.parentNode === tools) continue;
       if (phone.matches) tools.appendChild(el); else tools.insertBefore(el, $('sideClose'));
     }
+    const phoneHome = { session: $('status'), map: $('mapPick'), fit: $('mapTools'), reveal: $('mapTools'), full: $('mapTools'), langBox: $('langHome') };
     for (const id of ['session', 'map', 'fit', 'reveal', 'full', 'langBox']) {
       const el = $(id);
-      if (phone.matches) { if (el.parentNode !== quick) quick.appendChild(el); }
+      if (phone.matches) { if (el.parentNode !== phoneHome[id]) phoneHome[id].appendChild(el); }
       else if (el.parentNode !== bar) bar.insertBefore(el, id === 'session' || id === 'map' ? $('findBox') : $('options'));
     }
   }
@@ -5987,6 +6020,17 @@
     centreOn(x, y);
     flash = { x, y, at: performance.now() };
   }
+  // Somebody pressed in a list (the Raid list, the kill feed, a squad): followed, as when pressed on the map, and
+  // ringed. Not gone to as a spot (goTo): that sets following the player aside for good, so letting go of them (pressing
+  // off them) left the map where it was, instead of going back to the player at the zoom they had.
+  function watch(m) {
+    chase(m.id);
+    zoom = zoomTarget = Math.min(zoomMax, Math.max(zoomTarget, Math.min(vw, vh) / 60));
+    zoomAt = null;
+    centreOn(m.cx, m.cy);
+    flash = { x: m.cx, y: m.cy, at: performance.now() };
+    dirty = true;
+  }
   function togglePanel(on, remember) {
     $('panel').hidden = on === undefined ? !$('panel').hidden : !on;
     $('options').classList.toggle('on', !$('panel').hidden);
@@ -6078,6 +6122,19 @@
     speed.worst = speed.work = speed.workMost = speed.gapMost = 0;
   }
 
+  // The map standing still: not moved, zoomed or turned, and nothing held on it (a finger, the mouse dragging), for
+  // STILL_MS (longer on a phone, where a finger lifted and put down again is part of moving about). lookAt: the
+  // building looked into by being in the middle of the screen, picked when the map was last still.
+  const STILL_MS = 500, STILL_PHONE_MS = 800;
+  let viewKey = '', viewMovedAt = 0, lookAt = 0;
+  function viewStill(now) {
+    const key = panX.toFixed(1) + ',' + panY.toFixed(1) + ',' + zoom.toFixed(4) + ',' + (prefs.turns && map ? prefs.turns[map.loc] || 0 : 0);
+    if (key !== viewKey || dragging || pinch || fingers.size) { viewKey = key; viewMovedAt = now; }
+    if (now - viewMovedAt >= (phone.matches ? STILL_PHONE_MS : STILL_MS)) return true;
+    dirty = true;
+    return false;
+  }
+
   let last = performance.now();
   let sinceStatus = 1;
   function frame(now) {
@@ -6135,15 +6192,19 @@
           // a map with buildings goes by them, one without by its squares
           const myFloor = place => f.buildings ? buildingFloor(place, me.x, me.y, me.z) : floorOf(place, me.z);
           // looking about (not following, or no raid here): the building in the middle of the screen, once close
-          // enough to make it out; on the player's floor when it's the one they're in, else its ground floor
+          // enough to make it out; on the player's floor when it's the one they're in, else its ground floor. Picked
+          // only once the map has stood still a moment (see viewStill): while it's dragged, pinched or gliding, the
+          // building shown stays as it is, so roofs don't flick open as the middle passes over them.
           if (prefs.insideLook && (!here || !following()) && Math.min(vw, vh) / zoom <= prefs.lookSpan) {
-            const mid = toMap(vw / 2, vh / 2);
-            const place = f.buildings ? buildingAt(mid[0], mid[1]) : placeAt(mid[0], mid[1]);
-            if (place) {
-              wantPlace = place;
-              wantN = (place === mine ? myFloor(place) : 0) || (f.buildings ? mainFloor(place) : 1);
+            if (viewStill(now)) {
+              const mid = toMap(vw / 2, vh / 2);
+              lookAt = (f.buildings ? buildingAt(mid[0], mid[1]) : placeAt(mid[0], mid[1])) || 0;
             }
-          }
+            if (lookAt) {
+              wantPlace = lookAt;
+              wantN = (lookAt === mine ? myFloor(lookAt) : 0) || (f.buildings ? mainFloor(lookAt) : 1);
+            }
+          } else lookAt = 0;
           // the player's building pressed away (see pressed): the whole map until they leave it or press it again
           if (insideShut && insideShut !== mine) insideShut = 0;
           // or walk on: a few steps from where they stood when it was pressed away, and the inside is back
