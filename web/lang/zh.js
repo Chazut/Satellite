@@ -417,7 +417,7 @@ fumsLang({
 "Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.": "在同一 Wi-Fi 下的手机或平板上打开此地图：用相机扫描二维码，或输入地址。",
 "Copy": "复制",
 "Copied": "已复制",
-"Only this PC can open the map. In SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.": "目前只有这台电脑能打开地图。在 SPT_Data/configs/http.json 中把 \"ip\" 设为 \"0.0.0.0\"，然后重启服务器。",
+"Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).": "目前只有这台电脑能打开地图。要在手机上打开，服务器需要 Fika（它会把服务器开放给你的网络）。",
 "No network address was found for this PC.": "没有找到这台电脑的网络地址。",
 "Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.": "手机上打不开？在 Windows 防火墙中允许 SPT.Server.exe 通过专用网络。手机浏览器第一次会提示证书警告：继续访问页面即可。",
 "Saves every setting of this page to a file, to load in another browser or on another PC.": "将此页面的所有设置保存到文件，可在其他浏览器或其他电脑上载入。",
@@ -693,5 +693,18 @@ fumsLang({
 "Map scans by Fums,": "地图采集：Fums，",
 "Use, share and change them with credit. Not for sale.": "可署名使用、分享和修改，不得出售。",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov 归 Battlestate Games 所有。Satellite 是玩家自制模组，并非由其制作或支持。",
-"Satellite 1.0.0, made by Fums. Press for the credits and the map licence": "Satellite 1.0.0，作者 Fums。点击查看致谢和地图许可"
+"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1，作者 Fums。点击查看致谢和地图许可",
+"Transits": "转移点",
+"Transit": "转移点",
+"Transit to {map}": "前往{map}的转移点",
+"Not open yet": "尚未开启",
+"Secret extract": "秘密撤离点",
+"Not found yet: its note opens it": "尚未找到：拾取其纸条即可开启",
+"Secret ones not found yet": "尚未找到的秘密撤离点",
+"Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.": "秘密撤离点在你拾取其纸条后显示。开启：尚未找到的也以紫色显示。",
+"Only my wishlist": "仅显示我的心愿单",
+"{n} not on your wishlist": "{n} 件不在心愿单中",
+"Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "只显示心愿单上的战利品：散落的、容器里的、尸体上的，以及可能刷新的地点，不论价值和种类。任务物品仍会显示。在游戏里添加心愿单；地图会在半分钟内跟上。",
+"ISB special forces": "ISB特种部队",
+"ISB": "ISB"
 });

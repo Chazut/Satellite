@@ -10,7 +10,8 @@ namespace Satellite.Server;
 // GET api/quests[?session=]:
 //   {"sid","quests":[{"id","name","trader","loc"?,"goals":[{"id","text","zones":[zone ids],"items":[tpls],
 //     "locs":[locations]}]}],
-//    "zones":{"zone id":"name of a quest that sends you there",..},"names":{tpl: as in api/things}}
+//    "zones":{"zone id":"name of a quest that sends you there",..},"wish":[tpls on the player's wishlist],
+//    "names":{tpl: as in api/things}}
 // "quests" holds the quests the player has started, each with the goals not done yet. "zones" holds every place any
 // quest sends you to, so the page can name them all. A zone id is the id of a place in places.json's "zones".
 public partial class LiveMapRoute
@@ -128,6 +129,7 @@ public partial class LiveMapRoute
         }
 
         List<QuestStatus>? statuses = null;
+        var wish = new List<string>();
         try
         {
             foreach (var (profileId, profile) in saveServer.GetProfiles())
@@ -135,6 +137,12 @@ public partial class LiveMapRoute
                 if (profileId.ToString() == session.Id)
                 {
                     statuses = profile?.CharacterData?.PmcData?.Quests;
+                    // the items on the player's wishlist (the game keeps a group for each; any group counts)
+                    if (profile?.CharacterData?.PmcData?.WishList is { } wished)
+                    {
+                        wish.AddRange(wished.Keys.Select(tpl => tpl.ToString()));
+                    }
+
                     break;
                 }
             }
@@ -221,6 +229,7 @@ public partial class LiveMapRoute
             ["sid"] = session.Id,
             ["quests"] = list,
             ["zones"] = _questZones.DeepClone(),
+            ["wish"] = new JsonArray(wish.Distinct().Select(w => (JsonNode?)w).ToArray()),
             ["names"] = Names(named)
         }.ToJsonString();
     }

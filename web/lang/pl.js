@@ -417,7 +417,7 @@ fumsLang({
 "Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.": "Otwórz tę mapę na telefonie lub tablecie w tej samej sieci Wi-Fi: zeskanuj kod aparatem albo wpisz adres.",
 "Copy": "Kopiuj",
 "Copied": "Skopiowano",
-"Only this PC can open the map. In SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.": "Tylko ten komputer może otworzyć mapę. W SPT_Data/configs/http.json ustaw \"ip\" na \"0.0.0.0\", potem uruchom serwer ponownie.",
+"Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).": "Tylko ten komputer może otworzyć mapę. Aby otworzyć ją na telefonie, serwer potrzebuje Fiki (otwiera serwer na twoją sieć).",
 "No network address was found for this PC.": "Nie znaleziono adresu sieciowego tego komputera.",
 "Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.": "Nie otwiera się na telefonie? Zezwól na SPT.Server.exe w Zaporze systemu Windows dla sieci prywatnych. Przeglądarka telefonu za pierwszym razem ostrzeże o certyfikacie: przejdź dalej do strony.",
 "Saves every setting of this page to a file, to load in another browser or on another PC.": "Zapisuje wszystkie ustawienia tej strony do pliku, do wczytania w innej przeglądarce lub na innym PC.",
@@ -713,5 +713,18 @@ fumsLang({
 "Map scans by Fums,": "Skany map: Fums,",
 "Use, share and change them with credit. Not for sale.": "Używaj, udostępniaj i zmieniaj z podaniem autora. Nie sprzedawaj.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov należy do Battlestate Games. Satellite to mod fanowski, przez nich niestworzony ani niewspierany.",
-"Satellite 1.0.0, made by Fums. Press for the credits and the map licence": "Satellite 1.0.0, autor: Fums. Naciśnij, by zobaczyć autorów i licencję map"
+"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, autor: Fums. Naciśnij, by zobaczyć autorów i licencję map",
+"Transits": "Tranzyty",
+"Transit": "Tranzyt",
+"Transit to {map}": "Tranzyt do {map}",
+"Not open yet": "Jeszcze nie otwarty",
+"Secret extract": "Sekretne wyjście",
+"Not found yet: its note opens it": "Jeszcze nie znalezione: otwiera je notatka",
+"Secret ones not found yet": "Sekretne jeszcze nie znalezione",
+"Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.": "Sekretne wyjścia pojawiają się, gdy podniesiesz ich notatkę. Włączone: także te jeszcze nie znalezione, na fioletowo.",
+"Only my wishlist": "Tylko moja lista życzeń",
+"{n} not on your wishlist": "{n} spoza twojej listy życzeń",
+"Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Tylko łup z twojej listy życzeń: leżący luzem, w pojemnikach, na ciałach i tam, gdzie może się pojawić, bez względu na wartość i rodzaj. Przedmioty z zadań nadal są pokazywane. Dodawaj do listy życzeń w grze; mapa nadąża w ciągu pół minuty.",
+"ISB special forces": "Siły specjalne ISB",
+"ISB": "ISB"
 });

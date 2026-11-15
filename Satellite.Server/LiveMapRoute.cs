@@ -418,8 +418,8 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         ("friendlyPlayers", "Friendly Player"), ("enemyPmcs", "Enemy Player"), ("scavs", "Scav"), ("snipers", "Sniper"),
         ("guards", "Guard"), ("cultists", "Cultist"), ("goons", "Goon"), ("bosses", "Boss"), ("raiders", "Raider"), ("rogues", "Rogue"),
         ("smugglers", "Smuggler"), ("blackDivision", "Black Division"), ("ruaf", "RUAF"),
-        ("ruafRemnant", "RUAF Remnant"), ("civilians", "Civilian"), ("infected", "Infected"), ("otherAi", "Other AI"),
-        ("corpses", "Corpse"), ("extracts", "Extract"), ("airdrops", "Airdrop")
+        ("ruafRemnant", "RUAF Remnant"), ("untar", "UNTAR"), ("isb", "ISB"), ("civilians", "Civilian"), ("infected", "Infected"), ("otherAi", "Other AI"),
+        ("corpses", "Corpse"), ("extracts", "Extract"), ("transits", "Transit"), ("airdrops", "Airdrop")
     ];
 
     private string[]? _off;
@@ -472,6 +472,21 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
 
         return file;
+    }
+
+    // config.jsonc's server.quietLogs: on unless it says false (a config.jsonc from 1.0.0 doesn't have it)
+    public static bool QuietLogs(string file)
+    {
+        try
+        {
+            var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+            return !(File.Exists(file) && JsonNode.Parse(File.ReadAllText(file), null, options)?["server"]?["quietLogs"] is JsonValue value
+                && value.TryGetValue<bool>(out var on) && !on);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        {
+            return true;
+        }
     }
 
     private string[] ReadOff()
@@ -1153,7 +1168,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 }
 
                 near.Add((key, then));
-                if (Fit(then, now) is { } score && score < bestScore)
+                if (Fit(then, now, loose) is { } score && score < bestScore)
                 {
                     best = key;
                     bestScore = score;
@@ -1174,7 +1189,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 && !IsSnow(addon.Loc) && !taken.Contains(addon.Loc) && addon.Scenes.Count > 0)
             {
                 near.Add((addon.Loc, addon.Scenes));
-                if (Fit(addon.Scenes, now) is { } score && score < bestScore)
+                if (Fit(addon.Scenes, now, loose) is { } score && score < bestScore)
                 {
                     best = addon.Loc;
                     bestScore = score;
@@ -1226,11 +1241,18 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
 
     // How well the scenes a map was captured with fit the ones loaded now: the differences, or null when they don't
     // fit (one of its scenes isn't loaded and one it didn't have is: a swap; or more than half of its own are missing).
-    private static int? Fit(List<string> then, HashSet<string> now)
+    // Not loose (the scanner): only the very same scenes fit. A version can be another with a scene added (Manimal's
+    // Halloween 2026 Labs is his Labs Boiler with one layer more), and scanning it as that one would scan over it.
+    private static int? Fit(List<string> then, HashSet<string> now, bool loose = true)
     {
         var thenSet = new HashSet<string>(then, StringComparer.Ordinal);
         var missing = then.Count(s => !now.Contains(s));
         var added = now.Count(s => !thenSet.Contains(s));
+        if (!loose)
+        {
+            return missing == 0 && added == 0 ? 0 : null;
+        }
+
         var swapped = missing > 0 && added > 0;
         return !swapped && missing <= then.Count / 2 ? missing + added : null;
     }
@@ -1489,6 +1511,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
 
         logger.Success($"[Satellite] Captured the map of {location} ({columns} by {rows} tiles).");
         await SendJson(context, "{\"saved\":true}", cancellationToken);
+
+        // then its tiles in one file, as the release zips have them, after the answer (a big map takes a few seconds);
+        // the loose tiles are served until the pack is in place
+        _ = Task.Run(() => PackLoose(folder));
     }
 
     [GeneratedRegex("^[a-z]{1,16}$")]
@@ -1862,18 +1888,28 @@ public class LiveMapStartup(ISptLogger<LiveMapStartup> logger, HttpConfig http, 
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        // a newer or older SPT may have moved the request log: then the map's requests are just logged as before
-        try
-        {
-            new QuietRequests().Enable();
-        }
-        catch (Exception ex)
-        {
-            logger.Debug($"[Satellite] Couldn't quiet the map's request lines: {ex.Message}");
-        }
-
         // the server owner's settings: written now when there are none, so the file is there to edit
-        LiveMapRoute.ConfigFile(modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly()), m => logger.Info(m), m => logger.Warning(m));
+        var config = LiveMapRoute.ConfigFile(modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly()), m => logger.Info(m), m => logger.Warning(m));
+
+        // config.jsonc's server.quietLogs, on unless set false: SPT's "[Client Request]" line for every request, every
+        // mod's, left out (http.json's logRequests, which SPT reads for each request), so the page's many requests never
+        // fill the server's window, whichever way SPT runs. Set false: only the map's own are left out, by
+        // QuietRequests; a newer or older SPT may have moved the request log, and then they're logged as before.
+        if (LiveMapRoute.QuietLogs(config))
+        {
+            http.LogRequests = false;
+        }
+        else
+        {
+            try
+            {
+                new QuietRequests().Enable();
+            }
+            catch (Exception ex)
+            {
+                logger.Warning($"[Satellite] Couldn't leave the map's requests out of SPT's log, so every one is logged. To leave out every request line, set server.quietLogs to true in config.jsonc. ({ex.Message})");
+            }
+        }
 
         logger.Success($"[Satellite] Open it at https://127.0.0.1:{http.Port}{LiveMapRoute.Root}/");
 
@@ -1890,7 +1926,7 @@ public class LiveMapStartup(ISptLogger<LiveMapStartup> logger, HttpConfig http, 
         }
         else
         {
-            logger.Info("[Satellite] Only this PC can open the map. To open it on a phone: in SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.");
+            logger.Info("[Satellite] Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).");
         }
 
         return Task.CompletedTask;

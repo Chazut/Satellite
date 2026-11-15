@@ -417,7 +417,7 @@ fumsLang({
 "Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.": "同じWi-Fiのスマホやタブレットでこの地図を開けます：カメラでコードを読み取るか、アドレスを入力してください。",
 "Copy": "コピー",
 "Copied": "コピーしました",
-"Only this PC can open the map. In SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.": "この地図はこのPCでしか開けません。SPT_Data/configs/http.json の \"ip\" を \"0.0.0.0\" にして、サーバーを再起動してください。",
+"Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).": "この地図はこのPCでしか開けません。スマホで開くには、サーバーに Fika が必要です（サーバーをネットワークに公開します）。",
 "No network address was found for this PC.": "このPCのネットワークアドレスが見つかりませんでした。",
 "Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.": "スマホで開けない場合は、WindowsファイアウォールでSPT.Server.exeをプライベートネットワークに許可してください。スマホのブラウザーは最初に証明書の警告を出します：そのままページへ進んでください。",
 "Saves every setting of this page to a file, to load in another browser or on another PC.": "このページのすべての設定をファイルに保存します。別のブラウザーや別のPCで読み込めます。",
@@ -693,5 +693,18 @@ fumsLang({
 "Map scans by Fums,": "マップ撮影：Fums、",
 "Use, share and change them with credit. Not for sale.": "クレジット表記のうえ使用・共有・改変可。販売は不可。",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov は Battlestate Games のものです。Satellite はファンが作った MOD で、同社が制作・支援したものではありません。",
-"Satellite 1.0.0, made by Fums. Press for the credits and the map licence": "Satellite 1.0.0、作者 Fums。押すとクレジットとマップのライセンス"
+"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1、作者 Fums。押すとクレジットとマップのライセンス",
+"Transits": "トランジット",
+"Transit": "トランジット",
+"Transit to {map}": "{map}へのトランジット",
+"Not open yet": "まだ開いていない",
+"Secret extract": "シークレット脱出地点",
+"Not found yet: its note opens it": "未発見：メモを拾うと開く",
+"Secret ones not found yet": "未発見のシークレット",
+"Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.": "シークレット脱出地点はメモを拾うと表示されます。オン：未発見のものも紫で表示します。",
+"Only my wishlist": "ウィッシュリストのみ",
+"{n} not on your wishlist": "ウィッシュリスト外 {n} 件",
+"Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "ウィッシュリストにあるルートだけを表示します：落ちている物、コンテナの中、死体、スポーンし得る場所。価値や種類は問いません。クエストアイテムは引き続き表示されます。ウィッシュリストへの追加はゲーム内で。マップには30秒以内に反映されます。",
+"ISB special forces": "ISB特殊部隊",
+"ISB": "ISB"
 });

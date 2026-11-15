@@ -417,7 +417,7 @@ fumsLang({
 "Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.": "Открой эту карту на телефоне или планшете в той же сети Wi-Fi: отсканируй код камерой или введи адрес.",
 "Copy": "Копировать",
 "Copied": "Скопировано",
-"Only this PC can open the map. In SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.": "Карту может открыть только этот ПК. В SPT_Data/configs/http.json поставь \"ip\" в \"0.0.0.0\" и перезапусти сервер.",
+"Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).": "Карту может открыть только этот ПК. Чтобы открыть её на телефоне, серверу нужен Fika (он открывает сервер для вашей сети).",
 "No network address was found for this PC.": "Сетевой адрес этого ПК не найден.",
 "Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.": "Не открывается на телефоне? Разреши SPT.Server.exe в брандмауэре Windows для частных сетей. Браузер телефона в первый раз предупредит о сертификате: перейди на страницу.",
 "Saves every setting of this page to a file, to load in another browser or on another PC.": "Сохраняет все настройки этой страницы в файл, чтобы загрузить их в другом браузере или на другом ПК.",
@@ -713,5 +713,18 @@ fumsLang({
 "Map scans by Fums,": "Снимки карт: Fums,",
 "Use, share and change them with credit. Not for sale.": "Используйте, делитесь и изменяйте с указанием автора. Не продавать.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov принадлежит Battlestate Games. Satellite — фанатский мод, они его не делали и не поддерживают.",
-"Satellite 1.0.0, made by Fums. Press for the credits and the map licence": "Satellite 1.0.0, автор: Fums. Нажмите, чтобы увидеть авторов и лицензию карт"
+"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, автор: Fums. Нажмите, чтобы увидеть авторов и лицензию карт",
+"Transits": "Переходы",
+"Transit": "Переход",
+"Transit to {map}": "Переход на {map}",
+"Not open yet": "Ещё не открыт",
+"Secret extract": "Секретный выход",
+"Not found yet: its note opens it": "Ещё не найден: его открывает записка",
+"Secret ones not found yet": "Секретные, ещё не найденные",
+"Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.": "Секретные выходы появляются, когда вы подбираете их записку. Вкл.: ещё не найденные тоже, фиолетовым.",
+"Only my wishlist": "Только мой список желаемого",
+"{n} not on your wishlist": "{n} нет в списке желаемого",
+"Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Только лут из твоего списка желаемого: лежащий, в контейнерах, на телах и там, где он может появиться, сколько бы он ни стоил и какого бы ни был вида. Квестовые предметы по-прежнему видны. Добавляй в список желаемого в игре; карта подхватит в течение полуминуты.",
+"ISB special forces": "Спецназ ISB",
+"ISB": "ISB"
 });

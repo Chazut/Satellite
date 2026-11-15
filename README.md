@@ -8,22 +8,23 @@ A live map of your raid in the browser, for SPT 4.1. Use it on a second monitor,
 
 ![Maps, quests and options](examples/FeaturesExample.webp)
 
-- Top-down scans of every base game map. Modded maps come as add-ons.
-- You, your friends and every bot, live.
-- Extracts: green open, yellow needs something, red closed.
-- Loose loot and container contents, coloured by worth. Better Flea prices if you run it.
-- Locked doors and the key that opens them.
-- Quest places and quest items.
-- Building floors: walk inside and the map shows your floor.
-- Minefields, claymores and sniper zones.
-- Raid list, kill feed and raid events.
-- What bots are doing, with SAIN, ORBIT or COMET installed.
-- Arrows to who's off the screen.
-- Search for loot, keys and quests.
-- Works on a phone. Settings > About has a QR code.
-- 10 languages.
-- Every marker and feature has its own switch.
-- Export and import your settings.
+- Uses top-down scans of every base game map, with modded maps as add-ons
+- Shows you, your teammates and every bot live in the raid
+- Shows your extracts and whether they're open, need something, or are closed, secret ones once you find their note
+- Shows transits and the map each one goes to
+- Shows loose loot and what's inside containers, coloured by value (uses Better Flea prices if you have it)
+- Can show only the loot on your wishlist
+- Shows locked doors and which key opens them
+- Shows markers for your quests and their items
+- Shows the floor you're on when you walk into a building
+- Shows minefields, claymores and sniper zones
+- Lists everyone in the raid, with a kill feed and raid events
+- Shows what each bot is doing if you run SAIN, ORBIT or COMET
+- Points to players and bosses off the edge of the screen
+- Lets you search for loot, keys and quests
+- Works on your phone (scan the code in Settings > About), in 10 languages
+- Lets you turn every marker and feature on or off
+- Lets you export and import your settings
 
 It only reads. Nothing on the page changes anyone's game.
 
@@ -43,14 +44,14 @@ and events from whoever hosts the raid, and your own position from your game. Th
 
 ![Satellite on a phone](examples/PhoneExample.webp)
 
-1. Close the server. In `SPT_Runtime/SPT_Data/configs/http.json`, set `"ip"` to `"0.0.0.0"`. Leave `"backendIp"` alone.
-2. Start the server. Let SPT.Server.exe through the Windows firewall on Private networks.
-3. Make sure your Wi-Fi is set to Private in Windows.
-4. Open the map on the PC, go to Settings > About and scan the code.
+Needs Fika on the server. Fika opens the server to your network; without it, the server only answers the PC it runs
+on. The phone needs to reach that PC: on the same Wi-Fi, or through a VPN into your home network.
 
-This opens the whole SPT server to your network, not just the map. Only do it on your home network. If port 6969 is
-forwarded for Fika, anyone with your address can open the map too. Change the default `spt` / `spt` password in
-`http.json`.
+1. Let SPT.Server.exe through the Windows firewall on Private networks.
+2. Make sure your Wi-Fi is set to Private in Windows.
+3. Open the map on the PC, go to Settings > About and scan the code.
+
+If port 6969 is forwarded for Fika, anyone with your address can open the map too.
 
 ## Controls
 
@@ -75,6 +76,8 @@ forwarded for Fika, anyone with your address can open the map too. Change the de
 - Page settings are in the menu, saved in each viewer's browser.
 - `SPT_Runtime/user/mods/Satellite/config.jsonc`: the server owner can turn off any kind of marker or loot for every
   page. Made on first start. Updates don't overwrite it. Restart the server after a change.
+  SPT's `[Client Request]` lines are left out of the server window; `"server": { "quietLogs": false }` in it brings
+  them back (apart from the map's own).
 - F12 > Fums-Satellite: the key that opens the map, and how often it updates.
 
 ## Build

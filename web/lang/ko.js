@@ -417,7 +417,7 @@ fumsLang({
 "Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.": "같은 Wi-Fi의 휴대폰이나 태블릿에서 이 지도를 여세요: 카메라로 코드를 스캔하거나 주소를 입력하세요.",
 "Copy": "복사",
 "Copied": "복사됨",
-"Only this PC can open the map. In SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.": "이 PC에서만 지도를 열 수 있습니다. SPT_Data/configs/http.json에서 \"ip\"를 \"0.0.0.0\"으로 설정한 뒤 서버를 다시 시작하세요.",
+"Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).": "이 PC에서만 지도를 열 수 있습니다. 휴대폰에서 열려면 서버에 Fika가 필요합니다 (서버를 네트워크에 엽니다).",
 "No network address was found for this PC.": "이 PC의 네트워크 주소를 찾지 못했습니다.",
 "Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.": "휴대폰에서 열리지 않나요? Windows 방화벽에서 개인 네트워크에 대해 SPT.Server.exe를 허용하세요. 휴대폰 브라우저가 처음에 인증서 경고를 표시합니다: 페이지로 계속 진행하세요.",
 "Saves every setting of this page to a file, to load in another browser or on another PC.": "이 페이지의 모든 설정을 파일로 저장합니다. 다른 브라우저나 다른 PC에서 불러올 수 있습니다.",
@@ -693,5 +693,18 @@ fumsLang({
 "Map scans by Fums,": "맵 촬영: Fums,",
 "Use, share and change them with credit. Not for sale.": "출처를 밝히면 사용, 공유, 수정할 수 있습니다. 판매는 안 됩니다.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov는 Battlestate Games의 것입니다. Satellite는 팬 모드이며 그들이 만들거나 지원하지 않습니다.",
-"Satellite 1.0.0, made by Fums. Press for the credits and the map licence": "Satellite 1.0.0, 제작 Fums. 눌러서 크레딧과 맵 라이선스 보기"
+"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, 제작 Fums. 눌러서 크레딧과 맵 라이선스 보기",
+"Transits": "트랜짓",
+"Transit": "트랜짓",
+"Transit to {map}": "{map}(으)로 가는 트랜짓",
+"Not open yet": "아직 열리지 않음",
+"Secret extract": "비밀 탈출구",
+"Not found yet: its note opens it": "아직 못 찾음: 쪽지를 주우면 열림",
+"Secret ones not found yet": "아직 못 찾은 비밀 탈출구",
+"Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.": "비밀 탈출구는 쪽지를 주우면 표시됩니다. 켜면: 아직 못 찾은 것도 보라색으로 표시합니다.",
+"Only my wishlist": "내 위시리스트만",
+"{n} not on your wishlist": "위시리스트에 없는 것 {n}개",
+"Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "위시리스트에 있는 전리품만 표시합니다: 바닥, 컨테이너 안, 시체, 스폰될 수 있는 곳. 가치나 종류는 상관없습니다. 퀘스트 아이템은 계속 표시됩니다. 위시리스트 추가는 게임에서 하세요. 지도는 30초 안에 따라옵니다.",
+"ISB special forces": "ISB 특수부대",
+"ISB": "ISB"
 });

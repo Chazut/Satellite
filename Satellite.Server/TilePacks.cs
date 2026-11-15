@@ -7,7 +7,7 @@ namespace Satellite.Server;
 
 // A map's tiles, as they're sent to the page: from maps/<location>/<v>/tiles.pack when there is one (how the release
 // zips ship them, so there are a few dozen files to unzip, not thousands), else from the loose .jpg files (how a
-// capture writes them).
+// capture sends them, one by one; PackLoose joins them into the pack once the capture is complete).
 //
 // tiles.pack, little-endian:
 //   "SATTILE1"                                    8 bytes
@@ -106,6 +106,106 @@ public partial class LiveMapRoute
 
             return null;
         }
+    }
+
+    // A finished capture's loose tiles joined into the folder's tiles.pack, as the release zips have them, and then
+    // deleted. Written beside it first and read back tile for tile before it takes the pack's name (SendTile prefers a
+    // pack as soon as there is one). False, and the loose tiles kept (they're served as they are), when it went wrong.
+    private bool PackLoose(string folder)
+    {
+        var files = Directory.GetFiles(folder, "*.jpg")
+            .Where(f => TileName().IsMatch(Path.GetFileName(f)))
+            .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal)
+            .ToArray();
+        if (files.Length == 0 || files.Length > MostInPack)
+        {
+            return false;
+        }
+
+        var pack = Path.Combine(folder, PackName);
+        var partial = pack + ".part";
+        try
+        {
+            var names = files.Select(f => Encoding.ASCII.GetBytes(Path.GetFileName(f))).ToArray();
+            var lengths = new int[files.Length];
+            long offset = PackMagic.Length + 4;
+            foreach (var name in names)
+            {
+                offset += 1 + name.Length + 8 + 4;
+            }
+
+            using (var writer = new BinaryWriter(new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None)))
+            {
+                writer.Write(Encoding.ASCII.GetBytes(PackMagic));
+                writer.Write(files.Length);
+                for (var i = 0; i < files.Length; i++)
+                {
+                    lengths[i] = checked((int)new FileInfo(files[i]).Length);
+                    writer.Write((byte)names[i].Length);
+                    writer.Write(names[i]);
+                    writer.Write(offset);
+                    writer.Write(lengths[i]);
+                    offset += lengths[i];
+                }
+
+                foreach (var file in files)
+                {
+                    writer.Write(File.ReadAllBytes(file));
+                }
+            }
+
+            // read back as SendTile reads it: every tile there, byte for byte
+            var index = ReadIndex(partial, new FileInfo(partial));
+            using (var stream = new FileStream(partial, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                for (var i = 0; i < files.Length; i++)
+                {
+                    var name = Path.GetFileName(files[i]);
+                    if (!index.Tiles.TryGetValue(name, out var at) || at.Length != lengths[i])
+                    {
+                        throw new InvalidDataException($"{name} missing from the pack");
+                    }
+
+                    var bytes = new byte[at.Length];
+                    stream.Position = at.Offset;
+                    stream.ReadExactly(bytes);
+                    if (!bytes.AsSpan().SequenceEqual(File.ReadAllBytes(files[i])))
+                    {
+                        throw new InvalidDataException($"{name} differs in the pack");
+                    }
+                }
+            }
+
+            File.Move(partial, pack, true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OverflowException)
+        {
+            logger.Warning($"[Satellite] Couldn't pack the tiles in {folder}; they're kept as they are: {ex.Message}");
+            try
+            {
+                File.Delete(partial);
+            }
+            catch (Exception deleteEx) when (deleteEx is IOException or UnauthorizedAccessException)
+            {
+                // left; the next capture writes over it
+            }
+
+            return false;
+        }
+
+        foreach (var file in files)
+        {
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // the pack is served before it all the same
+            }
+        }
+
+        return true;
     }
 
     private static PackIndex ReadIndex(string pack, FileInfo info)

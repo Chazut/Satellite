@@ -28,7 +28,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
 <div id="toasts"></div>
 
 <header id="bar" class="ui">
-  <button id="brand" type="button" title="Satellite 1.0.0, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.0</span></button>
+  <button id="brand" type="button" title="Satellite 1.0.1, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.1</span></button>
   <div id="status" title=""><span id="dot"></span><span id="statusText">Connecting…</span></div>
   <button id="backRaid" type="button" title="Show the map of the raid again, following the player" hidden>Back to the raid</button>
   <select id="session" title="Whose game to show" hidden></select>
@@ -108,6 +108,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <option value="0">Anything</option><option value="5000">5,000 ₽</option><option value="10000">10,000 ₽</option>
         <option value="20000">20,000 ₽</option><option value="50000">50,000 ₽</option><option value="100000">100,000 ₽</option>
         <option value="200000">200,000 ₽</option></select></label>
+      <label class="row" title="Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute."><input type="checkbox" id="optWishOnly"><span>Only my wishlist</span></label>
       <details class="group" data-group="lootKinds" open>
         <summary>Kinds of loot</summary>
         <div class="filterHead">Switch <button type="button" class="linkBtn" id="lootKindsAll">All on</button> <button type="button" class="linkBtn" id="lootKindsNone">All off</button></div>
@@ -305,13 +306,13 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
           <div id="phoneAddr"><b id="phoneUrl"></b><button type="button" class="linkBtn" id="phoneCopy">Copy</button></div>
           <div id="phoneOthers"></div>
         </div>
-        <p id="phoneShut" hidden>Only this PC can open the map. In SPT_Data/configs/http.json set "ip" to "0.0.0.0", then restart the server.</p>
+        <p id="phoneShut" hidden>Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).</p>
         <p id="phoneNone" hidden>No network address was found for this PC.</p>
         <p class="phoneHelp">Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.</p>
       </details>
       <div id="about">
         <img src="icon.svg" alt="" width="32" height="32">
-        <div><b>Satellite</b> <span class="ver">1.0.0</span><br><small>by <b>Fums</b></small></div>
+        <div><b>Satellite</b> <span class="ver">1.0.1</span><br><small>by <b>Fums</b></small></div>
       </div>
       <p class="credit">Map scans by Fums, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>.</p>
       <p class="credit">Use, share and change them with credit. Not for sale.</p>
@@ -325,7 +326,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
   <span id="scaleBar" hidden></span>
   <span id="cursorAt"></span>
   <span id="playerAt"></span>
-  <button id="credit" type="button" title="Satellite 1.0.0, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
+  <button id="credit" type="button" title="Satellite 1.0.1, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
 </footer>
 
 <div id="hint" class="ui">H hide controls · M menu · P raid · L loot · Q quests · / find</div>

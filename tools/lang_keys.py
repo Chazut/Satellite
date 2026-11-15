@@ -33,7 +33,10 @@ for m in re.finditer(r"const lockName = kind => T\(\{(.*?)\}", js):
         keys.setdefault(unquote(v), 'lock kind')
 # the words of the tables looked up as they're shown: the rows of buttons (segment), the bot mods
 for name in ['LOOT_MODES', 'INTEL']:
-    block = re.search(r"const " + name + r" = \[(.*?)\];", js, re.S).group(1)
+    found = re.search(r"const " + name + r" = \[(.*?)\];", js, re.S)
+    if not found:
+        continue
+    block = found.group(1)
     for row in re.finditer(r"\[\s*" + STR + r",\s*" + STR + r",\s*" + STR + r"\s*\]", block):
         keys.setdefault(unquote(row.group(2)), 'button')
         keys.setdefault(unquote(row.group(3)), 'button tooltip')

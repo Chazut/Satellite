@@ -417,7 +417,7 @@ fumsLang({
 "Open this map on a phone or tablet on the same Wi-Fi: scan the code with its camera, or type the address.": "Ouvre cette carte sur un téléphone ou une tablette sur le même Wi-Fi : scanne le code avec l'appareil photo, ou tape l'adresse.",
 "Copy": "Copier",
 "Copied": "Copié",
-"Only this PC can open the map. In SPT_Data/configs/http.json set \"ip\" to \"0.0.0.0\", then restart the server.": "Seul ce PC peut ouvrir la carte. Dans SPT_Data/configs/http.json, mets \"ip\" à \"0.0.0.0\", puis redémarre le serveur.",
+"Only this PC can open the map. To open it on a phone, the server needs Fika (it opens the server to your network).": "Seul ce PC peut ouvrir la carte. Pour l'ouvrir sur un téléphone, le serveur a besoin de Fika (il ouvre le serveur à ton réseau).",
 "No network address was found for this PC.": "Aucune adresse réseau trouvée pour ce PC.",
 "Doesn't open on the phone? Let SPT.Server.exe through Windows Firewall on private networks. The phone's browser warns about the certificate the first time: continue to the page.": "Ça ne s'ouvre pas sur le téléphone ? Autorise SPT.Server.exe dans le pare-feu Windows sur les réseaux privés. Le navigateur du téléphone avertit au sujet du certificat la première fois : continue vers la page.",
 "Saves every setting of this page to a file, to load in another browser or on another PC.": "Enregistre tous les réglages de cette page dans un fichier, à charger dans un autre navigateur ou sur un autre PC.",
@@ -705,5 +705,18 @@ fumsLang({
 "Map scans by Fums,": "Captures des cartes par Fums,",
 "Use, share and change them with credit. Not for sale.": "Utilisez-les, partagez-les et modifiez-les en citant l’auteur. Pas de vente.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov appartient à Battlestate Games. Satellite est un mod de fan, ni fait ni soutenu par eux.",
-"Satellite 1.0.0, made by Fums. Press for the credits and the map licence": "Satellite 1.0.0, créé par Fums. Appuyez pour les crédits et la licence des cartes"
+"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, créé par Fums. Appuyez pour les crédits et la licence des cartes",
+"Transits": "Transits",
+"Transit": "Transit",
+"Transit to {map}": "Transit vers {map}",
+"Not open yet": "Pas encore ouvert",
+"Secret extract": "Sortie secrète",
+"Not found yet: its note opens it": "Pas encore trouvée : sa note l'ouvre",
+"Secret ones not found yet": "Secrètes pas encore trouvées",
+"Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.": "Les sorties secrètes apparaissent quand vous ramassez leur note. Activé : celles pas encore trouvées aussi, en violet.",
+"Only my wishlist": "Ma liste de souhaits seulement",
+"{n} not on your wishlist": "{n} hors de ta liste de souhaits",
+"Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Seulement le butin de ta liste de souhaits : au sol, dans les conteneurs, sur les corps et là où il peut apparaître, quels que soient sa valeur et son type. Les objets de quête restent affichés. Ajoute à la liste de souhaits dans le jeu ; la carte suit en moins d'une demi-minute.",
+"ISB special forces": "Forces spéciales ISB",
+"ISB": "ISB"
 });

@@ -86,6 +86,7 @@
   // how each kind of marker is drawn; a later one is drawn over an earlier one
   const KINDS = {
     'Extract': { name: T('Extracts'), col: '#3ddc5a', shape: 'exit', size: 1, label: true, order: 0 },
+    'Transit': { name: T('Transits'), col: '#4fc8e8', shape: 'transit', size: 1, label: true, order: 0.1 },
     'Corpse': { name: T('Corpses'), col: '#aab4c0', shape: 'cross', size: 0.8, order: 1 },
     'Other AI': { name: T('Other AI'), col: '#8d96a2', shape: 'arrow', size: 0.95, order: 2 },
     'Scav': { name: T('Scavs'), col: '#f2e24a', shape: 'arrow', size: 1, order: 2 },
@@ -95,6 +96,8 @@
     'Black Division': { name: T('Black Division'), col: '#ececec', shape: 'arrow', size: 1.05, order: 5 },
     'RUAF': { name: 'RUAF', col: '#7da35f', shape: 'arrow', size: 1.05, order: 5 },
     'RUAF Remnant': { name: T('RUAF remnant'), col: '#b08a5a', shape: 'arrow', size: 1.05, order: 5 },
+    'UNTAR': { name: 'UNTAR', col: '#8ec9ff', shape: 'arrow', size: 1.05, order: 5 },
+    'ISB': { name: T('ISB special forces'), col: '#e0a030', shape: 'arrow', size: 1.05, order: 5 },
     'Civilian': { name: T('Civilians'), col: '#b9d6ee', shape: 'arrow', size: 0.9, order: 2 },
     'Infected': { name: T('Infected'), col: '#b84a32', shape: 'arrow', size: 1, order: 3 },
     'Sniper': { name: T('Sniper scavs'), col: '#fff3a8', shape: 'arrow', size: 1, order: 3 },
@@ -116,8 +119,8 @@
     mine: { name: T('Minefields'), col: '#ff3b30', label: T('Mines') },
     sniper: { name: T('Sniper zones'), col: '#ffd23d', label: T('zone|Sniper'), hatch: true }
   };
-  // an extract: closed, wants something of you first, open
-  const EXIT_COL = ['#d8504a', '#e8c547', '#3ddc5a'];
+  // an extract: closed, wants something of you first, open, a secret one not found yet
+  const EXIT_COL = ['#d8504a', '#e8c547', '#3ddc5a', '#b48cff'];
   // What lies about and where things stand: each a layer that can be turned off on the page. server: the layer of
   // the server's config.jsonc that holds it.
   const LAYERS = {
@@ -161,11 +164,12 @@
   // floor: 'auto' (the one the player is on), 0 (the view from above) or a floor's number
   const SPAN_IN = [10, 120], SPAN_OUT = [40, 900];
   // worth: loose loot and containers worth less than this many roubles are left off (quest items never are)
+  // wishOnly: only loot on the player's wishlist, whatever it's worth and whatever its kind (quest items still show)
   // itemNames: loose loot named up close. allNames: every player and bot named.
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, allCorpses: true,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true,
     myQuests: true, otherLoot: 30, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -230,6 +234,9 @@
   delete prefs.refollow;
   if (typeof prefs.myExits !== 'boolean') prefs.myExits = true;
   if (typeof prefs.goneExits !== 'boolean') prefs.goneExits = false;
+  // secretExits: the secret extracts not found yet (their note not picked up) are shown too, in purple; found ones
+  // always are
+  if (typeof prefs.secretExits !== 'boolean') prefs.secretExits = false;
   // corpseKind: a body says what it was
   // alerts: the kinds that are announced once seen. has: the kinds only a mod brings that this game has
   // (1.0.0: a building opens by zooming in on it again, as well as when pressed; a page from the days it was put off
@@ -241,6 +248,7 @@
   prefs.lookSpan = Math.min(LOOK_SPAN[1], Math.max(LOOK_SPAN[0], +prefs.lookSpan || 220));
   if (typeof prefs.pressOpen !== 'boolean') prefs.pressOpen = true;
   prefs.otherLoot = Math.min(100, Math.max(0, Number.isFinite(+prefs.otherLoot) ? +prefs.otherLoot : 30));
+  if (typeof prefs.wishOnly !== 'boolean') prefs.wishOnly = false;
   if (typeof prefs.myQuestItems !== 'boolean') prefs.myQuestItems = prefs.myQuests !== false;
   if (typeof prefs.myQuestPlaces !== 'boolean') prefs.myQuestPlaces = prefs.myQuests !== false;
   if (!Array.isArray(prefs.alerts)) prefs.alerts = [];
@@ -370,6 +378,9 @@
   let tipFor = null;
   // the player's started quests: { sid, list: [{ id, name, trader, loc, goals }], zones: { zone id: quest name }, names }
   let quests = null;
+  // the items on the player's wishlist (a Set of templates; null while not known, or from a server that doesn't say),
+  // and the same as text, so what's worked out from it is worked out again when it changes
+  let wish = null, wishPrint = '';
   let questsAsking = false, questsAskedAt = -1e9, questsFor = '';
   let questsPrint = null;
   let find = '';                // what the search box asks for, lower case; '' for nothing
@@ -760,11 +771,20 @@
   const LOOT_KINDS = [['weapons', T('Weapons')], ['mods', T('Weapon parts')], ['ammo', T('Ammo')], ['gear', T('Gear')], ['meds', T('Medical')],
     ['food', T('Provisions')], ['keys', T('Keys')], ['valuables', T('Valuables')], ['electronics', T('Electronics')], ['tools', T('Tools, materials')],
     ['household', T('Household, other')], ['info', T('Info, maps')], ['money', T('Money')], ['special', T('Special')], ['other', T('Anything else')]];
+  // whether only what's on the player's wishlist is shown (once the wishlist is known)
+  const wishOnly = () => !!prefs.wishOnly && !!wish;
+  // what loot has to be worth to be shown: anything, while only the wishlist is shown
+  const minWorth = () => wishOnly() ? 0 : prefs.worth;
+  // what the loot shown hangs on, as text: what's worked out from it is worked out again when this changes
+  const lootPrint = () => prefs.lootOff.join(',') + (wishOnly() ? '|wish:' + wishPrint : '');
+  // what a list says of the items it leaves out: of kinds switched off, or not on the wishlist
+  const notShown = n => wishOnly() ? T('{n} not on your wishlist', { n }) : T('{n} of kinds not shown', { n });
   // whether an item is of a kind that's shown (quest items always are; an item the server hasn't sorted counts as
-  // "anything else")
+  // "anything else"). While only the wishlist is shown, it's whether it's on the wishlist, whatever its kind.
   const kindOn = (names, tpl) => {
-    if (!prefs.lootOff.length) return true;
     const entry = names[tpl] || {};
+    if (wishOnly()) return !!entry.q || wish.has(tpl);
+    if (!prefs.lootOff.length) return true;
     return !!entry.q || !prefs.lootOff.includes(entry.g || 'other');
   };
 
@@ -2084,6 +2104,9 @@
           })).filter(q => q.goals.length),
           zones: answer.zones || {}, names: answer.names || {}
         } : null;
+        const wished = answer && Array.isArray(answer.wish) ? answer.wish.filter(t => typeof t === 'string').sort() : null;
+        wish = wished ? new Set(wished) : null;
+        wishPrint = wished ? wished.join(',') : '';
         dirty = true;
       }
     } catch (e) { /* asked again in a while */ } finally {
@@ -2241,7 +2264,7 @@
     const worthOf = (tpl, n) => ((names[tpl] || {}).p || 0) * (n || 1);
     const hits = findHits;
     // what a kind of container can hold that's searched for, by name (kept while the search stays as it is)
-    const holdKey = find + '|' + findExact + '|' + prefs.lootOff.join(',') + '|' + (lootTable ? lootTable.loc : '');
+    const holdKey = find + '|' + findExact + '|' + lootPrint() + '|' + (lootTable ? lootTable.loc : '');
     if (holdMemo.key !== holdKey) holdMemo = { key: holdKey, by: new Map() };
     const canHold = (table, tpl) => {
       let names = holdMemo.by.get(tpl);
@@ -2413,7 +2436,7 @@
         const forQuest = !!items && mine && items.some(i => wants.items.has(i[0]));
         const match = looking && ((items || []).some(i => itemHits(i[0])) || itemHits(b.tpl) || canHits.length > 0);
         // in a raid: the ones worth looking in, and every one up close; out of a raid, where they stand, up close
-        const worth = !!items && total >= prefs.worth && total > 0;
+        const worth = !!items && total >= minWorth() && total > 0;
         if (looking ? !match : isHidden('Layer boxes') || !(worth || close || forQuest)) continue;
         found++;
         if (worth && !looking) inBuilding(b, b.p, total, true);
@@ -2433,7 +2456,7 @@
             .map(i => nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '') + ' · ' + roubles(worthOf(i[0], i[1])) + (mine && wants.items.has(i[0]) ? ' · ' + T('quest') : ''));
           if (counted && counted.length > 10) lines.push(T('…and {n} more', { n: counted.length - 10 }));
           if (items && !items.length) lines.push(T('Empty'));
-          else if (items && items.length > counted.length) lines.push(T('{n} of kinds not shown', { n: items.length - counted.length }));
+          else if (items && items.length > counted.length) lines.push(notShown(items.length - counted.length));
           if (b.key) lines.push(T('Key:') + ' ' + nameOf(b.key));
           if (table && table.boxes[b.tpl]) {
             const tn = table.names, all = table.boxes[b.tpl], can = all.filter(i => kindOn(tn, i[0]))
@@ -2444,7 +2467,7 @@
             if (can.length) lines.push(T('Can hold:'));
             for (const i of can.slice(0, 12)) lines.push('   ' + ((tn[i[0]] || {}).s || (tn[i[0]] || {}).n || i[0]) + ' · ' + percent(i[1]) + ' · ' + canWorth(tn, i[0]));
             if (can.length > 12) lines.push('   ' + T('…and {n} more', { n: can.length - 12 }));
-            if (all.length > can.length) lines.push(T('{n} of kinds not shown', { n: all.length - can.length }));
+            if (all.length > can.length) lines.push(notShown(all.length - can.length));
           }
           return lines;
         };
@@ -2465,7 +2488,7 @@
           // a quest item's: with the quest items' switch, whatever it's worth; only the player's quests' while those are asked for
           const wanted = pt.quest && mine ? can.map(i => wants.items.get(i[0])).find(Boolean) : null;
           if (pt.quest && !looking && (isHidden('Layer quest') || (mine && !wanted))) continue;
-          if (looking ? !match : (!pt.quest && best < prefs.worth && !close) || gone([pt.x, pt.y, pt.z])) continue;
+          if (looking ? !match : (!pt.quest && best < minWorth() && !close) || gone([pt.x, pt.y, pt.z])) continue;
           found++;
           if (match) for (const i of can) if (tnHits(i[0])) note((tn[i[0]] || {}).n || i[0], T('Can spawn'), [pt.x, pt.y]);
           const s = onScreen(pt.x, pt.y);
@@ -2500,7 +2523,7 @@
               get lines() {
                 const lines = can.slice(0, 12).map(i => ((tn[i[0]] || {}).s || (tn[i[0]] || {}).n || i[0]) + ' · ' + percent(i[1]) + ' · ' + canWorth(tn, i[0]));
                 if (can.length > 12) lines.push(T('…and {n} more', { n: can.length - 12 }));
-                if (can.length < pt.items.length) lines.push(T('{n} of kinds not shown', { n: pt.items.length - can.length }));
+                if (can.length < pt.items.length) lines.push(notShown(pt.items.length - can.length));
                 return [wanted ? T('For {quest}', { quest: wanted[0].name }) : ''].concat([T('If it spawns, one of:')], lines);
               }
             }
@@ -2562,7 +2585,7 @@
             .map(i => nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '') + ' · ' + roubles(worthOf(i[0], i[1])) + (mine && wants.items.has(i[0]) ? ' · ' + T('quest') : ''));
           if (counted.length > 12) lines.push(T('…and {n} more', { n: counted.length - 12 }));
           if (peeking() && !items.length) lines.push(T('Nothing on it'));
-          else if (items.length > counted.length) lines.push(T('{n} of kinds not shown', { n: items.length - counted.length }));
+          else if (items.length > counted.length) lines.push(notShown(items.length - counted.length));
           if (!mark.was && b.was) mark.was = b.was;
           const who = markerText(mark) || b.who || (b.side === 'Savage' ? T('A scav') : b.side ? T('A {side}', { side: b.side.toUpperCase() }) : T('A body'));
           mark.tip = { title: who + (total ? ' · ' + roubles(total) : ''), lines };
@@ -2593,7 +2616,7 @@
         const quest = it.q || !!want;
         if (!quest && !lootReal()) continue;
         const match = looking && itemHits(it.tpl);
-        if (looking ? !match : quest ? isHidden('Layer quest') : isHidden('Layer loose') || it.worth < prefs.worth || !kindOn(names, it.tpl) || gone([it.x, it.y, it.z])) continue;
+        if (looking ? !match : quest ? isHidden('Layer quest') : isHidden('Layer loose') || it.worth < minWorth() || !kindOn(names, it.tpl) || gone([it.x, it.y, it.z])) continue;
         found++;
         note(nameOf(it.tpl), T('Loose'), [it.x, it.y]);
         if (!quest && !looking) inBuilding(it, [it.x, it.y, it.z], it.worth, false);
@@ -2795,8 +2818,8 @@
   // What a marker is called: a body says what it was ("Scav · name") when asked to, a PMC their level.
   const ONE = { 'Enemy Player': T('PMC'), 'Friendly Player': T('Player'), 'Main Player': T('Player'), 'Sniper': T('Sniper scav'), 'Other AI': T('Bot'),
     Scav: T('Scav'), Smuggler: T('Smuggler'), Raider: T('Raider'), Rogue: T('Rogue'), 'Black Division': T('Black Division'), RUAF: T('RUAF'),
-    'RUAF Remnant': T('RUAF remnant'), Civilian: T('Civilian'), Infected: T('Infected'), Guard: T('Guard'), Cultist: T('Cultist'), Goon: T('Goon'),
-    Boss: T('Boss'), Corpse: T('Body'), Extract: T('Extract'), Airdrop: T('Airdrop'), BTR: T('BTR') };
+    'RUAF Remnant': T('RUAF remnant'), UNTAR: 'UNTAR', ISB: T('ISB'), Civilian: T('Civilian'), Infected: T('Infected'), Guard: T('Guard'), Cultist: T('Cultist'), Goon: T('Goon'),
+    Boss: T('Boss'), Corpse: T('Body'), Extract: T('Extract'), Transit: T('Transit'), Airdrop: T('Airdrop'), BTR: T('BTR') };
   const DROPS = { Common: T('Airdrop'), Supply: T('Supply airdrop'), Medical: T('Medical airdrop'), Weapon: T('Weapon airdrop') };
   // an airdrop's crate: what's in it and its worth, once the game tells (when container contents are shown)
   function dropTip(m) {
@@ -2812,7 +2835,16 @@
     const total = items.reduce((sum, i) => sum + worthOf(i), 0);
     return { title: (DROPS[m.t] || T('Airdrop')) + (total ? ' · ' + roubles(total) : ''), lines };
   }
+  const transitText = m => m.to ? T('Transit to {map}', { map: locationName(m.to) }) : T('Transit');
+  // what an extract or a transit says under the pointer: what it is, and whether it can be taken
+  function exitTip(m) {
+    // (not by the game's name for it: that's an id such as "TRANSIT01")
+    if (m.c === 'Transit') return { title: transitText(m), lines: [m.st === 0 ? T('Not open yet') : ''] };
+    if (m.c !== 'Extract' || !m.sec) return null;
+    return { title: m.t || T('Extract'), lines: [T('Secret extract'), m.st === 3 ? T('Not found yet: its note opens it') : ''] };
+  }
   function markerText(m) {
+    if (m.c === 'Transit') return transitText(m);
     if (m.c === 'Airdrop') return (DROPS[m.t] || T('Airdrop')) + (m.fall ? ' · ' + T('coming down') : '');
     if (m.c === 'Corpse') return prefs.corpseKind && m.was ? (ONE[m.was] || m.was) + (m.t ? ' · ' + m.t : '') : m.t || '';
     return m.t ? m.t + (m.lv ? ' · ' + T('Lv {n}', { n: m.lv }) : '') : '';
@@ -3001,9 +3033,10 @@
     if (x < -150 || y < -150 || x > vw + 150 || y > vh + 150) return;
     const r = 8 * scale * kind.size * (strong ? 1.2 : 1);
     const col = m.c === 'Extract' && m.st !== undefined ? EXIT_COL[m.st] || kind.col
+      : m.c === 'Transit' && m.st === 0 ? EXIT_COL[0]
       : m.c === 'Corpse' && prefs.corpseKind && m.was && KINDS[m.was] ? KINDS[m.was].col : kind.col;
     // on another floor than the player: fainter, with an arrow up or down
-    const apart = m.c !== 'Main Player' && m.c !== 'Extract' && m.c !== 'BTR' && m.c !== 'Airdrop' ? otherFloor(m.cx, m.cy, m.cz) : 0;
+    const apart = m.c !== 'Main Player' && m.c !== 'Extract' && m.c !== 'Transit' && m.c !== 'BTR' && m.c !== 'Airdrop' ? otherFloor(m.cx, m.cy, m.cz) : 0;
     const away = apart !== 0;
 
     ctx.save();
@@ -3121,6 +3154,18 @@
       ctx.moveTo(0, -r * 0.7); ctx.lineTo(0, r * 0.7);
       ctx.lineWidth = Math.max(1, r * 0.14);
       ctx.stroke();
+    } else if (kind.shape === 'transit') {
+      // a round sign with an arrow on it, pointing on to the next map
+      ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.45, 0); ctx.lineTo(r * 0.4, 0);
+      ctx.moveTo(r * 0.05, -r * 0.38); ctx.lineTo(r * 0.45, 0); ctx.lineTo(r * 0.05, r * 0.38);
+      ctx.lineWidth = Math.max(1.5, r * 0.2);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#0c0c12';
+      ctx.stroke();
     } else if (kind.shape === 'exit') {
       ctx.rotate(45 * RAD);
       ctx.rect(-r * 0.75, -r * 0.75, r * 1.5, r * 1.5);
@@ -3150,8 +3195,8 @@
     const person = m.c === 'Enemy Player' || m.c === 'Friendly Player';
     const named = kind.label || strong || (prefs.names === 'players' && person)
       || (m.c === 'Main Player' && (prefs.myName || live.some(o => o.c === 'Friendly Player')))
-      || (prefs.names === 'all' && m.c !== 'Corpse' && m.c !== 'Main Player' && m.c !== 'Extract');
-    if (named && m.t) label(markerText(m), 12 * scale, x, y + r * 1.35 + under, y - r * 1.35, col, away && !strong ? 0.6 : 1);
+      || (prefs.names === 'all' && m.c !== 'Corpse' && m.c !== 'Main Player' && m.c !== 'Extract' && m.c !== 'Transit');
+    if (named && (m.t || m.c === 'Transit')) label(markerText(m), 12 * scale, x, y + r * 1.35 + under, y - r * 1.35, col, away && !strong ? 0.6 : 1);
     // what it's doing, under its name ("What each bot is doing"): as a mod has it, not the game's own brain
     if (prefs.mapDoing && brain && !inArea(m)) {
       const said = brain.ghost ? m.ob || '' : brain.by === 'EFT' ? '' : brain.text;
@@ -3976,6 +4021,8 @@
       if (m.c === 'Corpse' || isHidden(m.c || 'None')) continue;
       // an extract that isn't there this raid (a car that never came), when only the ones to be had are wanted
       if (m.c === 'Extract' && !prefs.goneExits && m.st === 0) continue;
+      // a secret extract not found yet, unless those are wanted too
+      if (m.c === 'Extract' && !prefs.secretExits && m.st === 3) continue;
       if (inArea(m)) continue;
       if (pointed === m.id) { top = m; continue; }
       drawMarker(m, false, scale);
@@ -4157,7 +4204,7 @@
 
   // "The Goons have been spotted on the map": said once a raid for each kind asked for (each boss by name), whether
   // or not its markers are shown. Where they are isn't said.
-  const ALERTS = ['Goon', 'Boss', 'Cultist', 'Black Division', 'RUAF', 'RUAF Remnant', 'Raider', 'Rogue', 'Enemy Player', 'Infected', 'Airdrop'];
+  const ALERTS = ['Goon', 'Boss', 'Cultist', 'Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'Raider', 'Rogue', 'Enemy Player', 'Infected', 'Airdrop'];
   const spotted = new Set();
   let alertRaid = '';
   // a short two-note chime, made in the page (no sound file): only for alerts, and only when switched on
@@ -4244,6 +4291,8 @@
     thingsWanted = 0;
     thingsHave = -1;
     quests = null;
+    wish = null;
+    wishPrint = '';
     questsFor = '';
     questsAskedAt = -1e9;
     squadEvents = [];
@@ -4347,7 +4396,7 @@
   }
   // A kind only a mod brings has a switch only where that mod is installed (the game says which: "has"), and the
   // infected once they've been met. Never by who is in the raid: a switch that came and went would give them away.
-  const MOD_KINDS = ['Black Division', 'RUAF', 'RUAF Remnant', 'Civilian'];
+  const MOD_KINDS = ['Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'Civilian'];
   const available = c => MOD_KINDS.includes(c) ? !prefs.has || prefs.has.includes(c) : c === 'Infected' ? !!prefs.seenInfected : true;
   let filtersPrint = null;      // nothing drawn yet: the first look always draws the list
   // the switches, in groups; a few have a switch of their own under them (a prefs key, and what it says)
@@ -4359,7 +4408,7 @@
     // the rest of the game's own: raiders, rogues, smugglers, the infected (an event), and every bot not named
     // (event and arena bots, a mod's own)
     [T('Other'), ['Raider', 'Rogue', 'Smuggler', 'Infected', 'Other AI']],
-    [T('Modded bots'), ['Black Division', 'RUAF', 'RUAF Remnant', 'Civilian']],
+    [T('Modded bots'), ['Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'Civilian']],
     [T('Corpses'), ['Corpse']]
   ];
   const SECTION_OF = {};
@@ -4376,7 +4425,7 @@
   };
   const FILTER_GROUPS = [
     ['filtersPeople', PEOPLE_SECTIONS.flatMap(s => s[1])],
-    ['filtersMap', ['BTR', 'Airdrop', 'Layer btrRoad', 'Zone mine', 'Zone sniper', 'Layer locks', 'Layer spawnPmc', 'Layer spawnScav', 'Layer spawnBoss', 'Extract']],
+    ['filtersMap', ['BTR', 'Airdrop', 'Layer btrRoad', 'Zone mine', 'Zone sniper', 'Layer locks', 'Layer spawnPmc', 'Layer spawnScav', 'Layer spawnBoss', 'Extract', 'Transit']],
     ['filtersLoot', ['Layer loose', 'Layer boxes', 'Layer bodies']]
   ];
   // the switches under another one that start on
@@ -4384,7 +4433,8 @@
   const FILTER_SUBS = {
     'Corpse': [['allCorpses', T('All corpses, not only player kills')], ['seenDead', T('Corpses I\'ve been close to')], ['corpseKind', T('Show what each corpse was')]],
     'Layer loose': [['lootArea', T('Rough areas only')]],
-    'Extract': [['myExits', T('Mine only'), T('In a raid: only the extracts you can take this raid.')], ['goneExits', T('Closed ones'), T('Extracts that are no longer there this raid, such as a vehicle that has left, are shown in red. Off: they are hidden.')]]
+    'Extract': [['myExits', T('Mine only'), T('In a raid: only the extracts you can take this raid.')], ['goneExits', T('Closed ones'), T('Extracts that are no longer there this raid, such as a vehicle that has left, are shown in red. Off: they are hidden.')],
+      ['secretExits', T('Secret ones not found yet'), T('Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.')]]
   };
   function listFilters(keepColors) {
     const all = Object.keys(KINDS).sort((a, b) => KINDS[b].order - KINDS[a].order);
@@ -4726,7 +4776,7 @@
   // playing, then bosses and their like, the PMCs by the group they came in with, and the scavs last.
   // the Raid list's order: friends, then bosses (and the Goons), their guards, Black Division, PMCs, Rogues, the
   // kinds mods bring and the cultists, Raiders, and the scavs last
-  const ROSTER = ['Friendly Player', 'Boss', 'Goon', 'Guard', 'Black Division', 'Enemy Player', 'Rogue', 'RUAF', 'RUAF Remnant', 'Cultist',
+  const ROSTER = ['Friendly Player', 'Boss', 'Goon', 'Guard', 'Black Division', 'ISB', 'Enemy Player', 'Rogue', 'RUAF', 'RUAF Remnant', 'UNTAR', 'Cultist',
     'Smuggler', 'Civilian', 'Infected', 'Other AI', 'Raider', 'Scav', 'Sniper'];
   // the kinds that can be shown as a rough area only, each with its switch
   const AREA_ABLE = ROSTER.filter(k => k !== 'Friendly Player');
@@ -5596,7 +5646,7 @@
     const loot = inRaidHere() && things && things.loc === map.loc ? things : null;
     const shownPlaces = map && places && places.loc === map.loc ? places : null;
     const flags = ['Layer loose', 'Layer boxes', 'Layer bodies', 'Corpse'].map(isHidden).join('') + prefs.allCorpses;
-    const print = [!!loot, thingsHave, !!shownPlaces, map && map.loc, flags, live.filter(m => m.c === 'Corpse').length, prefs.bestMore, peeking(), prefs.loot, prefs.lootOff.join(',')].join('|');
+    const print = [!!loot, thingsHave, !!shownPlaces, map && map.loc, flags, live.filter(m => m.c === 'Corpse').length, prefs.bestMore, peeking(), prefs.loot, lootPrint()].join('|');
     if (print === bestPrint) return;
     bestPrint = print;
     const box = $('bestLoot');
@@ -5661,7 +5711,7 @@
   function listBestCan() {
     if (!lootCan()) return;
     const table = lootTable && map && lootTable.loc === map.loc ? lootTable : null;
-    const print = [!!table, map && map.loc, prefs.lootOff.join(','), prefs.bestMore].join('|');
+    const print = [!!table, map && map.loc, lootPrint(), prefs.bestMore].join('|');
     if (print === bestCanPrint) return;
     bestCanPrint = print;
     const box = $('bestCan');
@@ -6516,7 +6566,7 @@
     setHovered(b && b !== floorShown.place ? b : 0);
     // a marker with something to say (a corpse's loot) says it; not a marker: the nearest container, lock, item or
     // spawn point under the pointer says what it is
-    const says = mark ? mark.tip || dropTip(mark) || botTip(mark) : null;
+    const says = mark ? mark.tip || dropTip(mark) || exitTip(mark) || botTip(mark) : null;
     let near = says ? { tip: says } : null, best = Infinity;
     if (found === null) {
       for (const t of thingsDrawn) {
@@ -6759,7 +6809,7 @@
     if (prefs.groups && typeof prefs.groups[name] === 'boolean') group.open = prefs.groups[name];
     group.addEventListener('toggle', () => { prefs.groups = Object.assign({}, prefs.groups, { [name]: group.open }); save(); });
   }
-  for (const [id, key] of [['optItemNames', 'itemNames'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'],
+  for (const [id, key] of [['optItemNames', 'itemNames'], ['optWishOnly', 'wishOnly'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'],
     ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optMyName', 'myName'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],

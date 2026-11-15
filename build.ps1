@@ -3,18 +3,23 @@
 #   .\build.ps1 -SPTPath D:\SPT
 #   .\build.ps1 -SPTPath D:\SPT -NoInstall      (build and zip only)
 #   .\build.ps1 -SPTPath D:\SPT -NoMaps         (only the zip without maps: quicker, for trying a change)
+#   .\build.ps1 -Addons Factory-Classic,Laboratory-Halloween2026
+#                                               (only those add-on zips, by the name in the zip's; nothing else is
+#                                               built, zipped or installed, so the other zips stay as released)
 # A build for release makes two zips of the mod: Satellite-<version>.zip, with every one of the game's own maps, and
 # Satellite-<version>-NoMaps.zip, the same without the maps folder, for updating over a slow or capped line.
 # The maps come from the SPT folder's Satellite\maps. A build with maps stops if one of the game's own is missing.
 # Each map a mod adds goes in a zip of its own (Satellite-Addon-<map>-<version>.zip), so a player takes only the
 # ones for the mods they have: a version of a map ("Interchange~backport") or a map that isn't the game's
-# ("Terminal"). An add-on zip holds only SPT_Runtime\user\mods\Satellite\maps\<map>.
+# ("Terminal"). An add-on zip holds only SPT_Runtime\user\mods\Satellite\maps\<map>. Factory's day and night maps of
+# one version go in one zip ("factory4_day~classic" and "factory4_night~classic": Satellite-Addon-Factory-Classic).
 # The plugin is built against the game's own DLLs, so it needs your SPT folder. Instead of -SPTPath you can put the folder's path in a file called spt-path.txt next to this
 # script, or in the SPT_PATH environment variable.
 param(
     [string] $SPTPath = '',
     [switch] $NoInstall,
-    [switch] $NoMaps
+    [switch] $NoMaps,
+    [string[]] $Addons = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,45 +42,50 @@ if ($metadataVersion -ne $version -or $pluginVersion -ne $version) {
     throw "Version mismatch: $name.Server.csproj $version, ModMetadata.cs $metadataVersion, Plugin.cs $pluginVersion."
 }
 
+$addonsOnly = $Addons.Count -gt 0
+if ($addonsOnly -and $NoMaps) { throw '-Addons makes add-on zips, which are maps: leave out -NoMaps.' }
+
 # the SDK may be installed per-user, so it may not be on PATH
 $userDotnet = Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe'
 $dotnet = if (Test-Path $userDotnet) { $userDotnet } else { 'dotnet' }
 
-& $dotnet build $serverProject -c Release --nologo
-if ($LASTEXITCODE -ne 0) { throw 'Server build failed.' }
-$serverDll = Join-Path $root "$name.Server\bin\Release\$name.Server.dll"
-
-# the plugin compiles against the game's own DLLs, from the SPT folder
-& $dotnet build $clientProject -c Release --nologo "-p:SPTPath=$SPTPath"
-if ($LASTEXITCODE -ne 0) { throw 'Plugin build failed.' }
-$clientDll = Join-Path $root "$name.Client\bin\Release\$name.Client.dll"
-
-# the map scanner: for making the maps, never published, so it's installed here but kept out of dist\ and the zip
-# (it isn't in the public repo, so a build without it skips this)
-$scannerProject = Join-Path $root "$name.Scanner\$name.Scanner.csproj"
-$scannerDll = $null
-if (Test-Path -LiteralPath $scannerProject) {
-    & $dotnet build $scannerProject -c Release --nologo "-p:SPTPath=$SPTPath"
-    if ($LASTEXITCODE -ne 0) { throw 'Scanner build failed.' }
-    $scannerDll = Join-Path $root "$name.Scanner\bin\Release\$name.Scanner.dll"
-}
-
-# folder and zip laid out like the SPT folder, so the zip can be extracted straight over it
 $dist = Join-Path $root 'dist'
-$stage = Join-Path $dist "$name-$version"
-$mod = Join-Path $stage "SPT_Runtime\user\mods\$name"
-if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
-New-Item -ItemType Directory -Force $mod | Out-Null
-Copy-Item -LiteralPath $serverDll -Destination $mod
-Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $mod -Recurse
-Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $mod
-# config.jsonc isn't packed: the server writes the default the first time it starts, so an update never overwrites
-# the owner's own
-Copy-Item -LiteralPath (Join-Path $root 'LICENSE.md') -Destination $mod
-Copy-Item -LiteralPath (Join-Path $root 'LICENSE-MAPS.md') -Destination $mod
-$plugin = Join-Path $stage "BepInEx\plugins\$name"
-New-Item -ItemType Directory -Force $plugin | Out-Null
-Copy-Item -LiteralPath $clientDll -Destination $plugin
+if (-not $addonsOnly) {
+    & $dotnet build $serverProject -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Server build failed.' }
+    $serverDll = Join-Path $root "$name.Server\bin\Release\$name.Server.dll"
+
+    # the plugin compiles against the game's own DLLs, from the SPT folder
+    & $dotnet build $clientProject -c Release --nologo "-p:SPTPath=$SPTPath"
+    if ($LASTEXITCODE -ne 0) { throw 'Plugin build failed.' }
+    $clientDll = Join-Path $root "$name.Client\bin\Release\$name.Client.dll"
+
+    # the map scanner: for making the maps, never published, so it's installed here but kept out of dist\ and the zip
+    # (it isn't in the public repo, so a build without it skips this)
+    $scannerProject = Join-Path $root "$name.Scanner\$name.Scanner.csproj"
+    $scannerDll = $null
+    if (Test-Path -LiteralPath $scannerProject) {
+        & $dotnet build $scannerProject -c Release --nologo "-p:SPTPath=$SPTPath"
+        if ($LASTEXITCODE -ne 0) { throw 'Scanner build failed.' }
+        $scannerDll = Join-Path $root "$name.Scanner\bin\Release\$name.Scanner.dll"
+    }
+
+    # folder and zip laid out like the SPT folder, so the zip can be extracted straight over it
+    $stage = Join-Path $dist "$name-$version"
+    $mod = Join-Path $stage "SPT_Runtime\user\mods\$name"
+    if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
+    New-Item -ItemType Directory -Force $mod | Out-Null
+    Copy-Item -LiteralPath $serverDll -Destination $mod
+    Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $mod -Recurse
+    Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $mod
+    # config.jsonc isn't packed: the server writes the default the first time it starts, so an update never overwrites
+    # the owner's own
+    Copy-Item -LiteralPath (Join-Path $root 'LICENSE.md') -Destination $mod
+    Copy-Item -LiteralPath (Join-Path $root 'LICENSE-MAPS.md') -Destination $mod
+    $plugin = Join-Path $stage "BepInEx\plugins\$name"
+    New-Item -ItemType Directory -Force $plugin | Out-Null
+    Copy-Item -LiteralPath $clientDll -Destination $plugin
+}
 
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 # a folder laid out like the SPT folder, zipped; pictures are packed already, so they're stored as they are
@@ -100,10 +110,17 @@ function Label([string] $loc) {
     ($loc -split '~' | ForEach-Object { $_.Substring(0, 1).ToUpper() + $_.Substring(1) }) -join '-'
 }
 
+# the zip an add-on map goes in: its own, but Factory's day and night maps of one version share one ("Factory-Classic")
+function AddonZip([string] $loc) {
+    if ($loc -match '^factory4_(day|night)(~.+)$') { return "$name-Addon-$(Label ('factory' + $Matches[2]))" }
+    "$name-Addon-$(Label $loc)"
+}
+
 # A map's tiles in one file, maps/<location>/<v>/tiles.pack, in place of its thousands of .jpg files, so the zip
-# unzips quickly (the server reads either; see Satellite.Server/TilePacks.cs for the layout). Only ever done to the
-# copy in dist\, never to the SPT folder's maps, which captures write to and builds read from. Each pack is read back
-# and checked against the tiles it was made from before they're deleted.
+# unzips quickly (the server reads either; see Satellite.Server/TilePacks.cs for the layout). Done to the copy in
+# dist\ only. A capture's tiles are packed by the server once it's complete, so a map packed already is left as it is
+# (no loose tiles to pack); one with loose tiles (captured before that) is packed here. Each pack is read back and
+# checked against the tiles it was made from before they're deleted.
 Add-Type -Language CSharp -TypeDefinition @'
 using System;
 using System.IO;
@@ -112,6 +129,11 @@ using System.Text;
 public static class SatelliteTiles {
     public static int Pack(string folder) {
         var files = Directory.GetFiles(folder, "*.jpg").OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
+        // packed by the server already: the pack is what's served, so any tile left beside it is dropped from the copy
+        if (File.Exists(Path.Combine(folder, "tiles.pack"))) {
+            foreach (var f in files) File.Delete(f);
+            return 0;
+        }
         if (files.Length == 0) return 0;
         var names = files.Select(f => Encoding.ASCII.GetBytes(Path.GetFileName(f))).ToArray();
         long offset = 8 + 4;
@@ -160,7 +182,7 @@ function PackTiles([string] $mapsDir) {
 # the game's own locations; any other map (a version of one, after a "~", or a map a mod adds) is an add-on
 $gameMaps = 'bigmap', 'factory4_day', 'factory4_night', 'Interchange', 'laboratory', 'Labyrinth', 'Lighthouse',
     'RezervBase', 'Sandbox', 'Sandbox_high', 'Shoreline', 'TarkovStreets', 'Woods'
-$addons = @()
+$addonFolders = @()
 $snowMaps = @()
 $mapsFrom = Join-Path $SPTPath "SPT_Runtime\user\mods\$name\maps"
 if (-not $NoMaps) {
@@ -168,30 +190,30 @@ if (-not $NoMaps) {
     # a release always has every one of the game's own maps: stop before anything is packed if one is missing
     $lacking = @($gameMaps | Where-Object { -not (Test-Path -LiteralPath (Join-Path $mapsFrom "$_\meta.json")) })
     if ($lacking.Count) { throw "No map of $($lacking -join ', ') in $mapsFrom. Scan them first, or build with -NoMaps." }
-    $addons = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $gameMaps -cnotcontains $_.Name -and -not $_.Name.EndsWith('@snow') })
+    $addonFolders = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $gameMaps -cnotcontains $_.Name -and -not $_.Name.EndsWith('@snow') })
     # the maps with snow on the ground ("<map>@snow"): all in one add-on, and not in addons.json (without one, the
     # page shows the map without snow, so there's nothing to tell a player they're missing)
     $snowMaps = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $_.Name.EndsWith('@snow') })
 
     # addons.json: what tells each add-on in a raid (its scenes) and the zip it comes in, so the server can say which
     # add-on a player is missing. Kept next to this script, so a build with -NoMaps still has it.
-    $catalog = foreach ($map in $addons) {
+    $catalog = foreach ($map in $addonFolders) {
         $meta = Get-Content -LiteralPath (Join-Path $map.FullName 'meta.json') -Raw | ConvertFrom-Json
         if (-not $meta.scenes) { Write-Warning "$($map.Name) was captured without its scenes: a raid on it can't be told."; continue }
         $entry = [ordered]@{ loc = $map.Name; base = $meta.base; name = $meta.name }
         if ($meta.vname) { $entry.vname = $meta.vname }
-        $entry.zip = "$name-Addon-$(Label $map.Name)"
+        $entry.zip = AddonZip $map.Name
         $entry.scenes = @($meta.scenes)
         [pscustomobject]$entry
     }
     $json = ConvertTo-Json -InputObject ([ordered]@{ addons = @($catalog) }) -Depth 4
     [IO.File]::WriteAllText((Join-Path $root 'addons.json'), $json + "`n", (New-Object Text.UTF8Encoding $false))
 }
-if (Test-Path -LiteralPath (Join-Path $root 'addons.json')) { Copy-Item -LiteralPath (Join-Path $root 'addons.json') -Destination $mod }
+if (-not $addonsOnly -and (Test-Path -LiteralPath (Join-Path $root 'addons.json'))) { Copy-Item -LiteralPath (Join-Path $root 'addons.json') -Destination $mod }
 
 # the mod without its maps first, then the same with the game's own maps added
-Pack $stage (Join-Path $dist "$name-$version-NoMaps.zip")
-if (-not $NoMaps) {
+if (-not $addonsOnly) { Pack $stage (Join-Path $dist "$name-$version-NoMaps.zip") }
+if (-not $NoMaps -and -not $addonsOnly) {
     $mapsTo = Join-Path $mod 'maps'
     New-Item -ItemType Directory -Force $mapsTo | Out-Null
     foreach ($game in $gameMaps) { Copy-Item -LiteralPath (Join-Path $mapsFrom $game) -Destination $mapsTo -Recurse }
@@ -199,20 +221,26 @@ if (-not $NoMaps) {
     Pack $stage (Join-Path $dist "$name-$version.zip")
 }
 
-# each add-on: only its map's folder, where the mod keeps its maps, its tiles packed like the game's own maps'
-foreach ($map in $addons) {
-    $label = Label $map.Name
-    $addonStage = Join-Path $dist "$name-Addon-$label-$version"
+# each add-on: only its maps' folders, where the mod keeps its maps, their tiles packed like the game's own maps'
+$groups = @($addonFolders | Group-Object { AddonZip $_.Name })
+if ($addonsOnly) {
+    $wanted = @($Addons | ForEach-Object { "$name-Addon-$_" })
+    $unknown = @($wanted | Where-Object { $groups.Name -notcontains $_ })
+    if ($unknown.Count) { throw "No add-on $($unknown -join ', '). There are: $(($groups.Name | ForEach-Object { $_.Substring("$name-Addon-".Length) }) -join ', ')." }
+    $groups = @($groups | Where-Object { $wanted -contains $_.Name })
+}
+foreach ($group in $groups) {
+    $addonStage = Join-Path $dist "$($group.Name)-$version"
     if (Test-Path -LiteralPath $addonStage) { Remove-Item -LiteralPath $addonStage -Recurse -Force }
     $addonMaps = Join-Path $addonStage "SPT_Runtime\user\mods\$name\maps"
     New-Item -ItemType Directory -Force $addonMaps | Out-Null
-    Copy-Item -LiteralPath $map.FullName -Destination $addonMaps -Recurse
+    foreach ($map in $group.Group) { Copy-Item -LiteralPath $map.FullName -Destination $addonMaps -Recurse }
     PackTiles $addonMaps
-    Pack $addonStage (Join-Path $dist "$name-Addon-$label-$version.zip")
+    Pack $addonStage (Join-Path $dist "$($group.Name)-$version.zip")
 }
 
 # the snow add-on: every snow map in one zip
-if ($snowMaps.Count) {
+if ($snowMaps.Count -and -not $addonsOnly) {
     $snowStage = Join-Path $dist "$name-Addon-Snow-$version"
     if (Test-Path -LiteralPath $snowStage) { Remove-Item -LiteralPath $snowStage -Recurse -Force }
     $snowTo = Join-Path $snowStage "SPT_Runtime\user\mods\$name\maps"
@@ -222,7 +250,7 @@ if ($snowMaps.Count) {
     Pack $snowStage (Join-Path $dist "$name-Addon-Snow-$version.zip")
 }
 
-if (-not $NoInstall) {
+if (-not $NoInstall -and -not $addonsOnly) {
     if (-not (Test-Path (Join-Path $SPTPath 'SPT_Runtime\SPT.Server.dll'))) {
         throw "$SPTPath doesn't look like an SPT folder (no SPT_Runtime\SPT.Server.dll)."
     }

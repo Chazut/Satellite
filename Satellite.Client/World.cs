@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Comfort.Common;
 using EFT;
@@ -22,6 +23,11 @@ namespace Satellite.Client
             public float Yaw;
             public Player Player;
             public ExfiltrationPoint Exit;
+            // an extract: one of the secret ones (found by picking up its note)
+            public bool Secret;
+            // a transit to another location: the point, and the location it takes you to
+            public EFT.Interactive.TransitPoint Transit;
+            public string To;
             // a body: killed by a person playing, not a bot
             public bool ByPlayer;
             // moves though it's nobody (the BTR)
@@ -126,6 +132,7 @@ namespace Satellite.Client
         private static int _nextId;
         private static bool _exitsLooked;
         private static bool _exitsFailed;
+        private static bool _transitsFailed;
         private static readonly Dictionary<Player, Dot> Players = new Dictionary<Player, Dot>();
         private static readonly List<Dot> Still = new List<Dot>();
         private static readonly HashSet<Player> Alive = new HashSet<Player>();
@@ -514,6 +521,16 @@ namespace Satellite.Client
                 {
                     has.Add("Civilian");
                 }
+
+                if (loaded.Contains("UNTARGHPlugin"))
+                {
+                    has.Add("UNTAR");
+                }
+
+                if (loaded.Contains("ISB-SpecialForces"))
+                {
+                    has.Add("ISB");
+                }
             }
             catch (Exception)
             {
@@ -789,6 +806,28 @@ namespace Satellite.Client
                     return "RUAF";
                 }
 
+                if (Untar.Contains(role))
+                {
+                    return "UNTAR";
+                }
+
+                if (IsbSpecialForces(role))
+                {
+                    return "ISB";
+                }
+
+                // Scourge (Manimal's boss) and its followers, as a boss and guards: by number too, should the game not know
+                // their names
+                if (role == "776720")
+                {
+                    return "Boss";
+                }
+
+                if (role == "776721")
+                {
+                    return "Guard";
+                }
+
                 if (Civilians.Contains(role) || role.StartsWith("civilian", StringComparison.OrdinalIgnoreCase))
                 {
                     return "Civilian";
@@ -826,6 +865,19 @@ namespace Satellite.Client
         };
 
         private static readonly HashSet<string> Remnant = new HashSet<string> { "848406" };
+
+        // UNTAR (the UNTAR Go Home mod), by name and by number as the mod lists them: grunt, squad leader, marksman, officer
+        private static readonly HashSet<string> Untar = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "followeruntar", "bossuntarlead", "followeruntarmarksman", "bossuntarofficer", "1170", "1171", "1172", "1173"
+        };
+
+        // ISB Special Forces: its sixteen types, their bosses among them, named "ISB..." or numbered 13701 to 13716
+        private static bool IsbSpecialForces(string role)
+        {
+            return role.StartsWith("ISB", StringComparison.OrdinalIgnoreCase)
+                || (int.TryParse(role, out var number) && number >= 13701 && number <= 13716);
+        }
 
         // the people still living on Manimal's Terminal, who run rather than fight
         private static readonly HashSet<string> Civilians = new HashSet<string> { "776701" };
@@ -926,13 +978,10 @@ namespace Satellite.Client
             try
             {
                 var control = world.ExfiltrationController;
-                if (control == null)
-                {
-                    return;
-                }
-
-                ExfiltrationPoint[] points = main.Side == EPlayerSide.Savage ? control.ScavExfiltrationPoints : control.ExfiltrationPoints;
-                foreach (var point in points ?? new ExfiltrationPoint[0])
+                ExfiltrationPoint[] points = control == null ? null : main.Side == EPlayerSide.Savage ? control.ScavExfiltrationPoints : control.ExfiltrationPoints;
+                // and the secret ones this side can take: hidden until their note is picked up (ExitState 3)
+                var secret = control?.SecretExfiltrationPoints ?? new EFT.Interactive.SecretExfiltrations.SecretExfiltrationPoint[0];
+                foreach (var point in (points ?? new ExfiltrationPoint[0]).Concat(secret))
                 {
                     if (point == null || !point.isActiveAndEnabled || !point.InfiltrationMatch(main))
                     {
@@ -943,7 +992,8 @@ namespace Satellite.Client
                     Still.Add(new Dot
                     {
                         Id = ++_nextId, Kind = "Extract", Exit = point, At = point.transform.position,
-                        Text = string.IsNullOrEmpty(name) ? "" : name.Localized()
+                        Text = string.IsNullOrEmpty(name) ? "" : name.Localized(),
+                        Secret = point is EFT.Interactive.SecretExfiltrations.SecretExfiltrationPoint
                     });
                 }
             }
@@ -953,6 +1003,39 @@ namespace Satellite.Client
                 {
                     _exitsFailed = true;
                     Plugin.Log.LogWarning($"Couldn't read this raid's extracts: {e.Message}");
+                }
+            }
+
+            // the transits to other locations
+            try
+            {
+                var transits = world.TransitController?.pointsById;
+                if (transits == null)
+                {
+                    return;
+                }
+
+                foreach (var point in transits.Values)
+                {
+                    if (point == null || point.parameters == null || !point.parameters.active)
+                    {
+                        continue;
+                    }
+
+                    var name = point.parameters.name;
+                    Still.Add(new Dot
+                    {
+                        Id = ++_nextId, Kind = "Transit", Transit = point, At = point.transform.position,
+                        Text = string.IsNullOrEmpty(name) ? "" : name.Localized(), To = point.parameters.location
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                if (!_transitsFailed)
+                {
+                    _transitsFailed = true;
+                    Plugin.Log.LogWarning($"Couldn't read this raid's transits: {e.Message}");
                 }
             }
         }
@@ -971,8 +1054,23 @@ namespace Satellite.Client
                 {
                     case EExfiltrationStatus.NotPresent: return 0;
                     case EExfiltrationStatus.UncompleteRequirements: return 1;
+                    // a secret one not found yet
+                    case EExfiltrationStatus.Hidden: return 3;
                     default: return 2;
                 }
+            }
+            catch (Exception)
+            {
+                return 2;
+            }
+        }
+
+        // a transit: 0 not open (yet, or not for this raid), 2 open
+        private static int TransitState(EFT.Interactive.TransitPoint point)
+        {
+            try
+            {
+                return point != null && point.Enabled && point.IsActive ? 2 : 0;
             }
             catch (Exception)
             {
@@ -1090,7 +1188,7 @@ namespace Satellite.Client
             {
                 if (Shown(dot))
                 {
-                    print = unchecked(print * 31 + dot.Id * 4 + (dot.Exit != null ? ExitState(dot.Exit) : 3));
+                    print = unchecked(print * 31 + dot.Id * 8 + (dot.Exit != null ? ExitState(dot.Exit) : dot.Transit != null ? 4 + TransitState(dot.Transit) : 7));
                 }
             }
 
@@ -1217,6 +1315,18 @@ namespace Satellite.Client
             if (dot.Exit != null)
             {
                 to.Append(",\"st\":").Append(ExitState(dot.Exit));
+            }
+
+            if (dot.Secret)
+            {
+                to.Append(",\"sec\":1");
+            }
+
+            if (dot.Transit != null)
+            {
+                to.Append(",\"st\":").Append(TransitState(dot.Transit));
+                to.Append(",\"to\":");
+                Text(to, dot.To ?? "");
             }
 
             if (dot.ByPlayer)
