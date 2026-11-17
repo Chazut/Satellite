@@ -713,7 +713,7 @@ fumsLang({
 "Map scans by Fums,": "Skany map: Fums,",
 "Use, share and change them with credit. Not for sale.": "Używaj, udostępniaj i zmieniaj z podaniem autora. Nie sprzedawaj.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov należy do Battlestate Games. Satellite to mod fanowski, przez nich niestworzony ani niewspierany.",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, autor: Fums. Naciśnij, by zobaczyć autorów i licencję map",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2, autor: Fums. Naciśnij, by zobaczyć autorów i licencję map",
 "Transits": "Tranzyty",
 "Transit": "Tranzyt",
 "Transit to {map}": "Tranzyt do {map}",
@@ -726,5 +726,14 @@ fumsLang({
 "{n} not on your wishlist": "{n} spoza twojej listy życzeń",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Tylko łup z twojej listy życzeń: leżący luzem, w pojemnikach, na ciałach i tam, gdzie może się pojawić, bez względu na wartość i rodzaj. Przedmioty z zadań nadal są pokazywane. Dodawaj do listy życzeń w grze; mapa nadąża w ciągu pół minuty.",
 "ISB special forces": "Siły specjalne ISB",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "Zabity przez {who}",
+"Killed by you": "Zabity przez ciebie",
+"Killed by another player": "Zabity przez innego gracza",
+"Only my kills": "Tylko moje zabójstwa",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "Tylko ciała tych, których zabiłeś sam. Ciała mają pierścień, gdy zabił je człowiek: złoty dla twoich zabójstw, biały dla zabójstw innego gracza.",
+"PMCs killed by bots": "PMC zabici przez boty",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "Czerwony pierścień wokół ciała PMC zabitego przez bota, by odróżniał się od twoich zabójstw (złoty) i zabójstw innych graczy (biały). Wskazanie ciała pokazuje, kto je zabił.",
+"Kill lines": "Linie zabójstw",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Linia od zabójcy do zabitego i znak w miejscu śmierci, przez kilka sekund."
 });

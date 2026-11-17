@@ -705,7 +705,7 @@ fumsLang({
 "Map scans by Fums,": "Capturas de mapas de Fums,",
 "Use, share and change them with credit. Not for sale.": "Úsalas, compártelas y modifícalas citando al autor. Sin venderlas.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov pertenece a Battlestate Games. Satellite es un mod de fans y no está hecho ni respaldado por ellos.",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, hecho por Fums. Pulsa para ver los créditos y la licencia de los mapas",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2, hecho por Fums. Pulsa para ver los créditos y la licencia de los mapas",
 "Transits": "Tránsitos",
 "Transit": "Tránsito",
 "Transit to {map}": "Tránsito a {map}",
@@ -718,5 +718,14 @@ fumsLang({
 "{n} not on your wishlist": "{n} fuera de tu lista de deseos",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Solo el botín de tu lista de deseos: suelto, en contenedores, en cuerpos y donde puede aparecer, valga lo que valga y sea del tipo que sea. Los objetos de misión se siguen mostrando. Añade a la lista de deseos en el juego; el mapa se pone al día en medio minuto.",
 "ISB special forces": "Fuerzas especiales ISB",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "Lo mató {who}",
+"Killed by you": "Lo mataste tú",
+"Killed by another player": "Lo mató otro jugador",
+"Only my kills": "Solo mis bajas",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "Solo los cuerpos de quienes mataste tú. Los cuerpos llevan un anillo cuando los mató una persona: dorado para tus bajas, blanco para las de otro jugador.",
+"PMCs killed by bots": "PMC matados por bots",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "Un anillo rojo alrededor del cuerpo de un PMC que mató un bot, para distinguirlo de tus bajas (dorado) y de las de otros jugadores (blanco). Al señalar un cuerpo se ve quién lo mató.",
+"Kill lines": "Líneas de bajas",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Una línea del que mata al que muere, y una marca donde murió, durante unos segundos."
 });

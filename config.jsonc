@@ -57,12 +57,5 @@
     "botDetails": true,
     // what each living bot wears and carries (a page shows it only once its "Bot loot" switch is turned on)
     "botLoot": true
-  },
-  // The SPT server itself. Restart the server after a change.
-  "server": {
-    // true: SPT's "[Client Request] <address>" line for every request (every mod's, the game's own too) is left out of
-    // the server's window and log, so the map's many requests never fill it. false: SPT logs requests again, apart
-    // from the map's own.
-    "quietLogs": true
   }
 }

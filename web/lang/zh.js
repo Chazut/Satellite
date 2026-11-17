@@ -693,7 +693,7 @@ fumsLang({
 "Map scans by Fums,": "地图采集：Fums，",
 "Use, share and change them with credit. Not for sale.": "可署名使用、分享和修改，不得出售。",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov 归 Battlestate Games 所有。Satellite 是玩家自制模组，并非由其制作或支持。",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1，作者 Fums。点击查看致谢和地图许可",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2，作者 Fums。点击查看致谢和地图许可",
 "Transits": "转移点",
 "Transit": "转移点",
 "Transit to {map}": "前往{map}的转移点",
@@ -706,5 +706,14 @@ fumsLang({
 "{n} not on your wishlist": "{n} 件不在心愿单中",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "只显示心愿单上的战利品：散落的、容器里的、尸体上的，以及可能刷新的地点，不论价值和种类。任务物品仍会显示。在游戏里添加心愿单；地图会在半分钟内跟上。",
 "ISB special forces": "ISB特种部队",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "被{who}击杀",
+"Killed by you": "被你击杀",
+"Killed by another player": "被其他玩家击杀",
+"Only my kills": "仅我的击杀",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "只显示你亲手击杀者的尸体。由真人击杀的尸体带有圆环：你的击杀为金色，其他玩家的击杀为白色。",
+"PMCs killed by bots": "被人机击杀的PMC",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "被人机击杀的PMC尸体带有红色圆环，与你的击杀（金色）和其他玩家的击杀（白色）区分开。指向尸体可看到是谁击杀的。",
+"Kill lines": "击杀连线",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "从击杀者到被击杀者的连线，以及阵亡地点的标记，显示几秒。"
 });

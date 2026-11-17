@@ -76,8 +76,6 @@ If port 6969 is forwarded for Fika, anyone with your address can open the map to
 - Page settings are in the menu, saved in each viewer's browser.
 - `SPT_Runtime/user/mods/Satellite/config.jsonc`: the server owner can turn off any kind of marker or loot for every
   page. Made on first start. Updates don't overwrite it. Restart the server after a change.
-  SPT's `[Client Request]` lines are left out of the server window; `"server": { "quietLogs": false }` in it brings
-  them back (apart from the map's own).
 - F12 > Fums-Satellite: the key that opens the map, and how often it updates.
 
 ## Build

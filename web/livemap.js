@@ -169,7 +169,7 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, killLines: true, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true,
     myQuests: true, otherLoot: 30, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -333,6 +333,8 @@
   // the add-ons there are that aren't installed: [{ loc, base, name, vname, zip }]
   let addons = [];
   let mapsPrint = '';
+  // the stream brings the games, the maps' mark and the loot (see listen): nothing to keep asking for meanwhile
+  let streamUp = false;
   let mapsAsked = false;
   let map = null;
   let vw = 1, vh = 1;
@@ -370,6 +372,8 @@
   let lootTable = null;         // where loot can spawn on it and what, from the server's loot tables (see readSpawns)
   let lootAsked = '', lootAskedAt = -1e9;
   let placesAsked = '', placesAskedAt = 0;
+  // the server said it has none for that map: not asked again until the maps change (loadMaps)
+  let placesNone = false, lootNone = false;
   let things = null;            // what lies about in the raid shown: { loc, loose, inside, open, names }
   let thingsWanted = 0, thingsHave = -1, thingsAsking = false, thingsTriedAt = 0;
   let thingsDrawn = [];         // what of it is on the screen, to point at: { x, y, r, tip }
@@ -1644,12 +1648,13 @@
   async function loadPlaces(force) {
     if (!map) return;
     const loc = map.loc, now = performance.now();
-    if (!force && placesAsked === loc && (places || now - placesAskedAt < 15000)) return;
+    if (!force && placesAsked === loc && (places || placesNone || now - placesAskedAt < 15000)) return;
     placesAsked = loc;
     placesAskedAt = now;
     try {
       const answer = await (await fetch('api/places?loc=' + encodeURIComponent(loc))).json();
       if (!map || map.loc !== loc) return;
+      placesNone = !!(answer && answer.none);
       places = answer && !answer.none ? readPlaces(answer) : null;
       placeZones();
       dirty = true;
@@ -1666,12 +1671,13 @@
   async function loadSpawns() {
     if (!map || isHidden('Layer lootSpawns')) return;
     const loc = map.loc, now = performance.now();
-    if (lootAsked === loc && (lootTable || now - lootAskedAt < 15000)) return;
+    if (lootAsked === loc && (lootTable || lootNone || now - lootAskedAt < 15000)) return;
     lootAsked = loc;
     lootAskedAt = now;
     try {
       const answer = await (await fetch('api/spawns?loc=' + encodeURIComponent(loc))).json();
       if (!map || map.loc !== loc) return;
+      lootNone = !!(answer && answer.none);
       lootTable = answer && !answer.none ? readSpawns(answer) : null;
       bestPrint = bestCanPrint = null;
       dirty = true;
@@ -2079,6 +2085,8 @@
   // The player's started quests, and where every quest sends you: asked for when the game shown changes, and again
   // every little while (the profile changes after each raid).
   async function loadQuests(force) {
+    // the stream brings them while it's up (see listen)
+    if (streamUp && questsFor === sid) return;
     const now = performance.now();
     // a few seconds apart at the most, and every twenty while nothing changed
     const gap = force || questsFor !== sid ? 3000 : 20000;
@@ -2088,30 +2096,36 @@
     const whose = sid;
     try {
       const answer = await (await fetch('api/quests' + (whose ? '?session=' + encodeURIComponent(whose) : ''))).json();
-      if (whose === sid) {
-        questsFor = whose;
-        quests = answer && !answer.none ? {
-          sid: answer.sid,
-          // Only true quest items count (the ones that exist for a quest alone, picked up where the quest says).
-          // Ordinary items a quest wants found in raid or handed over are loot like any other: never marked, and a
-          // goal that is only about them isn't listed.
-          list: list(answer.quests).filter(q => q && typeof q.name === 'string').map(q => Object.assign(q, {
-            goals: list(q.goals).map(g => {
-              const asked = list(g.items);
-              const items = asked.filter(tpl => ((answer.names || {})[tpl] || {}).q);
-              return Object.assign(g, { items, plain: asked.length > 0 && !items.length && !list(g.zones).length });
-            }).filter(g => !g.plain)
-          })).filter(q => q.goals.length),
-          zones: answer.zones || {}, names: answer.names || {}
-        } : null;
-        const wished = answer && Array.isArray(answer.wish) ? answer.wish.filter(t => typeof t === 'string').sort() : null;
-        wish = wished ? new Set(wished) : null;
-        wishPrint = wished ? wished.join(',') : '';
-        dirty = true;
-      }
+      if (whose === sid) takeQuests(answer, whose);
     } catch (e) { /* asked again in a while */ } finally {
       questsAsking = false;
     }
+  }
+  // the quests as the stream brings them: the game shown's
+  function streamQuests(answer) {
+    if (answer && answer.sid && answer.sid !== sid) return;
+    takeQuests(answer, sid);
+  }
+  function takeQuests(answer, whose) {
+    questsFor = whose;
+    quests = answer && !answer.none ? {
+      sid: answer.sid,
+      // Only true quest items count (the ones that exist for a quest alone, picked up where the quest says).
+      // Ordinary items a quest wants found in raid or handed over are loot like any other: never marked, and a
+      // goal that is only about them isn't listed.
+      list: list(answer.quests).filter(q => q && typeof q.name === 'string').map(q => Object.assign(q, {
+        goals: list(q.goals).map(g => {
+          const asked = list(g.items);
+          const items = asked.filter(tpl => ((answer.names || {})[tpl] || {}).q);
+          return Object.assign(g, { items, plain: asked.length > 0 && !items.length && !list(g.zones).length });
+        }).filter(g => !g.plain)
+      })).filter(q => q.goals.length),
+      zones: answer.zones || {}, names: answer.names || {}
+    } : null;
+    const wished = answer && Array.isArray(answer.wish) ? answer.wish.filter(t => typeof t === 'string').sort() : null;
+    wish = wished ? new Set(wished) : null;
+    wishPrint = wished ? wished.join(',') : '';
+    dirty = true;
   }
   // what the started quests want: { items: tpl -> [quest, goal], zones: zone id -> [quest, goal] }
   function questWants() {
@@ -2133,16 +2147,24 @@
     const want = thingsWanted, whose = sid;
     try {
       const answer = await (await fetch('api/things?session=' + encodeURIComponent(whose))).json();
-      if (whose === sid && answer && !answer.none) {
-        things = readThings(answer);
-        dirty = true;
-        if (!places || places.loc !== things.loc) loadPlaces(false);
-      }
+      if (whose === sid) takeThings(answer);
       thingsHave = want;
     } catch (e) { /* asked again at the next change */ } finally {
       thingsAsking = false;
       if (thingsHave !== thingsWanted) setTimeout(loadThings, 300);
     }
+  }
+  function takeThings(answer) {
+    if (!answer || answer.none) return;
+    things = readThings(answer);
+    dirty = true;
+    if (!places || places.loc !== things.loc) loadPlaces(false);
+  }
+  // the loot as the stream brings it (see listen): the game shown's, numbered as its reports number it
+  function streamThings(answer) {
+    if (!answer || answer.sid !== sid) return;
+    takeThings(answer);
+    if (Number.isFinite(answer.v)) thingsHave = Math.max(thingsHave, answer.v);
   }
   function readThings(raw) {
     const names = raw.names || {};
@@ -2568,6 +2590,7 @@
       };
       const dress = (mark, b, kp) => {
         mark.body = b;
+        mark.kpr = !!kp;
         mark.kp = !!kp || bodySeen(mark);
         if (!b) return mark;
         const items = peeking() ? loot.inside[b.id] || [] : [];
@@ -2588,6 +2611,9 @@
           else if (items.length > counted.length) lines.push(notShown(items.length - counted.length));
           if (!mark.was && b.was) mark.was = b.was;
           const who = markerText(mark) || b.who || (b.side === 'Savage' ? T('A scav') : b.side ? T('A {side}', { side: b.side.toUpperCase() }) : T('A body'));
+          const by = killedBy(mark);
+          if (by === 'ai') { const k = botKiller(mark); if (k) lines.unshift(T('Killed by {who}', { who: k })); }
+          else if (by) lines.unshift(by === 'me' ? T('Killed by you') : T('Killed by another player'));
           mark.tip = { title: who + (total ? ' · ' + roubles(total) : ''), lines };
         }
         return mark;
@@ -2938,6 +2964,27 @@
   const BOT_MODS = { SAIN: "Each bot's SAIN personality, and when SAIN has it in a fight (a red ring round its marker).",
     ORBIT: 'What ORBIT has each bot heading for, and the bots it has parked as ghosts, far from every player.',
     COMET: "The move COMET has each bot making in a fight, and what its squad is doing together: tags in the Raid list, lines on the map to where each is sent, and the squad's events under the list." };
+  // Who killed a body: 'me' (the player shown), 'player' (somebody else playing), 'ai' (a bot, as the raid's kill
+  // events say) or '' (not known, or they killed themselves). By the body's own "kb" (the killer's profile id), else by
+  // the raid's kill events (an older plugin, and every kill by a bot).
+  let ownIds = [];
+  const killOf = m => m.pid ? killEvents.find(k => k.p === m.pid) : null;
+  function killedBy(m) {
+    if (m.kb) return ownIds.includes(m.kb) ? 'me' : 'player';
+    const e = killOf(m);
+    if (e) {
+      if (e.d.kk === 'Main Player') return 'me';
+      if (e.d.kk === 'Friendly Player') return 'player';
+      if (m.kpr) return 'player';
+      return e.d.kk && e.d.k !== e.p ? 'ai' : '';
+    }
+    return m.kpr ? 'player' : '';
+  }
+  // the bot that killed a body, as the tip names it: its name, else what it was
+  const botKiller = m => { const e = killOf(m); return e ? (e.d.kn ? latin(e.d.kn) : ONE[e.d.kk] || e.d.kk || '') : ''; };
+  // a body that was a PMC's (a person playing or a PMC bot)
+  const PMC_KINDS = ['Main Player', 'Friendly Player', 'Enemy Player'];
+  const wasPmc = m => { const e = killOf(m); return PMC_KINDS.includes(m.was) || !!(e && PMC_KINDS.includes(e.d.vk)); };
   const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
     ['optRosterGhosts', 'ORBIT'], ['optSquadParts', 'COMET']];
   const modHere = n => (prefs.brains || []).includes(n);
@@ -3686,6 +3733,65 @@
     if (tracers.length > 400) tracers.splice(0, tracers.length - 400);
     dirty = true;
   }
+  // Kills on the map: for a few seconds a line from where the killer stood to where the other died, and a mark there
+  // with who it was. (An older plugin doesn't say where: nothing is drawn for its kills.)
+  const KILL_MS = 12000;
+  function drawKills(scale) {
+    if (prefs.killLines === false) return;
+    const now = performance.now();
+    const list = killEvents.filter(e => now - e.at < KILL_MS);
+    if (!list.length) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const e of list) {
+      const d = e.d;
+      if (!Array.isArray(d.at) || isHidden(d.vk || 'None') || prefs.areaKinds.includes(d.vk) || prefs.areaKinds.includes(d.kk)) continue;
+      const age = now - e.at, s = toScreen(d.at[0], d.at[1]), r = 7 * scale;
+      ctx.globalAlpha = Math.min(1, (KILL_MS - age) / 2500);
+      if (Array.isArray(d.ka)) {
+        const k = toScreen(d.ka[0], d.ka[1]);
+        for (const [width, col] of [[4.5, 'rgba(0,0,0,0.75)'], [2, (KINDS[d.kk] || OTHER).col]]) {
+          ctx.beginPath();
+          ctx.moveTo(k[0], k[1]);
+          ctx.lineTo(s[0], s[1]);
+          ctx.setLineDash(width === 2 ? [7 * scale, 6 * scale] : []);
+          ctx.lineWidth = width * scale;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+      // a red disc with a white cross: somebody died here
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], r * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8322c';
+      ctx.fill();
+      ctx.lineWidth = 2 * scale;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s[0] - r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] + r * 0.6, s[1] + r * 0.6);
+      ctx.moveTo(s[0] + r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] - r * 0.6, s[1] + r * 0.6);
+      ctx.lineWidth = 2.4 * scale;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      const text = (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn ? '  ←  ' + latin(d.kn) : '');
+      if (text) {
+        ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+        ctx.strokeText(text, s[0], s[1] + r * 1.9);
+        ctx.fillStyle = '#ffd9d6';
+        ctx.fillText(text, s[0], s[1] + r * 1.9);
+      }
+    }
+    ctx.restore();
+    dirty = true;
+  }
+
   function drawShots() {
     if (!tracers.length) return;
     const now = performance.now();
@@ -3997,13 +4103,31 @@
       }
     }
     if (!inRaidHere()) return;
+    // the player shown, by the ids a body's killer may be told by
+    const mainNow = live.find(m => m.c === 'Main Player');
+    ownIds = [sid, mainNow && mainNow.pid].filter(Boolean);
     let top = null;
     // the corpses first, under everyone: the ones a player killed, or every one when asked
     if (!isHidden('Corpse')) {
       for (const m of corpsesNow || live.filter(k => k.c === 'Corpse')) {
         if (!m.kp && !prefs.allCorpses && !bodySeen(m)) continue;
+        const by = killedBy(m);
+        if (prefs.myCorpses && by !== 'me') continue;
         if (pointed === m.id) { top = m; continue; }
         drawMarker(m, false, scale);
+        // a ring round the ones a person killed: gold for the player's own, white for somebody else's; and, with
+        // "PMCs killed by bots" on, red round a PMC a bot killed
+        if (by && (by !== 'ai' || (prefs.botKills && wasPmc(m)))) {
+          const s = toScreen(m.cx, m.cy);
+          ctx.beginPath();
+          ctx.arc(s[0], s[1], 10.5 * scale, 0, Math.PI * 2);
+          ctx.lineWidth = 3.6;
+          ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+          ctx.stroke();
+          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = by === 'me' ? '#ffc94d' : by === 'ai' ? '#ff5148' : '#f2f2f5';
+          ctx.stroke();
+        }
         if (m.ring) {
           const s = toScreen(m.cx, m.cy);
           ctx.beginPath();
@@ -4029,6 +4153,7 @@
     }
     drawAreas(scale);
     drawShots();
+    drawKills(scale);
     drawPlane(scale);
     drawHeadings(scale);
     drawSquads(scale);
@@ -4118,9 +4243,15 @@
     if (!replayed && d.t === 'idle') dropHeld();
     if (moving && !replayed && smoothing()) { hold(message, now); return; }
 
-    // what lies about in the raid changed: asked for
+    // what lies about in the raid changed: the stream brings it just before (streamThings); asked for only when it
+    // hasn't come (an older server, or the stream down)
     if (d.t === 'things') {
-      if (d.v !== thingsWanted) { thingsWanted = d.v; loadThings(); }
+      if (d.v !== thingsWanted) {
+        thingsWanted = d.v;
+        if (thingsHave === d.v) return;
+        if (streamUp) setTimeout(() => { if (thingsHave !== thingsWanted) loadThings(); }, 2500);
+        else loadThings();
+      }
       return;
     }
 
@@ -4349,8 +4480,16 @@
     pick.value = wanted;
   }
   async function askGames() {
+    let answer = null;
     try {
-      const answer = await (await fetch('api/games')).json();
+      answer = await (await fetch('api/games')).json();
+    } catch (e) { /* asked again in a moment */ }
+    takeGames(answer);
+  }
+  // the games as api/games answers, asked for or brought by the stream (see listen)
+  function takeGames(answer) {
+    try {
+      if (!answer) throw new Error('no answer');
       games = (answer.games || []).filter(g => g && typeof g.sid === 'string');
       const mine = prefs.player && games.find(g => g.sid === prefs.player.sid);
       if (mine && mine.name && mine.name !== prefs.player.name) { prefs.player.name = mine.name; save(); }
@@ -4429,9 +4568,10 @@
     ['filtersLoot', ['Layer loose', 'Layer boxes', 'Layer bodies']]
   ];
   // the switches under another one that start on
-  const SUB_ON = ['seenDead', 'corpseKind', 'allCorpses', 'myExits'];
+  const SUB_ON = ['seenDead', 'corpseKind', 'allCorpses', 'myExits', 'botKills'];
   const FILTER_SUBS = {
-    'Corpse': [['allCorpses', T('All corpses, not only player kills')], ['seenDead', T('Corpses I\'ve been close to')], ['corpseKind', T('Show what each corpse was')]],
+    'Corpse': [['allCorpses', T('All corpses, not only player kills')], ['myCorpses', T('Only my kills'), T('Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player\'s.')],
+      ['botKills', T('PMCs killed by bots'), T('A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players\' (white). Pointing at a body says who killed it.')], ['seenDead', T('Corpses I\'ve been close to')], ['corpseKind', T('Show what each corpse was')]],
     'Layer loose': [['lootArea', T('Rough areas only')]],
     'Extract': [['myExits', T('Mine only'), T('In a raid: only the extracts you can take this raid.')], ['goneExits', T('Closed ones'), T('Extracts that are no longer there this raid, such as a vehicle that has left, are shown in red. Off: they are hidden.')],
       ['secretExits', T('Secret ones not found yet'), T('Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.')]]
@@ -6809,7 +6949,7 @@
     if (prefs.groups && typeof prefs.groups[name] === 'boolean') group.open = prefs.groups[name];
     group.addEventListener('toggle', () => { prefs.groups = Object.assign({}, prefs.groups, { [name]: group.open }); save(); });
   }
-  for (const [id, key] of [['optItemNames', 'itemNames'], ['optWishOnly', 'wishOnly'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'],
+  for (const [id, key] of [['optItemNames', 'itemNames'], ['optWishOnly', 'wishOnly'], ['optKillLines', 'killLines'],['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'],
     ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optMyName', 'myName'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],
@@ -7032,6 +7172,7 @@
     const print = answer.print || '';
     if (print === mapsPrint) return;
     mapsPrint = print;
+    placesNone = lootNone = false;
     addons = (Array.isArray(answer.addons) ? answer.addons : []).filter(a => a && typeof a.loc === 'string' && a.loc);
     maps = (answer.maps || []).map(readMap).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
     const pick = $('map');
@@ -7073,13 +7214,24 @@
     // One game's reports only: the player picked, or with nobody picked the game being shown. The other games on
     // the server then aren't asked for their markers. (Every game, only until the first is heard from.)
     streamFor = prefs.player ? prefs.player.sid : sid;
+    streamUp = false;
     source = new EventSource('api/stream' + (streamFor ? '?session=' + encodeURIComponent(streamFor) : ''));
     source.onopen = () => { serverLost = false; };
-    source.onerror = () => { serverLost = true; };
+    source.onerror = () => { serverLost = true; streamUp = false; };
     source.onmessage = e => {
       serverLost = false;
       try { take(JSON.parse(e.data)); } catch (err) { console.warn(err); }
     };
+    // What the page would otherwise keep asking for, brought by the stream when it changes. While a server sends
+    // these the page stops asking (streamUp); one that doesn't (older) is asked as before.
+    const news = (name, use) => source.addEventListener(name, e => {
+      streamUp = true;
+      try { use(JSON.parse(e.data)); } catch (err) { console.warn(err); }
+    });
+    news('games', takeGames);
+    news('maps', d => { if (d && d.print !== mapsPrint) loadMaps(); });
+    news('things', streamThings);
+    news('quests', d => { streamQuests(d); listQuests(); });
   }
 
   resized();
@@ -7109,9 +7261,9 @@
   // full screen can't be had on some phones (an iPhone's browser): no button for it there
   if (!document.documentElement.requestFullscreen) $('full').hidden = true;
   loadMaps();
-  setInterval(() => { loadMaps(); loadPlaces(false); loadSpawns(); }, 4000);
+  setInterval(() => { if (!streamUp) loadMaps(); loadPlaces(false); loadSpawns(); }, 4000);
   listen();
   askGames();
-  setInterval(askGames, 3000);
+  setInterval(() => { if (!streamUp) askGames(); }, 3000);
   requestAnimationFrame(frame);
 })();

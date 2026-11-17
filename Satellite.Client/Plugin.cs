@@ -21,7 +21,7 @@ namespace Satellite.Client
     {
         public const string Guid = "com.fums.satellite";
         public const string Name = "Fums-Satellite";
-        public const string Version = "1.0.1";
+        public const string Version = "1.0.2";
 
         private const string PushRoute = "/satellite/api/push";
 
@@ -41,6 +41,10 @@ namespace Satellite.Client
         private volatile int _watchers;
         private volatile bool _sending;
         private volatile bool _failed;
+
+        // the links reports and loot go by, once they're open (see Link)
+        private readonly Link _pushLink = new Link("push");
+        private readonly Link _thingsLink = new Link("things");
 
         private readonly StringBuilder _report = new StringBuilder(64 * 1024);
         // the report as it's sent: kept and used again, so a report leaves nothing behind for the game to clear away
@@ -124,6 +128,8 @@ namespace Satellite.Client
 
             try
             {
+                _pushLink.Tick(Time.unscaledDeltaTime);
+                _thingsLink.Tick(Time.unscaledDeltaTime);
                 Things.Tick(this, _watchers > 0 && !_failed);
 
                 _wait -= Time.unscaledDeltaTime;
@@ -471,6 +477,13 @@ namespace Satellite.Client
         // count: how much of bytes is sent (a buffer that's kept and used again is longer than what's in it)
         internal void Post(string route, byte[] bytes, int count, Action<bool, string> done)
         {
+            // by the link when it's open: no request of its own
+            var link = route == PushRoute ? _pushLink : route == Things.LootRoute ? _thingsLink : null;
+            if (link != null && link.Send(bytes, count, done))
+            {
+                return;
+            }
+
             Task.Run(async () =>
             {
                 var ok = false;

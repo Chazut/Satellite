@@ -3,6 +3,9 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
+using SPTarkov.Server.Core.Models.Common;
+using SPTarkov.Server.Core.Servers.Http;
 
 namespace Satellite.Server;
 
@@ -27,24 +30,14 @@ public partial class LiveMapRoute
     // goes up whenever new prices come in, so what was made with the old ones is made again
     private int _fleaVersion;
 
-    // marks the map's own questions to Better Flea, so SPT's request log leaves them out (QuietRequests)
-    public const string QuietHeader = "X-Satellite";
-
-    private static readonly HttpClient Flea = MakeFlea();
-
-    private static HttpClient MakeFlea()
+    private static readonly HttpClient Flea = new(new HttpClientHandler
     {
-        var client = new HttpClient(new HttpClientHandler
-        {
-            // this server's own certificate, which is SPT's self-signed one: only ever this server is asked
-            ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(20)
-        };
-        client.DefaultRequestHeaders.Add(QuietHeader, "1");
-        return client;
-    }
+        // this server's own certificate, which is SPT's self-signed one: only ever this server is asked
+        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(20)
+    };
 
     // Every item priced at once, the first time anything asks this server for the map (the game connecting, or a
     // page): so the prices are there before a page wants loot or spawn points.
@@ -182,14 +175,13 @@ public partial class LiveMapRoute
     {
         try
         {
-            using var one = await Flea.PostAsync(FleaHost() + FleaOneRoute, Json("[]"));
-            if (!one.IsSuccessStatusCode || JsonNode.Parse(await one.Content.ReadAsStringAsync())?["Price"] is null)
+            var one = await FleaPost(FleaOneRoute, "[]");
+            if (!one.Ok || JsonNode.Parse(one.Text)?["Price"] is null)
             {
                 return 4;
             }
 
-            using var many = await Flea.PostAsync(FleaHost() + FleaBatchRoute, Json("[]"));
-            return many.IsSuccessStatusCode ? 2 : 3;
+            return (await FleaPost(FleaBatchRoute, "[]")).Ok ? 2 : 3;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
@@ -203,25 +195,79 @@ public partial class LiveMapRoute
     private static JsonArray FreshItem(string tpl) =>
         [new JsonObject { ["_id"] = Guid.NewGuid().ToString("N")[..24], ["_tpl"] = tpl }];
 
-    private static async Task<List<double>> FleaBatch(List<string> tpls)
+    private async Task<List<double>> FleaBatch(List<string> tpls)
     {
         var body = new JsonArray(tpls.Select(t => (JsonNode)FreshItem(t)).ToArray());
-        using var answer = await Flea.PostAsync(FleaHost() + FleaBatchRoute, Json(body.ToJsonString()));
-        answer.EnsureSuccessStatusCode();
-        var prices = JsonNode.Parse(await answer.Content.ReadAsStringAsync())?["Prices"] as JsonArray ?? [];
+        var answer = await FleaPost(FleaBatchRoute, body.ToJsonString());
+        if (!answer.Ok)
+        {
+            throw new HttpRequestException("Better Flea didn't price them");
+        }
+
+        var prices = JsonNode.Parse(answer.Text)?["Prices"] as JsonArray ?? [];
         return prices.Select(p => p is JsonValue v && v.TryGetValue<double>(out var d) ? d : 0).ToList();
     }
 
-    private static async Task<List<double>> FleaOneByOne(List<string> tpls)
+    private async Task<List<double>> FleaOneByOne(List<string> tpls)
     {
         var prices = new List<double>();
         foreach (var tpl in tpls)
         {
-            using var answer = await Flea.PostAsync(FleaHost() + FleaOneRoute, Json(FreshItem(tpl).ToJsonString()));
-            answer.EnsureSuccessStatusCode();
-            prices.Add(JsonNode.Parse(await answer.Content.ReadAsStringAsync())?["Price"] is JsonValue v && v.TryGetValue<double>(out var d) ? d : 0);
+            var answer = await FleaPost(FleaOneRoute, FreshItem(tpl).ToJsonString());
+            if (!answer.Ok)
+            {
+                throw new HttpRequestException("Better Flea didn't price it");
+            }
+
+            prices.Add(JsonNode.Parse(answer.Text)?["Price"] is JsonValue v && v.TryGetValue<double>(out var d) ? d : 0);
         }
 
         return prices;
+    }
+
+    // Better Flea's route asked here in the server, handed the question as SPT itself hands it a request: nothing
+    // goes over the network, so SPT has no request line to write (every ten minutes, a few dozen of them). Over HTTP
+    // to this server only when that can't be done. Better Flea is asked as any caller asks it; nothing of it changes.
+    // Its route is looked for once (as SPT looks: the first listener that takes the address) and kept.
+    private readonly ConcurrentDictionary<string, IHttpListener?> _fleaListeners = new(StringComparer.Ordinal);
+
+    private static DefaultHttpContext FleaContext(string route, byte[] bytes)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = route;
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(bytes);
+        context.Request.ContentLength = bytes.Length;
+        return context;
+    }
+
+    private async Task<(bool Ok, string Text)> FleaPost(string route, string body)
+    {
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(body);
+            var context = FleaContext(route, bytes);
+            var listener = _fleaListeners.GetOrAdd(route, _ =>
+                (services.GetService(typeof(IEnumerable<IHttpListener>)) as IEnumerable<IHttpListener>)
+                ?.FirstOrDefault(l => l is not LiveMapRoute && l.CanHandle(FleaContext(route, []))));
+            if (listener == null)
+            {
+                // no such route on this server: no Better Flea (or one too old)
+                return (false, "");
+            }
+
+            using var output = new MemoryStream();
+            context.Response.Body = output;
+            await listener.HandleAsync(MongoId.Empty(), context, CancellationToken.None);
+            return (context.Response.StatusCode is >= 200 and < 300, Encoding.UTF8.GetString(output.ToArray()));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // asked over HTTP instead
+        }
+
+        using var answer = await Flea.PostAsync(FleaHost() + route, Json(body));
+        return (answer.IsSuccessStatusCode, await answer.Content.ReadAsStringAsync());
     }
 }

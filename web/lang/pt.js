@@ -705,7 +705,7 @@ fumsLang({
 "Map scans by Fums,": "Capturas dos mapas por Fums,",
 "Use, share and change them with credit. Not for sale.": "Use, compartilhe e altere com crédito. Sem vender.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov pertence à Battlestate Games. Satellite é um mod de fã e não é feito nem apoiado por ela.",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, feito por Fums. Toque para os créditos e a licença dos mapas",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2, feito por Fums. Toque para os créditos e a licença dos mapas",
 "Transits": "Trânsitos",
 "Transit": "Trânsito",
 "Transit to {map}": "Trânsito para {map}",
@@ -718,5 +718,14 @@ fumsLang({
 "{n} not on your wishlist": "{n} fora da tua lista de desejos",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Só o loot da tua lista de desejos: solto, em contentores, em corpos e onde pode aparecer, valha o que valer e seja de que tipo for. Os itens de missão continuam a aparecer. Adiciona à lista de desejos no jogo; o mapa acompanha em meio minuto.",
 "ISB special forces": "Forças especiais ISB",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "Morto por {who}",
+"Killed by you": "Morto por ti",
+"Killed by another player": "Morto por outro jogador",
+"Only my kills": "Só os meus abates",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "Só os corpos de quem tu próprio mataste. Os corpos têm um anel quando foi uma pessoa a matá-los: dourado para os teus abates, branco para os de outro jogador.",
+"PMCs killed by bots": "PMCs mortos por bots",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "Um anel vermelho à volta do corpo de um PMC morto por um bot, para se distinguir dos teus abates (dourado) e dos de outros jogadores (branco). Apontar para um corpo mostra quem o matou.",
+"Kill lines": "Linhas de abate",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Uma linha de quem matou a quem morreu, e uma marca onde morreu, durante alguns segundos."
 });

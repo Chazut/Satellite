@@ -693,7 +693,7 @@ fumsLang({
 "Map scans by Fums,": "맵 촬영: Fums,",
 "Use, share and change them with credit. Not for sale.": "출처를 밝히면 사용, 공유, 수정할 수 있습니다. 판매는 안 됩니다.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov는 Battlestate Games의 것입니다. Satellite는 팬 모드이며 그들이 만들거나 지원하지 않습니다.",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, 제작 Fums. 눌러서 크레딧과 맵 라이선스 보기",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2, 제작 Fums. 눌러서 크레딧과 맵 라이선스 보기",
 "Transits": "트랜짓",
 "Transit": "트랜짓",
 "Transit to {map}": "{map}(으)로 가는 트랜짓",
@@ -706,5 +706,14 @@ fumsLang({
 "{n} not on your wishlist": "위시리스트에 없는 것 {n}개",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "위시리스트에 있는 전리품만 표시합니다: 바닥, 컨테이너 안, 시체, 스폰될 수 있는 곳. 가치나 종류는 상관없습니다. 퀘스트 아이템은 계속 표시됩니다. 위시리스트 추가는 게임에서 하세요. 지도는 30초 안에 따라옵니다.",
 "ISB special forces": "ISB 특수부대",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "{who}이(가) 죽임",
+"Killed by you": "내가 죽임",
+"Killed by another player": "다른 플레이어가 죽임",
+"Only my kills": "내 킬만",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "내가 직접 죽인 대상의 시체만 표시합니다. 사람이 죽인 시체에는 고리가 표시됩니다: 내 킬은 금색, 다른 플레이어의 킬은 흰색.",
+"PMCs killed by bots": "봇에게 죽은 PMC",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "봇이 죽인 PMC의 시체에 빨간 고리를 표시해 내 킬(금색)과 다른 플레이어의 킬(흰색)과 구분합니다. 시체를 가리키면 누가 죽였는지 표시됩니다.",
+"Kill lines": "킬 라인",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "죽인 쪽에서 죽은 쪽까지의 선과, 죽은 자리의 표시를 몇 초간 보여 줍니다."
 });

@@ -693,7 +693,7 @@ fumsLang({
 "Map scans by Fums,": "マップ撮影：Fums、",
 "Use, share and change them with credit. Not for sale.": "クレジット表記のうえ使用・共有・改変可。販売は不可。",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov は Battlestate Games のものです。Satellite はファンが作った MOD で、同社が制作・支援したものではありません。",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1、作者 Fums。押すとクレジットとマップのライセンス",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2、作者 Fums。押すとクレジットとマップのライセンス",
 "Transits": "トランジット",
 "Transit": "トランジット",
 "Transit to {map}": "{map}へのトランジット",
@@ -706,5 +706,14 @@ fumsLang({
 "{n} not on your wishlist": "ウィッシュリスト外 {n} 件",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "ウィッシュリストにあるルートだけを表示します：落ちている物、コンテナの中、死体、スポーンし得る場所。価値や種類は問いません。クエストアイテムは引き続き表示されます。ウィッシュリストへの追加はゲーム内で。マップには30秒以内に反映されます。",
 "ISB special forces": "ISB特殊部隊",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "{who}がキル",
+"Killed by you": "自分がキル",
+"Killed by another player": "他のプレイヤーがキル",
+"Only my kills": "自分のキルのみ",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "自分で倒した相手の死体だけを表示します。人が倒した死体にはリングが付きます：自分のキルは金、他のプレイヤーのキルは白。",
+"PMCs killed by bots": "ボットに倒されたPMC",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "ボットに倒されたPMCの死体に赤いリングを付け、自分のキル（金）や他のプレイヤーのキル（白）と区別します。死体を指すと、誰が倒したかが表示されます。",
+"Kill lines": "キルライン",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "倒した側から倒された側への線と、死亡地点のマークを数秒間表示します。"
 });

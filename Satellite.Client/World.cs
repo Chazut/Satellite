@@ -30,6 +30,8 @@ namespace Satellite.Client
             public string To;
             // a body: killed by a person playing, not a bot
             public bool ByPlayer;
+            // the profile id of the person playing who killed them (a body's)
+            public string Killer;
             // moves though it's nobody (the BTR)
             public bool Moves;
             // a body: whose it was, so the page can put what it carries on it
@@ -544,7 +546,8 @@ namespace Satellite.Client
         internal static readonly HashSet<string> KilledByPlayers = new HashSet<string>();
 
         // Somebody died: said once, as an event ("kill"), for the page's kill feed. {"vk":what the dead one was,
-        // "k":the killer's profile id,"kn":their name,"kk":what they are,"w":the weapon,"bp":where it hit,"m":how far}
+        // "k":the killer's profile id,"kn":their name,"kk":what they are,"w":the weapon,"bp":where it hit,"m":how far,
+        // "at":[east,north,height] where they died,"ka":where the killer stood}
         private const System.Reflection.BindingFlags Kept = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
         private static readonly System.Reflection.FieldInfo LastDamage = typeof(Player).GetField("LastDamageInfo", Kept);
         private static readonly System.Reflection.FieldInfo LastPart = typeof(Player).GetField("LastBodyPart", Kept);
@@ -557,6 +560,8 @@ namespace Satellite.Client
                 var killer = dead.KillerId;
                 string killerName = null, killerKind = null, weapon = null, part = null;
                 var far = -1f;
+                var where = dead.Position;
+                Vector3? from = null;
                 if (!string.IsNullOrEmpty(killer))
                 {
                     Names.TryGetValue(killer, out killerName);
@@ -576,6 +581,7 @@ namespace Satellite.Client
                     if (aggressor != null && aggressor.ProfileId != dead.ProfileId)
                     {
                         far = Vector3.Distance(aggressor.Position, dead.Position);
+                        from = aggressor.Position;
                     }
                 }
                 catch (Exception)
@@ -622,6 +628,13 @@ namespace Satellite.Client
                         to.Append(",\"m\":").Append((int)Math.Round(far));
                     }
 
+                    // where they died, and where the one who killed them stood
+                    Spot(to, "at", where);
+                    if (from.HasValue)
+                    {
+                        Spot(to, "ka", from.Value);
+                    }
+
                     to.Append('}');
                 });
             }
@@ -640,7 +653,7 @@ namespace Satellite.Client
         {
             var byPlayer = KilledByPlayer(player, world);
             Killed(player, dot);
-            Still.Add(new Dot { Id = ++_nextId, Kind = "Corpse", Text = dot.Text, At = dot.At, ByPlayer = byPlayer, Profile = player.ProfileId, Was = dot.Kind });
+            Still.Add(new Dot { Id = ++_nextId, Kind = "Corpse", Text = dot.Text, At = dot.At, ByPlayer = byPlayer, Killer = byPlayer ? player.KillerId : null, Profile = player.ProfileId, Was = dot.Kind });
             if (byPlayer && !string.IsNullOrEmpty(player.ProfileId))
             {
                 KilledByPlayers.Add(player.ProfileId);
@@ -1225,6 +1238,18 @@ namespace Satellite.Client
             }
         }
 
+        // where something happened, into an event: ,"<name>":[east,north,height]
+        internal static void Spot(StringBuilder to, string name, Vector3 at)
+        {
+            to.Append(",\"").Append(name).Append("\":[");
+            Number(to, at.x);
+            to.Append(',');
+            Number(to, at.z);
+            to.Append(',');
+            Number(to, at.y);
+            to.Append(']');
+        }
+
         // east, north, height, facing (degrees clockwise from north)
         private static void Place(StringBuilder to, Vector3 at, float yaw)
         {
@@ -1332,6 +1357,12 @@ namespace Satellite.Client
             if (dot.ByPlayer)
             {
                 to.Append(",\"kp\":1");
+                // "kb": which player it was, so a page can tell its own player's kills from a friend's
+                if (!string.IsNullOrEmpty(dot.Killer))
+                {
+                    to.Append(",\"kb\":");
+                    Text(to, dot.Killer);
+                }
             }
 
             if (!string.IsNullOrEmpty(dot.Profile))

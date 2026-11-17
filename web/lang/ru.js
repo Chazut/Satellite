@@ -713,7 +713,7 @@ fumsLang({
 "Map scans by Fums,": "Снимки карт: Fums,",
 "Use, share and change them with credit. Not for sale.": "Используйте, делитесь и изменяйте с указанием автора. Не продавать.",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "Escape from Tarkov принадлежит Battlestate Games. Satellite — фанатский мод, они его не делали и не поддерживают.",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "Satellite 1.0.1, автор: Fums. Нажмите, чтобы увидеть авторов и лицензию карт",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "Satellite 1.0.2, автор: Fums. Нажмите, чтобы увидеть авторов и лицензию карт",
 "Transits": "Переходы",
 "Transit": "Переход",
 "Transit to {map}": "Переход на {map}",
@@ -726,5 +726,14 @@ fumsLang({
 "{n} not on your wishlist": "{n} нет в списке желаемого",
 "Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute.": "Только лут из твоего списка желаемого: лежащий, в контейнерах, на телах и там, где он может появиться, сколько бы он ни стоил и какого бы ни был вида. Квестовые предметы по-прежнему видны. Добавляй в список желаемого в игре; карта подхватит в течение полуминуты.",
 "ISB special forces": "Спецназ ISB",
-"ISB": "ISB"
+"ISB": "ISB",
+"Killed by {who}": "Убит: {who}",
+"Killed by you": "Убит тобой",
+"Killed by another player": "Убит другим игроком",
+"Only my kills": "Только мои убийства",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "Только тела тех, кого убил ты сам. У тел есть кольцо, если их убил человек: золотое для твоих убийств, белое для убийств другого игрока.",
+"PMCs killed by bots": "ЧВК, убитые ботами",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "Красное кольцо вокруг тела ЧВК, которого убил бот, чтобы отличать его от твоих убийств (золотое) и убийств других игроков (белое). Если навести на тело, видно, кто его убил.",
+"Kill lines": "Линии убийств",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Линия от убийцы к убитому и метка на месте гибели, на несколько секунд."
 });

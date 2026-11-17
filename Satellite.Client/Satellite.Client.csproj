@@ -11,7 +11,7 @@
     <AssemblyName>Satellite.Client</AssemblyName>
     <RootNamespace>Satellite.Client</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <DebugType>none</DebugType>
@@ -46,6 +46,7 @@
     <Reference Include="UnityEngine.TerrainModule" HintPath="$(Managed)\UnityEngine.TerrainModule.dll" Private="false" />
     <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(Managed)\UnityEngine.ImageConversionModule.dll" Private="false" />
     <Reference Include="Newtonsoft.Json" HintPath="$(Managed)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="websocket-sharp" HintPath="$(Managed)\websocket-sharp.dll" Private="false" />
     <Reference Include="System.Net.Http" HintPath="$(Managed)\System.Net.Http.dll" Private="false" />
     <Reference Include="spt-common" HintPath="$(SptPlugins)\spt-common.dll" Private="false" />
   </ItemGroup>

@@ -345,13 +345,24 @@ public partial class LiveMapRoute
             return;
         }
 
-        var sent = JsonNode.Parse(await ReadBody(context, cancellationToken)) as JsonObject;
+        if (!ThingsTaken(id, await ReadBody(context, cancellationToken)))
+        {
+            context.Response.StatusCode = 400;
+            return;
+        }
+
+        await SendJson(context, "{\"saved\":true}", cancellationToken);
+    }
+
+    // What lies about in a raid, taken in (by POST, or over the plugin's link): false when it isn't that
+    private bool ThingsTaken(string id, byte[] body)
+    {
+        var sent = JsonNode.Parse(body) as JsonObject;
         var location = sent?["loc"] is JsonValue loc && loc.TryGetValue<string>(out var name) ? name : "";
         if (sent == null || !LocationName().IsMatch(location) || sent["loose"] is not JsonArray
             || sent["inside"] is not JsonObject || sent["open"] is not JsonArray)
         {
-            context.Response.StatusCode = 400;
-            return;
+            return false;
         }
 
         var off = LayersOff;
@@ -379,7 +390,7 @@ public partial class LiveMapRoute
         session.Things = sent.ToJsonString();
         var count = Interlocked.Increment(ref session.ThingsSent);
         Publish(session, "{\"t\":\"things\",\"v\":" + count + ",\"loc\":" + JsonSerializer.Serialize(location) + "}");
-        await SendJson(context, "{\"saved\":true}", cancellationToken);
+        return true;
     }
 
     // GET api/things[?session=]: what lies about in that game's raid (the game heard from last), with names

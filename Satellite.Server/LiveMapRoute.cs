@@ -164,6 +164,12 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
 
         try
         {
+            if (path.StartsWith("api/link/", StringComparison.OrdinalIgnoreCase) && context.WebSockets.IsWebSocketRequest)
+            {
+                await Link(sessionId, context, path[9..].ToLowerInvariant(), cancellationToken);
+                return;
+            }
+
             switch (path.ToLowerInvariant())
             {
                 case "api/push" when post:
@@ -298,11 +304,22 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             return;
         }
 
-        var body = await ReadBody(context, cancellationToken);
-        if (body.Length == 0)
+        var answer = Pushed(id, await ReadBody(context, cancellationToken));
+        if (answer == null)
         {
             context.Response.StatusCode = 400;
             return;
+        }
+
+        await SendJson(context, answer, cancellationToken);
+    }
+
+    // A report taken in (by POST, or over the plugin's link): the answer, or null when it isn't one
+    private string? Pushed(string id, byte[] body)
+    {
+        if (body.Length == 0)
+        {
+            return null;
         }
 
         var session = _sessions.GetOrAdd(id, key => new Session(key));
@@ -316,8 +333,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             var root = report.RootElement;
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("t", out var kind))
             {
-                context.Response.StatusCode = 400;
-                return;
+                return null;
             }
 
             if (root.TryGetProperty("raid", out var raid) && raid.ValueKind is JsonValueKind.True or JsonValueKind.False)
@@ -407,7 +423,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             }
         }
 
-        await SendJson(context, answer.Append('}').ToString(), cancellationToken);
+        return answer.Append('}').ToString();
     }
 
     // ---- what the server never passes on: config.jsonc ------------------------------------------------------------
@@ -472,21 +488,6 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
 
         return file;
-    }
-
-    // config.jsonc's server.quietLogs: on unless it says false (a config.jsonc from 1.0.0 doesn't have it)
-    public static bool QuietLogs(string file)
-    {
-        try
-        {
-            var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
-            return !(File.Exists(file) && JsonNode.Parse(File.ReadAllText(file), null, options)?["server"]?["quietLogs"] is JsonValue value
-                && value.TryGetValue<bool>(out var on) && !on);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
-        {
-            return true;
-        }
     }
 
     private string[] ReadOff()
@@ -857,17 +858,20 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             }
 
             await context.Response.WriteAsync(": hello\n\n", gone.Token);
+            var news = new StreamNews();
+            await context.Response.WriteAsync(News(news, wanted), gone.Token);
             await context.Response.Body.FlushAsync(gone.Token);
 
             var reader = subscriber.Messages.Reader;
             while (!gone.IsCancellationRequested)
             {
                 using var quiet = CancellationTokenSource.CreateLinkedTokenSource(gone.Token);
-                quiet.CancelAfter(TimeSpan.FromSeconds(5));
+                quiet.CancelAfter(TimeSpan.FromSeconds(2));
                 try
                 {
                     var message = await reader.ReadAsync(quiet.Token);
-                    var batch = new StringBuilder();
+                    // what's new first (loot a report is about to tell of, say), so the page needn't ask for it
+                    var batch = new StringBuilder(News(news, wanted));
                     batch.Append("data: ").Append(message).Append("\n\n");
                     while (reader.TryRead(out var more))
                     {
@@ -878,8 +882,8 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 }
                 catch (OperationCanceledException) when (!gone.IsCancellationRequested)
                 {
-                    // nothing from the game for a while: keep the line open
-                    await context.Response.WriteAsync(": quiet\n\n", gone.Token);
+                    // nothing from the game for a while: keep the line open, and say what's new
+                    await context.Response.WriteAsync(": quiet\n\n" + News(news, wanted), gone.Token);
                 }
 
                 await context.Response.Body.FlushAsync(gone.Token);
@@ -890,6 +894,68 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             _subscribers.TryRemove(subscriber, out _);
         }
     }
+
+    // What a page would otherwise keep asking for, sent down its stream when it changes, so it needn't ask: the
+    // games ("event: games", as api/games answers), a mark of the maps ("event: maps", {"print"}: the page asks
+    // api/maps only when it differs), the loot of the game it watches ("event: things", as api/things answers) and
+    // that player's quests ("event: quests", as api/quests answers).
+    private sealed class StreamNews
+    {
+        public string Games = "";
+        public string MapsPrint = "";
+        public int Things = -1;
+        public string Quests = "";
+        public long At;
+        public long QuestsAt;
+    }
+
+    private string News(StreamNews news, string? wanted)
+    {
+        var to = new StringBuilder();
+        // loot as soon as there's more; the games and maps at most once a second
+        if (Pick(wanted) is { } session && session.Things != null && session.ThingsSent != news.Things)
+        {
+            news.Things = session.ThingsSent;
+            to.Append("event: things\ndata: ").Append(OneLine(ThingsFor(wanted).Text)).Append("\n\n");
+        }
+
+        if (Now - news.At < 1000)
+        {
+            return to.ToString();
+        }
+
+        news.At = Now;
+        var games = Games();
+        if (games != news.Games)
+        {
+            news.Games = games;
+            to.Append("event: games\ndata: ").Append(games).Append("\n\n");
+        }
+
+        var (_, print) = Maps();
+        if (print != news.MapsPrint)
+        {
+            news.MapsPrint = print;
+            to.Append("event: maps\ndata: {\"print\":").Append(JsonSerializer.Serialize(print)).Append("}\n\n");
+        }
+
+        // the quests: looked at every few seconds (they change when the player hands one in, between raids)
+        if (Now - news.QuestsAt >= 5000)
+        {
+            news.QuestsAt = Now;
+            var quests = OneLine(QuestsFor(wanted));
+            if (quests != news.Quests)
+            {
+                news.Quests = quests;
+                to.Append("event: quests\ndata: ").Append(quests).Append("\n\n");
+            }
+        }
+
+        return to.ToString();
+    }
+
+    private static string OneLine(string text) =>
+        text.AsSpan().IndexOfAny('\r', '\n') >= 0 ? text.Replace("\r", "").Replace("\n", "") : text;
 
     private async Task State(HttpContext context, string? wanted, CancellationToken cancellationToken)
     {
@@ -1889,27 +1955,7 @@ public class LiveMapStartup(ISptLogger<LiveMapStartup> logger, HttpConfig http, 
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
         // the server owner's settings: written now when there are none, so the file is there to edit
-        var config = LiveMapRoute.ConfigFile(modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly()), m => logger.Info(m), m => logger.Warning(m));
-
-        // config.jsonc's server.quietLogs, on unless set false: SPT's "[Client Request]" line for every request, every
-        // mod's, left out (http.json's logRequests, which SPT reads for each request), so the page's many requests never
-        // fill the server's window, whichever way SPT runs. Set false: only the map's own are left out, by
-        // QuietRequests; a newer or older SPT may have moved the request log, and then they're logged as before.
-        if (LiveMapRoute.QuietLogs(config))
-        {
-            http.LogRequests = false;
-        }
-        else
-        {
-            try
-            {
-                new QuietRequests().Enable();
-            }
-            catch (Exception ex)
-            {
-                logger.Warning($"[Satellite] Couldn't leave the map's requests out of SPT's log, so every one is logged. To leave out every request line, set server.quietLogs to true in config.jsonc. ({ex.Message})");
-            }
-        }
+        LiveMapRoute.ConfigFile(modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly()), m => logger.Info(m), m => logger.Warning(m));
 
         logger.Success($"[Satellite] Open it at https://127.0.0.1:{http.Port}{LiveMapRoute.Root}/");
 

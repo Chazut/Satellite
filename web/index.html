@@ -28,7 +28,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
 <div id="toasts"></div>
 
 <header id="bar" class="ui">
-  <button id="brand" type="button" title="Satellite 1.0.1, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.1</span></button>
+  <button id="brand" type="button" title="Satellite 1.0.2, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.2</span></button>
   <div id="status" title=""><span id="dot"></span><span id="statusText">Connecting…</span></div>
   <button id="backRaid" type="button" title="Show the map of the raid again, following the player" hidden>Back to the raid</button>
   <select id="session" title="Whose game to show" hidden></select>
@@ -202,6 +202,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <details class="group" data-group="bots" open>
         <summary>People and bots</summary>
         <label class="row" title="A thin line for every shot, from the gun to where the bullet went, for a moment."><input type="checkbox" id="optShots"><span>Shot lines</span></label>
+        <label class="row" title="A line from the killer to the one killed, and a mark where they died, for a few seconds."><input type="checkbox" id="optKillLines"><span>Kill lines</span></label>
         <label class="row" title="A small bar over anybody who is hurt: how much health they have left. Also by the pointer."><input type="checkbox" id="optHealth"><span>Health bars</span></label>
         <label class="row sub" title="The bar over everybody, hurt or not."><input type="checkbox" id="optHealthAll"><span>Also when not hurt</span></label>
         <label class="row" title="Under each bot's marker, always: what it is doing now, as SAIN, COMET, ORBIT, QuestingBots or Phobos has it (looting, heading for a quest, in a fight). Off: only by the pointer and in the Raid list."><input type="checkbox" id="optMapDoing"><span>What each bot is doing</span></label>
@@ -312,7 +313,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       </details>
       <div id="about">
         <img src="icon.svg" alt="" width="32" height="32">
-        <div><b>Satellite</b> <span class="ver">1.0.1</span><br><small>by <b>Fums</b></small></div>
+        <div><b>Satellite</b> <span class="ver">1.0.2</span><br><small>by <b>Fums</b></small></div>
       </div>
       <p class="credit">Map scans by Fums, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>.</p>
       <p class="credit">Use, share and change them with credit. Not for sale.</p>
@@ -326,7 +327,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
   <span id="scaleBar" hidden></span>
   <span id="cursorAt"></span>
   <span id="playerAt"></span>
-  <button id="credit" type="button" title="Satellite 1.0.1, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
+  <button id="credit" type="button" title="Satellite 1.0.2, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
 </footer>
 
 <div id="hint" class="ui">H hide controls · M menu · P raid · L loot · Q quests · / find</div>

@@ -433,7 +433,7 @@
 "Gold: a floor picked by hand. Press to go back to the floor it would show by itself": "page title",
 "Floor up ( ] )": "page title",
 "Floor up": "page aria-label",
-"Satellite 1.0.1, made by Fums. Press for the credits and the map licence": "page title",
+"Satellite 1.0.2, made by Fums. Press for the credits and the map licence": "page title",
 "Connecting…": "page text",
 "Whose game to show": "page title",
 "Map": "page title",
@@ -660,5 +660,14 @@
 "Use, share and change them with credit. Not for sale.": "page text",
 "Escape from Tarkov belongs to Battlestate Games. Satellite is a fan mod and is not made or backed by them.": "page text",
 "Satellite · © Fums": "page text",
-"H hide controls · M menu · P raid · L loot · Q quests · / find": "page text"
+"H hide controls · M menu · P raid · L loot · Q quests · / find": "page text",
+"Killed by {who}": "script",
+"Killed by you": "script",
+"Killed by another player": "script",
+"Only my kills": "script",
+"Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player's.": "script",
+"PMCs killed by bots": "script",
+"A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "script",
+"Kill lines": "page text",
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "page title"
 }
