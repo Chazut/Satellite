@@ -669,5 +669,10 @@
 "PMCs killed by bots": "script",
 "A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "script",
 "Kill lines": "page text",
-"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "page title"
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "page title",
+"My keys": "script",
+"The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.": "script",
+"You have the key with you": "script",
+"The key is in your stash": "script",
+"You don't have the key": "script"
 }

@@ -715,5 +715,10 @@ fumsLang({
 "PMCs killed by bots": "봇에게 죽은 PMC",
 "A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "봇이 죽인 PMC의 시체에 빨간 고리를 표시해 내 킬(금색)과 다른 플레이어의 킬(흰색)과 구분합니다. 시체를 가리키면 누가 죽였는지 표시됩니다.",
 "Kill lines": "킬 라인",
-"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "죽인 쪽에서 죽은 쪽까지의 선과, 죽은 자리의 표시를 몇 초간 보여 줍니다."
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "죽인 쪽에서 죽은 쪽까지의 선과, 죽은 자리의 표시를 몇 초간 보여 줍니다.",
+"My keys": "내 열쇠",
+"The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.": "이 자물쇠의 열쇠: 가지고 있으면 밝게, 창고에 있으면 금색, 없으면 어둡게 표시합니다.",
+"You have the key with you": "열쇠를 가지고 있습니다",
+"The key is in your stash": "열쇠가 창고에 있습니다",
+"You don't have the key": "열쇠가 없습니다"
 });

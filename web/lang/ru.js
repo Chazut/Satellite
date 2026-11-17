@@ -735,5 +735,10 @@ fumsLang({
 "PMCs killed by bots": "ЧВК, убитые ботами",
 "A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "Красное кольцо вокруг тела ЧВК, которого убил бот, чтобы отличать его от твоих убийств (золотое) и убийств других игроков (белое). Если навести на тело, видно, кто его убил.",
 "Kill lines": "Линии убийств",
-"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Линия от убийцы к убитому и метка на месте гибели, на несколько секунд."
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Линия от убийцы к убитому и метка на месте гибели, на несколько секунд.",
+"My keys": "Мои ключи",
+"The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.": "Ключ от замка: яркий, если он у тебя с собой, золотой, если он в схроне, тусклый, если его нет.",
+"You have the key with you": "Ключ у тебя с собой",
+"The key is in your stash": "Ключ в твоём схроне",
+"You don't have the key": "У тебя нет ключа"
 });

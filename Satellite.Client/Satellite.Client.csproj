@@ -47,6 +47,7 @@
     <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(Managed)\UnityEngine.ImageConversionModule.dll" Private="false" />
     <Reference Include="Newtonsoft.Json" HintPath="$(Managed)\Newtonsoft.Json.dll" Private="false" />
     <Reference Include="websocket-sharp" HintPath="$(Managed)\websocket-sharp.dll" Private="false" />
+    <Reference Include="ItemComponent.Types" HintPath="$(Managed)\ItemComponent.Types.dll" Private="false" />
     <Reference Include="System.Net.Http" HintPath="$(Managed)\System.Net.Http.dll" Private="false" />
     <Reference Include="spt-common" HintPath="$(SptPlugins)\spt-common.dll" Private="false" />
   </ItemGroup>

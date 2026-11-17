@@ -354,6 +354,7 @@ namespace Satellite.Client
                 Ids.Clear();
                 Born.Clear();
                 Shots.Forget();
+                KeysCarried.Forget();
                 Pickups.Forget();
                 Planes.Forget();
                 KilledByPlayers.Clear();

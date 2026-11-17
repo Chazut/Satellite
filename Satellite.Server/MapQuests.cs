@@ -120,6 +120,97 @@ public partial class LiveMapRoute
 
     private JsonObject? _questZones;
 
+    // The keys there are: every kind of item whose kinds above it lead to "Key" (mechanical keys and keycards)
+    private const string KeyKind = "543be5e94bdc2df1348b4568";
+    private HashSet<string>? _keyTemplates;
+
+    private HashSet<string> KeyTemplates()
+    {
+        if (_keyTemplates != null)
+        {
+            return _keyTemplates;
+        }
+
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (id, item) in templates.Items)
+        {
+            var at = item;
+            for (var up = 0; up < 10 && at != null; up++)
+            {
+                if (at.Parent.ToString() == KeyKind)
+                {
+                    keys.Add(id.ToString());
+                    break;
+                }
+
+                at = templates.Items.TryGetValue(at.Parent, out var parent) ? parent : null;
+            }
+        }
+
+        return _keyTemplates = keys;
+    }
+
+    // The player's keys, for the page to mark the locks they open: {"key template": 1 with them (worn, carried, in the
+    // secure container), 2 in their stash}. In a raid, what they have with them is as their own game says (carried),
+    // since the profile here has only what they went in with.
+    private JsonObject KeysOf(BotBaseInventory? inventory, HashSet<string>? carried)
+    {
+        var keys = KeyTemplates();
+        var mine = new JsonObject();
+        if (inventory?.Items is { } items)
+        {
+            var byId = new Dictionary<string, Item>(StringComparer.Ordinal);
+            foreach (var item in items)
+            {
+                byId[item.Id.ToString()] = item;
+            }
+
+            var worn = inventory.Equipment?.ToString();
+            var stash = inventory.Stash?.ToString();
+            foreach (var item in items)
+            {
+                var tpl = item.Template.ToString();
+                if (!keys.Contains(tpl))
+                {
+                    continue;
+                }
+
+                // what it's in, up to the player's equipment or their stash
+                string? root = null;
+                var at = item;
+                for (var up = 0; up < 24 && at?.ParentId is { } parent; up++)
+                {
+                    if (parent == worn || parent == stash)
+                    {
+                        root = parent;
+                        break;
+                    }
+
+                    at = byId.GetValueOrDefault(parent);
+                }
+
+                if (root == worn && carried == null)
+                {
+                    mine[tpl] = 1;
+                }
+                else if (root == stash && mine[tpl] == null)
+                {
+                    mine[tpl] = 2;
+                }
+            }
+        }
+
+        foreach (var tpl in carried ?? [])
+        {
+            if (keys.Contains(tpl))
+            {
+                mine[tpl] = 1;
+            }
+        }
+
+        return mine;
+    }
+
     private string QuestsFor(string? wanted)
     {
         var session = Pick(wanted);
@@ -130,6 +221,7 @@ public partial class LiveMapRoute
 
         List<QuestStatus>? statuses = null;
         var wish = new List<string>();
+        BotBaseInventory? inventory = null;
         try
         {
             foreach (var (profileId, profile) in saveServer.GetProfiles())
@@ -137,6 +229,7 @@ public partial class LiveMapRoute
                 if (profileId.ToString() == session.Id)
                 {
                     statuses = profile?.CharacterData?.PmcData?.Quests;
+                    inventory = profile?.CharacterData?.PmcData?.Inventory;
                     // the items on the player's wishlist (the game keeps a group for each; any group counts)
                     if (profile?.CharacterData?.PmcData?.WishList is { } wished)
                     {
@@ -167,7 +260,13 @@ public partial class LiveMapRoute
                     continue;
                 }
 
+                // done as the profile here has it, and in a raid as the player's game has it (a goal done in a raid
+                // is known here only once the raid is over; after it, the profile alone says, kept or not)
                 var done = new HashSet<string>(status.CompletedConditions ?? []);
+                if (session.Raid)
+                {
+                    done.UnionWith(session.QuestsDone);
+                }
                 var goals = new JsonArray();
                 foreach (var condition in quest.Conditions?.AvailableForFinish ?? [])
                 {
@@ -230,6 +329,7 @@ public partial class LiveMapRoute
             ["quests"] = list,
             ["zones"] = _questZones.DeepClone(),
             ["wish"] = new JsonArray(wish.Distinct().Select(w => (JsonNode?)w).ToArray()),
+            ["keys"] = KeysOf(inventory, session.Raid ? session.KeysCarried : null),
             ["names"] = Names(named)
         }.ToJsonString();
     }

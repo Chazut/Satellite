@@ -169,7 +169,7 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, killLines: true, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, killLines: true, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true, keyStates: true,
     myQuests: true, otherLoot: 30, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -385,6 +385,8 @@
   // the items on the player's wishlist (a Set of templates; null while not known, or from a server that doesn't say),
   // and the same as text, so what's worked out from it is worked out again when it changes
   let wish = null, wishPrint = '';
+  // the player's keys (with the quests): key template -> 1 with them, 2 in their stash
+  let myKeys = {}, myKeysPrint = '';
   let questsAsking = false, questsAskedAt = -1e9, questsFor = '';
   let questsPrint = null;
   let find = '';                // what the search box asks for, lower case; '' for nothing
@@ -858,36 +860,37 @@
   // arcades, which have one floor, and roofs, which are above the top floor. Either way the player has to be standing
   // on that floor: within a square of ground it has, at about its height. Under a train wagon by a warehouse on
   // Customs the game says indoors, and the warehouse a few metres off was shown, floor 1, with the player outside it.
-  function placeInside() {
+  // (who: the player, or a bot being followed: {x, y, z, in})
+  function placeInside(who = me) {
     const f = map && map.floors;
-    if (!f || !me) return 0;
+    if (!f || !who) return 0;
     if (f.buildings) {
       // within a building's walls, on one of its floors: the game's word isn't needed, a shelter isn't a building
-      const b = buildingAt(me.x, me.y, me.z);
-      return b && buildingFloor(b, me.x, me.y, me.z) ? b : 0;
+      const b = buildingAt(who.x, who.y, who.z);
+      return b && buildingFloor(b, who.x, who.y, who.z) ? b : 0;
     }
-    const indoors = me.in !== false;
+    const indoors = who.in !== false;
     // where the game says indoors, a doorway may fall a square outside the building's squares
-    const place = placeAt(me.x, me.y) || (indoors ? placeNear(me.x, me.y) : 0);
+    const place = placeAt(who.x, who.y) || (indoors ? placeNear(who.x, who.y) : 0);
     const levels = place ? f.levels[place - 1] : null;
     if (!Array.isArray(levels) || !levels.length || (!indoors && levels.length < 2)) return 0;
-    const n = floorOf(place, me.z);
+    const n = floorOf(place, who.z);
     if (!n) return 0;
     // on the floor: not a metre under it (a cellar's floor is the lowest there is), nor far above it (on the stairs
     // up, the floor above takes over at a metre under it). Outdoors under a wagon is well under a building's ground floor.
-    if (!indoors && me.z < levels[n - 1] - 1) return 0;
+    if (!indoors && who.z < levels[n - 1] - 1) return 0;
     // Nor, outdoors, well above the top floor: on a bridge's deck, 2.4 m over the road under it (Customs), the road's
     // "floor" was shown. Between two floors is the stairs, and stays.
-    if (!indoors && n === levels.length && me.z > levels[n - 1] + 1.2) return 0;
+    if (!indoors && n === levels.length && who.z > levels[n - 1] + 1.2) return 0;
     if (f.squares) {
-      const cx = Math.floor((me.x - f.x) / f.cell), cy = Math.floor((me.y - f.y) / f.cell);
+      const cx = Math.floor((who.x - f.x) / f.cell), cy = Math.floor((who.y - f.y) / f.cell);
       const bit = 1 << (n - 1);
       const has = (x, y) => x >= 0 && y >= 0 && x < f.wide && y < f.tall && f.grid[y * f.wide + x] === place && !!(f.squares[y * f.wide + x] & bit);
       let near = has(cx, cy);
       // indoors: a square beside one with that floor will do (2 m, a doorway); outdoors only the square itself
       for (let dy = -1; indoors && !near && dy <= 1; dy++) for (let dx = -1; !near && dx <= 1; dx++) near = has(cx + dx, cy + dy);
       if (!near) return 0;
-      if (indoors && me.z < levels[n - 1] - 1.5) return 0;
+      if (indoors && who.z < levels[n - 1] - 1.5) return 0;
     }
     return place;
   }
@@ -1805,6 +1808,8 @@
     other: '?', mixed: 'i:mixed'
   };
   const SPAWN_INK = '#f4f5f6';
+  // a lock's key: with the player, in their stash, not had (see My keys)
+  const KEY_WITH = '#7dff8a', KEY_STASH = '#ffc94d', KEY_NONE = '#6b6e7a';
   // from how far out they have their pictures: the screen's short side this many metres across, or fewer
   const SPAWN_PICTURES = 320;
   const spawnKindName = kind => (SPAWN_KINDS[kind] || SPAWN_KINDS.mixed)[0];
@@ -2124,6 +2129,8 @@
     } : null;
     const wished = answer && Array.isArray(answer.wish) ? answer.wish.filter(t => typeof t === 'string').sort() : null;
     wish = wished ? new Set(wished) : null;
+    myKeys = answer && answer.keys && typeof answer.keys === 'object' ? answer.keys : {};
+    myKeysPrint = Object.keys(myKeys).sort().map(k => k + myKeys[k]).join(',');
     wishPrint = wished ? wished.join(',') : '';
     dirty = true;
   }
@@ -2437,9 +2444,13 @@
         if (!s) continue;
         const open = loot && loot.open.has(l.id);
         const rim = open ? '#3ddc5a' : LAYERS.locks.col;
-        put(s, l.p, badge(open ? 'i:unlocked' : LOCK_GLYPH[l.kind] || 'i:lock', '#1a1a24', rim, SPAWN_INK, 'hex', size));
+        // its key: with the player (bright), in their stash (gold), or not had (dim); off: as before, one colour
+        const has = prefs.keyStates !== false && quests ? myKeys[l.key] || 0 : -1;
+        const ink = has === 1 ? KEY_WITH : has === 2 ? KEY_STASH : has === 0 ? KEY_NONE : SPAWN_INK;
+        put(s, l.p, badge(open ? 'i:unlocked' : LOCK_GLYPH[l.kind] || 'i:lock', '#1a1a24', rim, ink, 'hex', size));
         if (match) ring(s, size * 0.85);
-        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: lockName(l.kind) + ' · ' + (open ? T('open now') : T('locked')), lines: [T('Key:') + ' ' + nameOf(l.key)] } });
+        const keyLine = has === 1 ? T('You have the key with you') : has === 2 ? T('The key is in your stash') : has === 0 ? T("You don't have the key") : '';
+        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: lockName(l.kind) + ' · ' + (open ? T('open now') : T('locked')), lines: [T('Key:') + ' ' + nameOf(l.key), keyLine].filter(Boolean) } });
       }
 
       for (const b of shown.boxes) {
@@ -4568,11 +4579,12 @@
     ['filtersLoot', ['Layer loose', 'Layer boxes', 'Layer bodies']]
   ];
   // the switches under another one that start on
-  const SUB_ON = ['seenDead', 'corpseKind', 'allCorpses', 'myExits', 'botKills'];
+  const SUB_ON = ['seenDead', 'corpseKind', 'allCorpses', 'myExits', 'botKills', 'keyStates'];
   const FILTER_SUBS = {
     'Corpse': [['allCorpses', T('All corpses, not only player kills')], ['myCorpses', T('Only my kills'), T('Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player\'s.')],
       ['botKills', T('PMCs killed by bots'), T('A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players\' (white). Pointing at a body says who killed it.')], ['seenDead', T('Corpses I\'ve been close to')], ['corpseKind', T('Show what each corpse was')]],
     'Layer loose': [['lootArea', T('Rough areas only')]],
+    'Layer locks': [['keyStates', T('My keys'), T("The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.")]],
     'Extract': [['myExits', T('Mine only'), T('In a raid: only the extracts you can take this raid.')], ['goneExits', T('Closed ones'), T('Extracts that are no longer there this raid, such as a vehicle that has left, are shown in red. Off: they are hidden.')],
       ['secretExits', T('Secret ones not found yet'), T('Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.')]]
   };
@@ -6366,26 +6378,29 @@
       const f = map.floors;
       let wantPlace = 0, wantN = 0;
       if (f) {
-        const here = me && raidHere ? [me.x, me.y] : null;
+        // whose floor: the player's, or the bot being followed (its building and floor, as the player's would be)
+        const them = chased !== null && raidHere ? liveById.get(chased) : null;
+        const who = them && Number.isFinite(them.cx) ? { x: them.cx, y: them.cy, z: Number.isFinite(them.cz) ? them.cz : them.p[2], in: them.in } : me;
+        const here = who && raidHere ? [who.x, who.y] : null;
         const shut = opened && !(f.buildings && f.buildings[opened - BUILDING]);
         if (shut) opened = 0;
         if (opened) {
           // pressed on: the floor picked, else the player's floor when they're in it, else its biggest
           const has = floorsOf(opened);
-          const mine = here ? placeInside() : 0;
+          const mine = here ? placeInside(who) : 0;
           wantPlace = opened;
           wantN = +prefs.floor > 0 ? has[Math.min(+prefs.floor, has.length) - 1]
-            : (opened === mine ? buildingFloor(opened, me.x, me.y, me.z) : 0) || mainFloor(opened);
+            : (opened === mine ? buildingFloor(opened, who.x, who.y, who.z) : 0) || mainFloor(opened);
         } else if (prefs.floor === 'auto') {
           // only where the player is indoors (not under an awning or an arcade), see placeInside
-          const mine = here ? placeInside() : 0;
+          const mine = here ? placeInside(who) : 0;
           // a map with buildings goes by them, one without by its squares
-          const myFloor = place => f.buildings ? buildingFloor(place, me.x, me.y, me.z) : floorOf(place, me.z);
+          const myFloor = place => f.buildings ? buildingFloor(place, who.x, who.y, who.z) : floorOf(place, who.z);
           // looking about (not following, or no raid here): the building in the middle of the screen, once close
           // enough to make it out; on the player's floor when it's the one they're in, else its ground floor. Picked
           // only once the map has stood still a moment (see viewStill): while it's dragged, pinched or gliding, the
           // building shown stays as it is, so roofs don't flick open as the middle passes over them.
-          if (prefs.insideLook && (!here || !following()) && Math.min(vw, vh) / zoom <= prefs.lookSpan) {
+          if (prefs.insideLook && (!here || !(following() || them)) && Math.min(vw, vh) / zoom <= prefs.lookSpan) {
             if (viewStill(now)) {
               const mid = toMap(vw / 2, vh / 2);
               lookAt = (f.buildings ? buildingAt(mid[0], mid[1]) : placeAt(mid[0], mid[1])) || 0;
@@ -6405,7 +6420,7 @@
           }
         } else if (+prefs.floor > 0) {
           const at = here || toMap(vw / 2, vh / 2);
-          wantPlace = f.buildings ? buildingAt(at[0], at[1], here ? me.z : undefined) : placeAt(at[0], at[1]);
+          wantPlace = f.buildings ? buildingAt(at[0], at[1], here ? who.z : undefined) : placeAt(at[0], at[1]);
           // the floors it has, lowest first: the one picked, or its top one
           const has = !wantPlace ? null : floorsOf(wantPlace);
           wantN = has && has.length ? has[Math.min(+prefs.floor, has.length) - 1] : 0;

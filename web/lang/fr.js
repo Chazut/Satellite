@@ -727,5 +727,10 @@ fumsLang({
 "PMCs killed by bots": "PMC tués par des bots",
 "A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "Un anneau rouge autour du corps d'un PMC tué par un bot, pour le distinguer de tes éliminations (or) et de celles des autres joueurs (blanc). Pointer un corps indique qui l'a tué.",
 "Kill lines": "Lignes d'élimination",
-"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Une ligne du tueur à sa victime, et une marque là où elle est morte, pendant quelques secondes."
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "Une ligne du tueur à sa victime, et une marque là où elle est morte, pendant quelques secondes.",
+"My keys": "Mes clés",
+"The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.": "La clé de la serrure : vive si tu l'as sur toi, dorée si elle est dans ta planque, terne si tu ne l'as pas.",
+"You have the key with you": "Tu as la clé sur toi",
+"The key is in your stash": "La clé est dans ta planque",
+"You don't have the key": "Tu n'as pas la clé"
 });

@@ -715,5 +715,10 @@ fumsLang({
 "PMCs killed by bots": "ボットに倒されたPMC",
 "A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "ボットに倒されたPMCの死体に赤いリングを付け、自分のキル（金）や他のプレイヤーのキル（白）と区別します。死体を指すと、誰が倒したかが表示されます。",
 "Kill lines": "キルライン",
-"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "倒した側から倒された側への線と、死亡地点のマークを数秒間表示します。"
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "倒した側から倒された側への線と、死亡地点のマークを数秒間表示します。",
+"My keys": "自分の鍵",
+"The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.": "この錠の鍵：持っていれば明るく、スタッシュにあれば金色、持っていなければ暗く表示します。",
+"You have the key with you": "鍵を持っています",
+"The key is in your stash": "鍵はスタッシュにあります",
+"You don't have the key": "鍵を持っていません"
 });

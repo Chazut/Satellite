@@ -378,6 +378,8 @@ namespace Satellite.Client
                 Events.Take(to);
                 Shots.Take(to);
                 Planes.Take(to);
+                QuestsDone.Take(to);
+                KeysCarried.Take(to);
             }
 
             to.Append('}');

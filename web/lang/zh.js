@@ -715,5 +715,10 @@ fumsLang({
 "PMCs killed by bots": "被人机击杀的PMC",
 "A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players' (white). Pointing at a body says who killed it.": "被人机击杀的PMC尸体带有红色圆环，与你的击杀（金色）和其他玩家的击杀（白色）区分开。指向尸体可看到是谁击杀的。",
 "Kill lines": "击杀连线",
-"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "从击杀者到被击杀者的连线，以及阵亡地点的标记，显示几秒。"
+"A line from the killer to the one killed, and a mark where they died, for a few seconds.": "从击杀者到被击杀者的连线，以及阵亡地点的标记，显示几秒。",
+"My keys": "我的钥匙",
+"The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.": "这把锁的钥匙：随身携带时高亮，在仓库里时为金色，没有时变暗。",
+"You have the key with you": "钥匙在你身上",
+"The key is in your stash": "钥匙在你的仓库里",
+"You don't have the key": "你没有这把钥匙"
 });

@@ -70,6 +70,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         public long PolledAt;
         // the player's name, as JSON text
         public volatile string? Name;
+        // the goals of the player's started quests that their own game says are done (a full report's "qd")
+        public volatile HashSet<string> QuestsDone = [];
+        // the keys the player has with them in a raid, as their own game says (a full report's "kh"); null: not told
+        public volatile HashSet<string>? KeysCarried;
         public volatile bool Raid;
         // the markers of the kinds config.jsonc keeps off the page, from the last full report
         public volatile HashSet<long> Blocked = [];
@@ -351,6 +355,36 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             if (root.TryGetProperty("me", out var me) && me.ValueKind == JsonValueKind.Array)
             {
                 session.Me = me.GetRawText();
+            }
+
+            // the goals of their quests their own game has done, the profile here not knowing it until the raid ends
+            if (root.TryGetProperty("qd", out var qd) && qd.ValueKind == JsonValueKind.Array)
+            {
+                var done = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var goal in qd.EnumerateArray())
+                {
+                    if (goal.ValueKind == JsonValueKind.String && goal.GetString() is { Length: > 0 and <= 64 } goalId)
+                    {
+                        done.Add(goalId);
+                    }
+                }
+
+                session.QuestsDone = done;
+            }
+
+            // the keys the player has with them in the raid (to mark the locks they open as theirs)
+            if (root.TryGetProperty("kh", out var kh) && kh.ValueKind == JsonValueKind.Array)
+            {
+                var keys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var key in kh.EnumerateArray())
+                {
+                    if (key.ValueKind == JsonValueKind.String && key.GetString() is { Length: > 0 and <= 64 } tpl)
+                    {
+                        keys.Add(tpl);
+                    }
+                }
+
+                session.KeysCarried = keys;
             }
 
             if (session.Raid && root.TryGetProperty("loc", out var loc) && loc.ValueKind == JsonValueKind.String
@@ -695,6 +729,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             }
 
             KeepEvents(session, node);
+            // the quest goals done and the keys carried are for the server (QuestsFor), not the pages
+            node.Remove("qd");
+            node.Remove("kh");
             var censored = node.ToJsonString();
             if (session.IsHost)
             {

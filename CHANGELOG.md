@@ -4,6 +4,9 @@
 
 - Kills show on the map: for a few seconds, a line from the killer and a mark where they died, with who it was. Map > "Kill lines" turns it off.
 - Bodies have a ring when a person killed them: gold for your own kills, white for another player's. Corpses > "Only my kills" shows only yours. A PMC a bot killed has a red ring (Corpses > "PMCs killed by bots"), and pointing at a body says who killed it.
+- A quest goal's markers leave the map as soon as the goal is done in the raid.
+- Locked doors show whether you have their key: bright when it's with you, gold when it's in your stash, dim when you don't have it. Map filters > Locked doors > "My keys" turns it off.
+- Following a bot shows the floor it's on, as the map does for the player.
 - Far fewer of the map's `[Client Request]` lines in the server window. The game reports over one connection that stays open, the page gets the list of games, the maps, the loot and the quests down its stream, and Better Flea's prices are asked inside the server. A game and a page open now make a few lines, not one for every report.
 - `server.quietLogs` is gone from `config.jsonc`: the map makes few requests now, so there's nothing to leave out. SPT's request logging is left as SPT has it.
 
