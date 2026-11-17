@@ -93,7 +93,7 @@
     'Smuggler': { name: T('Smugglers'), col: '#5b9bf0', shape: 'arrow', size: 1, order: 3 },
     'Raider': { name: T('Raiders'), col: '#ff7a45', shape: 'arrow', size: 1.05, order: 4 },
     'Rogue': { name: T('Rogues'), col: '#b8e04a', shape: 'arrow', size: 1.05, order: 4 },
-    'Black Division': { name: T('Black Division'), col: '#ececec', shape: 'arrow', size: 1.05, order: 5 },
+    'Black Division': { name: T('Black Division'), col: '#36393f', shape: 'arrow', size: 1.05, order: 5 },
     'RUAF': { name: 'RUAF', col: '#7da35f', shape: 'arrow', size: 1.05, order: 5 },
     'RUAF Remnant': { name: T('RUAF remnant'), col: '#f08e75', shape: 'arrow', size: 1.05, order: 5 },
     'UNTAR': { name: 'UNTAR', col: '#8ec9ff', shape: 'arrow', size: 1.05, order: 5 },
@@ -112,6 +112,18 @@
     'Main Player': { name: T('Player'), col: '#39ff14', shape: 'arrow', size: 1.3, order: 9 }
   };
   const OTHER = { col: '#ccd5df', shape: 'dot', size: 0.8, order: 1 };
+  // A colour too dark to make out on the dark map and page (Black Division's charcoal, or one picked): outlined in
+  // light grey, not black, and written in light grey wherever it'd be text or a thin line
+  const LIGHT_EDGE = '#c8ccd4';
+  const darkCol = col => {
+    if (typeof col !== 'string' || !/^#[0-9a-f]{6}$/i.test(col)) return false;
+    // by its brightest part, so a deep red (the minefields') stays red
+    const n = parseInt(col.slice(1), 16);
+    return Math.max(n >> 16, n >> 8 & 255, n & 255) < 96;
+  };
+  const edgeOf = col => darkCol(col) ? LIGHT_EDGE : '#000';
+  const inkOf = col => darkCol(col) ? LIGHT_EDGE : col;
+  const paintSwatch = (el, col) => { el.style.background = col; el.style.boxShadow = darkCol(col) ? '0 0 0 1px ' + LIGHT_EDGE : ''; };
   // the deadly ground at a location's edge, drawn on the map itself; claymores that lie together make a minefield
   const MINE_REACH = 2.5;       // metres around a claymore drawn as dangerous
   const MINE_TOGETHER = 40;     // claymores this close are one field
@@ -2847,7 +2859,7 @@
   }
   function write(text, px, x, y, col, alpha) {
     px *= prefs.textScale;
-    const ratio = pixelRatio(), pic = wordPic(String(text), px, col, ratio);
+    const ratio = pixelRatio(), pic = wordPic(String(text), px, inkOf(col), ratio);
     // on whole screen pixels, so the words stay sharp
     const left = Math.round((x - pic.w / 2) * ratio) / ratio, top = Math.round((y - pic.pad) * ratio) / ratio;
     ctx.globalAlpha = alpha;
@@ -3122,7 +3134,7 @@
     ctx.globalAlpha = away && !strong ? 0.6 : 1;
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1.5, r * 0.22);
-    ctx.strokeStyle = '#000';
+    ctx.strokeStyle = edgeOf(col);
     ctx.fillStyle = col;
     ctx.beginPath();
     const brain = kind.shape === 'arrow' && hasDetails(m) ? brainOf(m) : null;
@@ -3689,7 +3701,7 @@
     for (const a of areas.values()) {
       const age = now - a.moved;
       if (a.x === null || age >= AREA_FADE || !prefs.areaKinds.includes(a.c) || isHidden(a.c)) continue;
-      const col = (KINDS[a.c] || OTHER).col;
+      const col = inkOf((KINDS[a.c] || OTHER).col);
       const s = toScreen(a.x, a.y), r = AREA_R * zoom;
       if (s[0] < -r || s[1] < -r || s[0] > vw + r || s[1] > vh + r) continue;
       const strength = Math.min(1, 1.25 - age / AREA_FADE);
@@ -3783,7 +3795,7 @@
       ctx.globalAlpha = Math.min(1, (KILL_MS - age) / 2500);
       if (Array.isArray(d.ka)) {
         const k = toScreen(d.ka[0], d.ka[1]);
-        for (const [width, col] of [[4.5, 'rgba(0,0,0,0.75)'], [2, (KINDS[d.kk] || OTHER).col]]) {
+        for (const [width, col] of [[4.5, 'rgba(0,0,0,0.75)'], [2, inkOf((KINDS[d.kk] || OTHER).col)]]) {
           ctx.beginPath();
           ctx.moveTo(k[0], k[1]);
           ctx.lineTo(s[0], s[1]);
@@ -3845,7 +3857,7 @@
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
       ctx.stroke();
       ctx.lineWidth = 1.2;
-      ctx.strokeStyle = m ? (KINDS[m.c] || OTHER).col : '#ffe9a8';
+      ctx.strokeStyle = m ? inkOf((KINDS[m.c] || OTHER).col) : '#ffe9a8';
       ctx.stroke();
     }
     ctx.restore();
@@ -4085,7 +4097,7 @@
       ctx.closePath();
       ctx.lineJoin = 'round';
       ctx.lineWidth = Math.max(2, r * 0.4);
-      ctx.strokeStyle = '#000';
+      ctx.strokeStyle = edgeOf(kind.col);
       ctx.stroke();
       ctx.fillStyle = m.id === chased ? '#5fd4ff' : kind.col;
       ctx.fill();
@@ -4094,7 +4106,7 @@
       const far = farOf(m);
       if (Number.isFinite(far)) {
         const tx = x - Math.cos(turn) * r * 2.9, ty = y - Math.sin(turn) * r * 2.2;
-        write(far >= 1000 ? (far / 1000).toFixed(1) + ' km' : Math.round(far) + ' m', 10 * scale, tx, ty - 5 * scale, kind.col, 1);
+        write(far >= 1000 ? (far / 1000).toFixed(1) + ' km' : Math.round(far) + ' m', 10 * scale, tx, ty - 5 * scale, inkOf(kind.col), 1);
       }
       drawn.push({ m, x, y, w: r * 3.2, h: r * 3.2 });
     }
@@ -4405,7 +4417,7 @@
         : m.c === 'Goon' ? T('The Goons have been spotted on the map')
         : m.c === 'Enemy Player' ? T('Enemy PMCs have been spotted on the map')
         : m.c === 'Airdrop' ? T('An airdrop is coming in')
-        : T('{kind} have been spotted on the map', { kind: KINDS[m.c].name }), KINDS[m.c].col);
+        : T('{kind} have been spotted on the map', { kind: KINDS[m.c].name }), inkOf(KINDS[m.c].col));
       rang = true;
     }
     if (rang && prefs.alertSound) chime();
@@ -4651,7 +4663,7 @@
           listRoster();
         };
         swatch.className = 'swatch';
-        swatch.style.background = KINDS[kind].col;
+        paintSwatch(swatch, KINDS[kind].col);
         span.textContent = KINDS[kind].name;
         row.append(input, swatch, span);
         grid.appendChild(row);
@@ -4676,7 +4688,7 @@
           dirty = true;
         };
         swatch.className = 'swatch';
-        swatch.style.background = KINDS[kind].col;
+        paintSwatch(swatch, KINDS[kind].col);
         span.textContent = KINDS[kind].name;
         row.append(input, swatch, span);
         grid.appendChild(row);
@@ -4779,7 +4791,7 @@
         back.title = T('Back to the usual colour');
         const show = typed => {
           pick.value = look.col;
-          sw.style.background = look.col;
+          paintSwatch(sw, look.col);
           if (!typed) { text.value = look.col; text.classList.remove('bad'); }
           back.hidden = !prefs.cols[key];
           row.classList.toggle('changed', !!prefs.cols[key]);
@@ -4871,7 +4883,7 @@
       };
       const swatch = document.createElement('i');
       swatch.className = 'swatch';
-      swatch.style.background = KINDS[kind].col;
+      paintSwatch(swatch, KINDS[kind].col);
       const span = document.createElement('span');
       span.textContent = kind === 'Boss' ? T('Bosses, by name') : KINDS[kind].name;
       row.append(input, swatch, span);
@@ -4894,7 +4906,7 @@
       input.dataset.def = startOff.includes(category) ? '0' : '1';
       const swatch = document.createElement('i');
       swatch.className = 'swatch';
-      swatch.style.background = col;
+      paintSwatch(swatch, col);
       const span = document.createElement('span');
       span.textContent = name + (barred ? ' ' + T('(off on the server)') : '');
       row.append(input, swatch, span);
@@ -4988,7 +5000,7 @@
     row.className = 'sideRow';
     const swatch = document.createElement('i');
     swatch.className = 'swatch';
-    swatch.style.background = col;
+    paintSwatch(swatch, col);
     const name = document.createElement('span');
     name.textContent = text;
     row.append(swatch, name);
@@ -5177,7 +5189,7 @@
       const tag = chip((ONE[kind] || kind) + ' ' + count, 'count' + (rosterIsShut(kind) && !near ? ' shut' : ''), KINDS[kind].name + (near ? '' : '. ' + T('Press to fold these away, or show them')));
       if (!near) tag.onclick = () => foldRoster(kind);
       const swatch = document.createElement('b');
-      swatch.style.background = KINDS[kind].col;
+      paintSwatch(swatch, KINDS[kind].col);
       tag.prepend(swatch);
       sum.appendChild(tag);
     }
@@ -5361,7 +5373,7 @@
     const name = (text, kind) => {
       const b = document.createElement('b');
       b.textContent = text;
-      b.style.color = (KINDS[kind] || OTHER).col;
+      b.style.color = inkOf((KINDS[kind] || OTHER).col);
       b.title = ONE[kind] || kind || '';
       return b;
     };
@@ -6831,6 +6843,7 @@
 
   $('follow').onclick = () => setFollow(roaming ? true : !prefs.follow);
   $('fit').onclick = wholeMap;
+  $('unbare').onclick = () => document.body.classList.remove('bare');
   $('options').onclick = () => togglePanel();
   // the name in the top bar: opens Settings at its foot, where the version, credits and map licence are
   // (and the maker's line under the scale, bottom left)

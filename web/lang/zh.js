@@ -482,6 +482,8 @@ fumsLang({
 "Who's shown": "显示谁",
 "On the map and in this list. Off: no marker and no row.": "在地图和此列表中。关闭：没有标记也没有行。",
 "Rough area only": "仅大致区域",
+"Show controls": "显示控件",
+"The controls are hidden. Press here, or H, to have them back.": "控件已隐藏。点击此处或按 H 即可恢复。",
 "For each kind switched on here: no marker, name or row saying where they are. Only a circle they are somewhere in, while they have been moving.": "对于这里开启的每个类别：没有标记、名字或说明位置的行。只有一个圆圈表示他们在其中某处，在他们移动时显示。",
 "How big the circle is that one of them is somewhere in.": "表示其中一人所在范围的圆圈有多大。",
 "Area size": "区域大小",

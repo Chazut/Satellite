@@ -494,6 +494,8 @@ fumsLang({
 "Who's shown": "Qui est affiché",
 "On the map and in this list. Off: no marker and no row.": "Sur la carte et dans cette liste. Désactivé : ni marqueur ni ligne.",
 "Rough area only": "Zone approximative seulement",
+"Show controls": "Afficher les commandes",
+"The controls are hidden. Press here, or H, to have them back.": "Les commandes sont masquées. Appuyez ici, ou sur H, pour les retrouver.",
 "For each kind switched on here: no marker, name or row saying where they are. Only a circle they are somewhere in, while they have been moving.": "Pour chaque type activé ici : ni marqueur, ni nom, ni ligne disant où ils sont. Seulement un cercle dans lequel ils se trouvent, tant qu'ils ont bougé.",
 "How big the circle is that one of them is somewhere in.": "Taille du cercle dans lequel l'un d'eux se trouve.",
 "Area size": "Taille de zone",

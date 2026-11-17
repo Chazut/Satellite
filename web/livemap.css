@@ -208,6 +208,12 @@ html, body, #stage { cursor: url("cursors/idle.png") 2 2, default; }
 
 .ui { transition: opacity 0.15s; }
 body.bare .ui { opacity: 0; pointer-events: none; }
+/* with the controls hidden (H): one faint button to have them back, for a pointer or a finger */
+#unbare { display: none; position: fixed; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); z-index: 60;
+  padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; font-size: 12px;
+  opacity: 0.45; cursor: pointer; }
+#unbare:hover, #unbare:focus-visible { opacity: 1; }
+body.bare #unbare { display: block; }
 
 /* ---- the bar along the top ---- */
 #bar {

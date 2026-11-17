@@ -482,6 +482,8 @@ fumsLang({
 "Who's shown": "表示する対象",
 "On the map and in this list. Off: no marker and no row.": "マップとこのリスト。オフ：マーカーも行も表示しません。",
 "Rough area only": "おおよそのエリアのみ",
+"Show controls": "操作を表示",
+"The controls are hidden. Press here, or H, to have them back.": "操作は非表示です。ここか H を押すと元に戻ります。",
 "For each kind switched on here: no marker, name or row saying where they are. Only a circle they are somewhere in, while they have been moving.": "ここでオンにした種類は、マーカーも名前も位置を示す行も表示しません。移動している間、どこかにいる範囲の円だけを表示します。",
 "How big the circle is that one of them is somewhere in.": "誰かがいる範囲を示す円の大きさ。",
 "Area size": "エリアの大きさ",

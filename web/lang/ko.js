@@ -482,6 +482,8 @@ fumsLang({
 "Who's shown": "표시 대상",
 "On the map and in this list. Off: no marker and no row.": "맵과 이 목록. 끄기: 마커도 줄도 없음.",
 "Rough area only": "대략적인 구역만",
+"Show controls": "조작 표시",
+"The controls are hidden. Press here, or H, to have them back.": "조작이 숨겨져 있습니다. 여기나 H를 누르면 다시 나타납니다.",
 "For each kind switched on here: no marker, name or row saying where they are. Only a circle they are somewhere in, while they have been moving.": "여기서 켠 각 종류: 위치를 알려 주는 마커, 이름, 줄이 없습니다. 움직이는 동안 어딘가에 있다는 원만 표시합니다.",
 "How big the circle is that one of them is somewhere in.": "그중 누군가가 있는 원의 크기.",
 "Area size": "구역 크기",
