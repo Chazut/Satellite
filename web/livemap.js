@@ -424,6 +424,9 @@
   let opened = 0, hovered = 0;
   // the building the player is in, when its inside was pressed away: not shown again until they leave it
   let insideShut = 0, insideShutAt = null;
+  // the building in the middle of the screen, when its inside was pressed away: not shown again until the middle is
+  // on another building (or none), or it's pressed
+  let lookShut = 0;
   // a floor stepped to with the badge's arrows: { place, n }, kept while that building is the one shown
   let floorPick = null;
   // every building outlined (see drawHovered): while the button or B is held; a quick press leaves them outlined
@@ -1621,6 +1624,7 @@
     floorTiles = [];
     floorEdge = [];
     opened = 0;
+    lookShut = 0;
     hovered = 0;
     floorPick = null;
     stage.classList.remove('canOpen');
@@ -2622,9 +2626,8 @@
           else if (items.length > counted.length) lines.push(notShown(items.length - counted.length));
           if (!mark.was && b.was) mark.was = b.was;
           const who = markerText(mark) || b.who || (b.side === 'Savage' ? T('A scav') : b.side ? T('A {side}', { side: b.side.toUpperCase() }) : T('A body'));
-          const by = killedBy(mark);
-          if (by === 'ai') { const k = botKiller(mark); if (k) lines.unshift(T('Killed by {who}', { who: k })); }
-          else if (by) lines.unshift(by === 'me' ? T('Killed by you') : T('Killed by another player'));
+          const killer = killerLine(mark);
+          if (killer) lines.unshift(killer);
           mark.tip = { title: who + (total ? ' · ' + roubles(total) : ''), lines };
         }
         return mark;
@@ -2638,7 +2641,7 @@
       }
       // bodies with no marker (they died while no page was open)
       for (const b of free) {
-        corpsesNow.push(dress({ id: 'body:' + b.id, c: 'Corpse', t: b.who, was: b.was, p: b.p, cx: b.p[0], cy: b.p[1], cz: b.p[2], r: 0 }, b, b.kp));
+        corpsesNow.push(dress({ id: 'body:' + b.id, c: 'Corpse', t: b.who, was: b.was, pid: b.pid, p: b.p, cx: b.p[0], cy: b.p[1], cz: b.p[2], r: 0 }, b, b.kp));
       }
 
       // "Rough areas only": loose loot isn't drawn where it lies; what a square of LOOT_CELL metres holds is added up
@@ -2993,6 +2996,23 @@
   }
   // the bot that killed a body, as the tip names it: its name, else what it was
   const botKiller = m => { const e = killOf(m); return e ? (e.d.kn ? latin(e.d.kn) : ONE[e.d.kk] || e.d.kk || '') : ''; };
+  // the line saying who killed a body, or '' when that's not known
+  function killerLine(m) {
+    const by = killedBy(m);
+    if (by === 'ai') { const k = botKiller(m); return k ? T('Killed by {who}', { who: k }) : ''; }
+    return by === 'me' ? T('Killed by you') : by ? T('Killed by another player') : '';
+  }
+  // A body's tip when its loot isn't shown (corpse loot off, or no loot to hand): who it was and who killed them.
+  // Kept while it says the same, so the tip isn't drawn again at every move of the pointer.
+  let killTipKept = null;
+  function killTip(m) {
+    if (m.c !== 'Corpse') return null;
+    const line = killerLine(m);
+    if (!line) return null;
+    const title = markerText(m) || m.t || T('A body');
+    if (!killTipKept || killTipKept.title !== title || killTipKept.lines[0] !== line) killTipKept = { title, lines: [line] };
+    return killTipKept;
+  }
   // a body that was a PMC's (a person playing or a PMC bot)
   const PMC_KINDS = ['Main Player', 'Friendly Player', 'Enemy Player'];
   const wasPmc = m => { const e = killOf(m); return PMC_KINDS.includes(m.was) || !!(e && PMC_KINDS.includes(e.d.vk)); };
@@ -6405,7 +6425,8 @@
               const mid = toMap(vw / 2, vh / 2);
               lookAt = (f.buildings ? buildingAt(mid[0], mid[1]) : placeAt(mid[0], mid[1])) || 0;
             }
-            if (lookAt) {
+            if (lookShut && lookAt !== lookShut) lookShut = 0;
+            if (lookAt && lookAt !== lookShut) {
               wantPlace = lookAt;
               wantN = (lookAt === mine ? myFloor(lookAt) : 0) || (f.buildings ? mainFloor(lookAt) : 1);
             }
@@ -6644,10 +6665,16 @@
       // where there are no buildings to press, the roofed place of the map's squares
       const spot = b || (map && map.floors && !map.floors.buildings ? placeAt(at[0], at[1]) : 0);
       if (spot && spot === insideShut) insideShut = 0;
+      else if (spot && spot === lookShut) lookShut = 0;
       else if (b && prefs.pressOpen && b !== opened && b !== floorShown.place) { opened = b; revealSet(false); roam(); roamFrom = me && inRaidHere() ? [me.x, me.y] : null; }
       else if (!b && opened) opened = 0;
-      // off the building the player is in, while its inside is shown: the whole map again, not dimmed
-      else if (spot !== floorShown.place && floorShown.place && floorShown.n && prefs.floor === 'auto') { insideShut = floorShown.place; insideShutAt = me && inRaidHere() ? [me.x, me.y] : null; }
+      // off the building shown (the one in the middle of the screen, or the one the player is in): the whole map
+      // again, not dimmed
+      else if (spot !== floorShown.place && floorShown.place && floorShown.n && prefs.floor === 'auto') {
+        if (floorShown.place === lookAt) lookShut = lookAt;
+        insideShut = floorShown.place;
+        insideShutAt = me && inRaidHere() ? [me.x, me.y] : null;
+      }
       setHovered(0);
       dirty = true;
     }
@@ -6721,7 +6748,7 @@
     setHovered(b && b !== floorShown.place ? b : 0);
     // a marker with something to say (a corpse's loot) says it; not a marker: the nearest container, lock, item or
     // spawn point under the pointer says what it is
-    const says = mark ? mark.tip || dropTip(mark) || exitTip(mark) || botTip(mark) : null;
+    const says = mark ? mark.tip || dropTip(mark) || exitTip(mark) || botTip(mark) || killTip(mark) : null;
     let near = says ? { tip: says } : null, best = Infinity;
     if (found === null) {
       for (const t of thingsDrawn) {

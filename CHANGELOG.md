@@ -3,7 +3,8 @@
 ## 1.0.2
 
 - Kills show on the map: for a few seconds, a line from the killer and a mark where they died, with who it was. Map > "Kill lines" turns it off.
-- Bodies have a ring when a person killed them: gold for your own kills, white for another player's. Corpses > "Only my kills" shows only yours. A PMC a bot killed has a red ring (Corpses > "PMCs killed by bots"), and pointing at a body says who killed it.
+- Bodies have a ring when a person killed them: gold for your own kills, white for another player's. Corpses > "Only my kills" shows only yours. A PMC a bot killed has a red ring (Corpses > "PMCs killed by bots"), and pointing at a body says who killed it, with corpse loot shown or not.
+- Pressing the map off a building that's open because it's in the middle of the screen shuts it. It opens again once the middle moves onto another building and back, or when it's pressed.
 - A quest goal's markers leave the map as soon as the goal is done in the raid.
 - Locked doors can show whether you have their key: bright when it's with you, gold when it's in your stash, dim when you don't have it. Turn it on under Map filters > Locked doors > "My keys" (off by default).
 - Following a bot shows the floor it's on, as the map does for the player.
