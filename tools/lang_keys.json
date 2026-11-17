@@ -324,6 +324,7 @@
 "Somebody": "script",
 "killed": "script",
 "died": "script",
+"was killed": "script",
 "killed themselves": "script",
 "Kills": "script",
 "Back to only the latest": "script",

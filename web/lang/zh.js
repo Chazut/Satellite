@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "某人",
 "killed": "击杀了",
 "died": "死亡",
+"was killed": "被击杀",
 "killed themselves": "自杀",
 "Kills": "击杀",
 "Show the kills": "显示击杀",

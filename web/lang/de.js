@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "Jemand",
 "killed": "tötete",
 "died": "starb",
+"was killed": "wurde getötet",
 "killed themselves": "tötete sich selbst",
 "Kills": "Kills",
 "Show the kills": "Kills einblenden",

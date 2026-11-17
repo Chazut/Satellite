@@ -3011,7 +3011,8 @@
   // the line saying who killed a body, or '' when that's not known
   function killerLine(m) {
     const by = killedBy(m);
-    if (by === 'ai') { const k = botKiller(m); return k ? T('Killed by {who}', { who: k }) : ''; }
+    // a bot is named only when its kind is shown on the map
+    if (by === 'ai') { const e = killOf(m), k = botKiller(m); return k && e && !isHidden(e.d.kk) && !prefs.areaKinds.includes(e.d.kk) ? T('Killed by {who}', { who: k }) : ''; }
     return by === 'me' ? T('Killed by you') : by ? T('Killed by another player') : '';
   }
   // A body's tip when its loot isn't shown (corpse loot off, or no loot to hand): who it was and who killed them.
@@ -3790,10 +3791,16 @@
     ctx.lineCap = 'round';
     for (const e of list) {
       const d = e.d;
-      if (!Array.isArray(d.at) || isHidden(d.vk || 'None') || prefs.areaKinds.includes(d.vk) || prefs.areaKinds.includes(d.kk)) continue;
+      // Never more than the map shows anyway: the line from the killer, and their name, only when their kind is shown
+      // (the player always is); the kill itself when the one who died is shown, or the player or a friend shown
+      // killed them.
+      const seen = kind => !!kind && !isHidden(kind) && !prefs.areaKinds.includes(kind);
+      const byUs = d.kk === 'Main Player' || (d.kk === 'Friendly Player' && seen(d.kk));
+      const killerSeen = d.kk === 'Main Player' || seen(d.kk);
+      if (!Array.isArray(d.at) || !(seen(d.vk || 'None') || byUs)) continue;
       const age = now - e.at, s = toScreen(d.at[0], d.at[1]), r = 7 * scale;
       ctx.globalAlpha = Math.min(1, (KILL_MS - age) / 2500);
-      if (Array.isArray(d.ka)) {
+      if (killerSeen && Array.isArray(d.ka)) {
         const k = toScreen(d.ka[0], d.ka[1]);
         for (const [width, col] of [[4.5, 'rgba(0,0,0,0.75)'], [2, inkOf((KINDS[d.kk] || OTHER).col)]]) {
           ctx.beginPath();
@@ -3820,7 +3827,7 @@
       ctx.lineWidth = 2.4 * scale;
       ctx.strokeStyle = '#fff';
       ctx.stroke();
-      const text = (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn ? '  ←  ' + latin(d.kn) : '');
+      const text = (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn && killerSeen ? '  ←  ' + latin(d.kn) : '');
       if (text) {
         ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
         // above the mark: under it is where the body's own name goes
@@ -3847,7 +3854,8 @@
     ctx.lineCap = 'round';
     for (const t of tracers) {
       const m = t.who ? liveById.get(t.who) : null;
-      if (m && (isHidden(m.c || 'None') || inArea(m))) continue;
+      // a shooter not on the page (not known yet, or kept off it): no line to give them away
+      if (!m || isHidden(m.c || 'None') || inArea(m)) continue;
       const a = toScreen(t.a[0], t.a[1]), b = toScreen(t.b[0], t.b[1]);
       ctx.globalAlpha = 0.85 * (1 - (now - t.at) / SHOT_MS);
       ctx.beginPath();
@@ -5381,18 +5389,20 @@
     // whose names are given: everyone's, not the killer's, or nobody's (the player and their friends always)
     const bare = (kind, hide) => hide && !FEED_OURS.includes(kind);
     const victim = name(e.nm && !bare(d.vk, prefs.feedNames === 'kinds') ? latin(e.nm) : ONE[d.vk] || d.vk || T('Somebody'), d.vk);
-    if (d.k) {
+    // a killer whose kind isn't shown on the map isn't named, nor how far they were: that would say where they are
+    const killerSeen = d.kk === 'Main Player' || (!!d.kk && !isHidden(d.kk) && !prefs.areaKinds.includes(d.kk));
+    if (d.k && killerSeen) {
       row.appendChild(name(d.kn && !bare(d.kk, prefs.feedNames !== 'all') ? latin(d.kn) : ONE[d.kk] || d.kk || T('Somebody'), d.kk));
       const how = document.createElement('i');
       how.textContent = d.w || T('killed');
       row.append(how, victim);
     } else {
       const how = document.createElement('i');
-      how.textContent = d.self ? T('killed themselves') : T('died');
+      how.textContent = d.self ? T('killed themselves') : d.k ? T('was killed') : T('died');
       row.append(victim, how);
     }
     // with nobody else to say it by, what did it (a grenade, a fall)
-    const more = [d.k ? '' : d.w || '', PARTS[d.bp] || '', Number.isFinite(d.m) && d.k ? d.m + ' m' : ''].filter(Boolean).join(' · ');
+    const more = [d.k ? '' : d.w || '', PARTS[d.bp] || '', Number.isFinite(d.m) && d.k && killerSeen ? d.m + ' m' : ''].filter(Boolean).join(' · ');
     if (more) { const s = document.createElement('small'); s.textContent = more; row.appendChild(s); }
     return row;
   }

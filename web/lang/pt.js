@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "Alguém",
 "killed": "matou",
 "died": "morreu",
+"was killed": "foi morto",
 "killed themselves": "se matou",
 "Kills": "Abates",
 "Show the kills": "Mostrar os abates",

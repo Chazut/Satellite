@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "Ktoś",
 "killed": "zabił",
 "died": "zginął",
+"was killed": "został zabity",
 "killed themselves": "zabił się",
 "Kills": "Zabójstwa",
 "Show the kills": "Pokaż zabójstwa",

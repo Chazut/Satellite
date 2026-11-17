@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "誰か",
 "killed": "がキル：",
 "died": "が死亡",
+"was killed": "が倒された",
 "killed themselves": "が自滅",
 "Kills": "キル",
 "Show the kills": "キルを表示",

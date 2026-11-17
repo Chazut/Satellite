@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "Quelqu'un",
 "killed": "a tué",
 "died": "est mort",
+"was killed": "a été tué",
 "killed themselves": "s'est tué",
 "Kills": "Éliminations",
 "Show the kills": "Afficher les éliminations",

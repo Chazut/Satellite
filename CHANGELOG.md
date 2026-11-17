@@ -2,7 +2,7 @@
 
 ## 1.0.2
 
-- Kills show on the map: for a few seconds, a line from the killer and a mark where they died, with who it was. Map > "Kill lines" turns it off.
+- Kills show on the map: for a few seconds, a line from the killer and a mark where they died, with who it was. Map > "Kill lines" turns it off. A killer whose kind isn't shown on the map gets no line, and the kill feed and a body's tip don't name them or say how far they were, so nothing gives away where they are. Your own kills always show.
 - Bodies have a ring when a person killed them: gold for your own kills, white for another player's. Corpses > "Only my kills" shows only yours. A PMC a bot killed has a red ring (Corpses > "PMCs killed by bots"), and pointing at a body says who killed it, with corpse loot shown or not.
 - The kill feed says when somebody killed themselves (their own grenade, a fall), and what did it when nobody else did. A kill's names on the map sit above its mark, clear of the body's own name.
 - "Point to who's off the screen" has a switch for every kind (Map > View > "Who gets an arrow"), scavs and the rest too. PMCs, friends, bosses, Goons and airdrops are on to begin with.

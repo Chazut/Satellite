@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "Кто-то",
 "killed": "убил",
 "died": "погиб",
+"was killed": "убит",
 "killed themselves": "погиб от своей руки",
 "Kills": "Убийства",
 "Show the kills": "Показать убийства",

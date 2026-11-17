@@ -337,6 +337,7 @@ fumsLang({
 "Somebody": "누군가",
 "killed": "킬:",
 "died": "사망",
+"was killed": "처치됨",
 "killed themselves": "자멸",
 "Kills": "킬",
 "Show the kills": "킬 보이기",
