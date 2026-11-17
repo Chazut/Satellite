@@ -4,6 +4,9 @@
 
 - Kills show on the map: for a few seconds, a line from the killer and a mark where they died, with who it was. Map > "Kill lines" turns it off.
 - Bodies have a ring when a person killed them: gold for your own kills, white for another player's. Corpses > "Only my kills" shows only yours. A PMC a bot killed has a red ring (Corpses > "PMCs killed by bots"), and pointing at a body says who killed it, with corpse loot shown or not.
+- The kill feed says when somebody killed themselves (their own grenade, a fall), and what did it when nobody else did. A kill's names on the map sit above its mark, clear of the body's own name.
+- "Point to who's off the screen" has a switch for every kind (Map > View > "Who gets an arrow"), scavs and the rest too. PMCs, friends, bosses, Goons and airdrops are on to begin with.
+- New default colours, so no two kinds look alike: you are green, ISB special forces blue, PMC spawns red like PMCs, and quest markers, airdrops, minefields, locked doors, corpses and a few bots have their own. Colours you picked yourself are kept.
 - Pressing the map off a building that's open because it's in the middle of the screen shuts it. It opens again once the middle moves onto another building and back, or when it's pressed.
 - A quest goal's markers leave the map as soon as the goal is done in the raid.
 - Locked doors can show whether you have their key: bright when it's with you, gold when it's in your stash, dim when you don't have it. Turn it on under Map filters > Locked doors > "My keys" (off by default).

@@ -196,7 +196,11 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <label class="row range" title="Which way up this map is. Usual: as the maps people know (tarkov.dev) have it. Kept for each map."><span>Map turned</span><select id="optTurn">
         <option value="auto">Usual way up</option><option value="0">Game's north up</option><option value="90">A quarter left</option>
         <option value="180">Upside down</option><option value="270">A quarter right</option></select></label>
-      <label class="row" title="PMCs, friends, bosses, Goons and airdrops that are off the screen: an arrow at the screen's edge points to each, with how far it is from you. Press one to go and look. Only the kinds that are switched on."><input type="checkbox" id="optEdge"><span>Point to who's off the screen</span></label>
+      <label class="row" title="Who's off the screen, of the kinds picked below: an arrow at the screen's edge points to each, with how far it is from you. Press one to go and look."><input type="checkbox" id="optEdge"><span>Point to who's off the screen</span></label>
+      <details class="group sub" data-group="edgeKinds">
+        <summary>Who gets an arrow</summary>
+        <div id="edgeKinds" class="filterGrid"></div>
+      </details>
       <label class="row" title="The places and items of the quests you have started that are off the screen: a yellow arrow at the screen's edge points to each, with how far it is from you."><input type="checkbox" id="optEdgeQuests"><span>Point to my quests off screen</span></label>
       </details>
       <details class="group" data-group="bots" open>

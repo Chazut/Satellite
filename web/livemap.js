@@ -86,53 +86,53 @@
   // how each kind of marker is drawn; a later one is drawn over an earlier one
   const KINDS = {
     'Extract': { name: T('Extracts'), col: '#3ddc5a', shape: 'exit', size: 1, label: true, order: 0 },
-    'Transit': { name: T('Transits'), col: '#4fc8e8', shape: 'transit', size: 1, label: true, order: 0.1 },
-    'Corpse': { name: T('Corpses'), col: '#aab4c0', shape: 'cross', size: 0.8, order: 1 },
-    'Other AI': { name: T('Other AI'), col: '#8d96a2', shape: 'arrow', size: 0.95, order: 2 },
+    'Transit': { name: T('Transits'), col: '#40d8f0', shape: 'transit', size: 1, label: true, order: 0.1 },
+    'Corpse': { name: T('Corpses'), col: '#a9b1bd', shape: 'cross', size: 0.8, order: 1 },
+    'Other AI': { name: T('Other AI'), col: '#6f7684', shape: 'arrow', size: 0.95, order: 2 },
     'Scav': { name: T('Scavs'), col: '#f2e24a', shape: 'arrow', size: 1, order: 2 },
     'Smuggler': { name: T('Smugglers'), col: '#5b9bf0', shape: 'arrow', size: 1, order: 3 },
     'Raider': { name: T('Raiders'), col: '#ff7a45', shape: 'arrow', size: 1.05, order: 4 },
     'Rogue': { name: T('Rogues'), col: '#b8e04a', shape: 'arrow', size: 1.05, order: 4 },
     'Black Division': { name: T('Black Division'), col: '#ececec', shape: 'arrow', size: 1.05, order: 5 },
     'RUAF': { name: 'RUAF', col: '#7da35f', shape: 'arrow', size: 1.05, order: 5 },
-    'RUAF Remnant': { name: T('RUAF remnant'), col: '#b08a5a', shape: 'arrow', size: 1.05, order: 5 },
+    'RUAF Remnant': { name: T('RUAF remnant'), col: '#f08e75', shape: 'arrow', size: 1.05, order: 5 },
     'UNTAR': { name: 'UNTAR', col: '#8ec9ff', shape: 'arrow', size: 1.05, order: 5 },
-    'ISB': { name: T('ISB special forces'), col: '#e0a030', shape: 'arrow', size: 1.05, order: 5 },
-    'Civilian': { name: T('Civilians'), col: '#b9d6ee', shape: 'arrow', size: 0.9, order: 2 },
+    'ISB': { name: T('ISB special forces'), col: '#5c6cff', shape: 'arrow', size: 1.05, order: 5 },
+    'Civilian': { name: T('Civilians'), col: '#adebe1', shape: 'arrow', size: 0.9, order: 2 },
     'Infected': { name: T('Infected'), col: '#b84a32', shape: 'arrow', size: 1, order: 3 },
-    'Sniper': { name: T('Sniper scavs'), col: '#fff3a8', shape: 'arrow', size: 1, order: 3 },
+    'Sniper': { name: T('Sniper scavs'), col: '#fff6c8', shape: 'arrow', size: 1, order: 3 },
     'Enemy Player': { name: T('Enemy PMCs'), col: '#ff5148', shape: 'arrow', size: 1, order: 4 },
-    'Guard': { name: T('Guards'), col: '#ff7fbf', shape: 'arrow', size: 1.05, label: true, order: 5 },
+    'Guard': { name: T('Guards'), col: '#ff8fa8', shape: 'arrow', size: 1.05, label: true, order: 5 },
     'Cultist': { name: T('Cultists'), col: '#b06fa8', shape: 'arrow', size: 1.05, order: 5 },
     'Goon': { name: T('Goons'), col: '#33d6c0', shape: 'arrow', size: 1.15, label: true, order: 6 },
     'Boss': { name: T('Bosses'), col: '#c77dff', shape: 'arrow', size: 1.15, label: true, order: 7 },
-    'Friendly Player': { name: T('Friendly players'), col: '#ffdcab', shape: 'arrow', size: 1.1, label: true, order: 8 },
+    'Friendly Player': { name: T('Friendly players'), col: '#ffc299', shape: 'arrow', size: 1.1, label: true, order: 8 },
     'BTR': { name: T('BTR'), col: '#a3c45c', shape: 'btr', size: 1, label: true, order: 8.5 },
-    'Airdrop': { name: T('Airdrops'), col: '#ff6fb5', shape: 'drop', size: 1.15, label: true, order: 8.4 },
-    'Main Player': { name: T('Player'), col: '#ffb253', shape: 'arrow', size: 1.3, order: 9 }
+    'Airdrop': { name: T('Airdrops'), col: '#ff4fd8', shape: 'drop', size: 1.15, label: true, order: 8.4 },
+    'Main Player': { name: T('Player'), col: '#39ff14', shape: 'arrow', size: 1.3, order: 9 }
   };
   const OTHER = { col: '#ccd5df', shape: 'dot', size: 0.8, order: 1 };
   // the deadly ground at a location's edge, drawn on the map itself; claymores that lie together make a minefield
   const MINE_REACH = 2.5;       // metres around a claymore drawn as dangerous
   const MINE_TOGETHER = 40;     // claymores this close are one field
   const ZONES = {
-    mine: { name: T('Minefields'), col: '#ff3b30', label: T('Mines') },
-    sniper: { name: T('Sniper zones'), col: '#ffd23d', label: T('zone|Sniper'), hatch: true }
+    mine: { name: T('Minefields'), col: '#b01010', label: T('Mines') },
+    sniper: { name: T('Sniper zones'), col: '#e8ff3a', label: T('zone|Sniper'), hatch: true }
   };
   // an extract: closed, wants something of you first, open, a secret one not found yet
   const EXIT_COL = ['#d8504a', '#e8c547', '#3ddc5a', '#b48cff'];
   // What lies about and where things stand: each a layer that can be turned off on the page. server: the layer of
   // the server's config.jsonc that holds it.
   const LAYERS = {
-    quest: { name: T('Quest items'), col: '#ffe14d', server: 'loose' },
-    questZones: { name: T('Quest places'), col: '#ffe14d', server: null },
+    quest: { name: T('Quest items'), col: '#ffbf00', server: 'loose' },
+    questZones: { name: T('Quest places'), col: '#ffbf00', server: null },
     btrRoad: { name: T('BTR road and stops'), col: '#a3c45c', server: null },
-    loose: { name: T('Loose loot'), col: '#7fd36b', server: 'loose' },
+    loose: { name: T('Loose loot'), col: '#6fd38f', server: 'loose' },
     lootSpawns: { name: T('Loot spawn points'), col: '#e6d38a', server: 'loose' },
-    boxes: { name: T('Containers'), col: '#c9a86a', server: 'contents' },
-    bodies: { name: T('Corpse loot'), col: '#949ca8', server: 'contents' },
-    locks: { name: T('Locked doors'), col: '#ff8a3d', server: 'locks' },
-    spawnPmc: { name: T('PMC spawns'), col: '#4aa8ff', server: 'spawns' },
+    boxes: { name: T('Containers'), col: '#b07d4a', server: 'contents' },
+    bodies: { name: T('Corpse loot'), col: '#a9b1bd', server: 'contents' },
+    locks: { name: T('Locked doors'), col: '#ff9a00', server: 'locks' },
+    spawnPmc: { name: T('PMC spawns'), col: '#ff5148', server: 'spawns' },
     spawnScav: { name: T('Scav spawns'), col: '#f2e24a', server: 'spawns' },
     spawnBoss: { name: T('Boss spawns'), col: '#c77dff', server: 'spawns' }
   };
@@ -1813,7 +1813,7 @@
   };
   const SPAWN_INK = '#f4f5f6';
   // a lock's key: with the player, in their stash, not had (see My keys)
-  const KEY_WITH = '#7dff8a', KEY_STASH = '#ffc94d', KEY_NONE = '#6b6e7a';
+  const KEY_WITH = '#7dff8a', KEY_STASH = '#ffc94d', KEY_NONE = '#50535e';
   // from how far out they have their pictures: the screen's short side this many metres across, or fewer
   const SPAWN_PICTURES = 320;
   const spawnKindName = kind => (SPAWN_KINDS[kind] || SPAWN_KINDS.mixed)[0];
@@ -3553,7 +3553,9 @@
   // Who matters and is off the screen: an arrow at the edge of what can be seen of the map (clear of the bar, the
   // menu and the Raid list) points to each, in its kind's colour, with how far it is from the player. It can be
   // pointed at and pressed like the marker itself.
+  // the kinds that have one unless picked otherwise (prefs.edgeKinds), and every kind that can
   const EDGE = ['Enemy Player', 'Friendly Player', 'Boss', 'Goon', 'Airdrop'];
+  if (!Array.isArray(prefs.edgeKinds)) prefs.edgeKinds = EDGE.slice();
   // What's seen of the map: the screen inside the bar (and on a phone the menu over it), less the menu and the Raid
   // list where they stand over it. Those are only as tall as what's in them: below a short Raid list the map is seen
   // right to the screen's side, and arrows go there (covers: the panels, as boxes on the screen).
@@ -3809,14 +3811,15 @@
       const text = (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn ? '  ←  ' + latin(d.kn) : '');
       if (text) {
         ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
+        // above the mark: under it is where the body's own name goes
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
+        ctx.textBaseline = 'bottom';
         ctx.lineJoin = 'round';
         ctx.lineWidth = 3.5;
         ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-        ctx.strokeText(text, s[0], s[1] + r * 1.9);
+        ctx.strokeText(text, s[0], s[1] - r * 1.9);
         ctx.fillStyle = '#ffd9d6';
-        ctx.fillText(text, s[0], s[1] + r * 1.9);
+        ctx.fillText(text, s[0], s[1] - r * 1.9);
       }
     }
     ctx.restore();
@@ -4065,7 +4068,7 @@
     }
     if (!prefs.edge) return;
     for (const m of live) {
-      if (!EDGE.includes(m.c) && m.id !== chased) continue;
+      if (!prefs.edgeKinds.includes(m.c) && m.id !== chased) continue;
       if (m.c === 'Corpse' || m.c === 'Main Player' || inArea(m) || isHidden(m.c || 'None') || !Number.isFinite(m.cx)) continue;
       const at = toScreen(m.cx, m.cy);
       if (inSight(box, at)) continue;
@@ -4583,6 +4586,7 @@
   ];
   const SECTION_OF = {};
   for (const [title, kinds] of PEOPLE_SECTIONS) for (const k of kinds) SECTION_OF[k] = title;
+  const EDGE_ABLE = PEOPLE_SECTIONS.flatMap(s => s[1]).filter(k => k !== 'Main Player' && k !== 'Corpse').concat(['Airdrop']);
   // a section's title, across the grid, before the first of its kinds that is listed
   const sectionHead = (grid, kind, last) => {
     const title = SECTION_OF[kind];
@@ -4645,6 +4649,31 @@
           const now = chased !== null ? liveById.get(chased) : null;
           if (now && inArea(now)) chase(null);
           listRoster();
+        };
+        swatch.className = 'swatch';
+        swatch.style.background = KINDS[kind].col;
+        span.textContent = KINDS[kind].name;
+        row.append(input, swatch, span);
+        grid.appendChild(row);
+      }
+    }
+    // "Point to who's off the screen": a switch for each kind that can have an arrow
+    {
+      const grid = $('edgeKinds');
+      grid.textContent = '';
+      let section = '';
+      for (const kind of EDGE_ABLE) {
+        if (!available(kind) || off.includes(kind)) continue;
+        section = sectionHead(grid, kind, section);
+        const row = document.createElement('label'), input = document.createElement('input'), swatch = document.createElement('i'), span = document.createElement('span');
+        row.className = 'row';
+        input.type = 'checkbox';
+        input.checked = prefs.edgeKinds.includes(kind);
+        input.dataset.def = EDGE.includes(kind) ? '1' : '0';
+        input.onchange = () => {
+          prefs.edgeKinds = prefs.edgeKinds.filter(k => k !== kind).concat(input.checked ? [kind] : []);
+          save();
+          dirty = true;
         };
         swatch.className = 'swatch';
         swatch.style.background = KINDS[kind].col;
@@ -5347,10 +5376,11 @@
       row.append(how, victim);
     } else {
       const how = document.createElement('i');
-      how.textContent = T('died');
+      how.textContent = d.self ? T('killed themselves') : T('died');
       row.append(victim, how);
     }
-    const more = [PARTS[d.bp] || '', Number.isFinite(d.m) && d.k ? d.m + ' m' : ''].filter(Boolean).join(' · ');
+    // with nobody else to say it by, what did it (a grenade, a fall)
+    const more = [d.k ? '' : d.w || '', PARTS[d.bp] || '', Number.isFinite(d.m) && d.k ? d.m + ' m' : ''].filter(Boolean).join(' · ');
     if (more) { const s = document.createElement('small'); s.textContent = more; row.appendChild(s); }
     return row;
   }
@@ -6911,7 +6941,7 @@
       head.append(back);
       before.before(head);
     };
-    for (const id of ['boxKinds', 'filtersPeople', 'areaKinds', 'filtersMap', 'filtersLoot', 'alerts']) {
+    for (const id of ['boxKinds', 'filtersPeople', 'areaKinds', 'edgeKinds', 'filtersMap', 'filtersLoot', 'alerts']) {
       both($(id), () => $(id).querySelectorAll(':scope > label.row:not(.sub) > input[type="checkbox"]'),
         () => $(id).querySelectorAll('label.row > input[type="checkbox"]'));
     }

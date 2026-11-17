@@ -1271,7 +1271,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 }
 
                 near.Add((key, then));
-                if (Fit(then, now, loose) is { } score && score < bestScore)
+                // the game's own map, when the raid is said to be the game's own version (MapVariants, or nothing
+                // swaps it): scenes another mod adds (props, ladders) don't make it another version, even for the scanner
+                var ownMap = key == place && hint == place;
+                if (Fit(then, now, loose, ownMap) is { } score && score < bestScore)
                 {
                     best = key;
                     bestScore = score;
@@ -1346,14 +1349,14 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
     // fit (one of its scenes isn't loaded and one it didn't have is: a swap; or more than half of its own are missing).
     // Not loose (the scanner): only the very same scenes fit. A version can be another with a scene added (Manimal's
     // Halloween 2026 Labs is his Labs Boiler with one layer more), and scanning it as that one would scan over it.
-    private static int? Fit(List<string> then, HashSet<string> now, bool loose = true)
+    private static int? Fit(List<string> then, HashSet<string> now, bool loose = true, bool addedOk = false)
     {
         var thenSet = new HashSet<string>(then, StringComparer.Ordinal);
         var missing = then.Count(s => !now.Contains(s));
         var added = now.Count(s => !thenSet.Contains(s));
         if (!loose)
         {
-            return missing == 0 && added == 0 ? 0 : null;
+            return missing == 0 && (added == 0 || addedOk) ? added : null;
         }
 
         var swapped = missing > 0 && added > 0;

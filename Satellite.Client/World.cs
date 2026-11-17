@@ -548,7 +548,7 @@ namespace Satellite.Client
 
         // Somebody died: said once, as an event ("kill"), for the page's kill feed. {"vk":what the dead one was,
         // "k":the killer's profile id,"kn":their name,"kk":what they are,"w":the weapon,"bp":where it hit,"m":how far,
-        // "at":[east,north,height] where they died,"ka":where the killer stood}
+        // "at":[east,north,height] where they died,"ka":where the killer stood,"self":1 when they killed themselves}
         private const System.Reflection.BindingFlags Kept = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
         private static readonly System.Reflection.FieldInfo LastDamage = typeof(Player).GetField("LastDamageInfo", Kept);
         private static readonly System.Reflection.FieldInfo LastPart = typeof(Player).GetField("LastBodyPart", Kept);
@@ -563,6 +563,8 @@ namespace Satellite.Client
                 var far = -1f;
                 var where = dead.Position;
                 Vector3? from = null;
+                // killed by their own hand (their own grenade, a fall): said as such, not as no killer known
+                var self = killer == dead.ProfileId;
                 if (!string.IsNullOrEmpty(killer))
                 {
                     Names.TryGetValue(killer, out killerName);
@@ -579,6 +581,11 @@ namespace Satellite.Client
                     weapon = item != null ? item.LocalizedShortName() : null;
                     part = LastPart != null ? Convert.ToString(LastPart.GetValue(dead)) : null;
                     var aggressor = LastHit != null ? LastHit.GetValue(dead) as IPlayer : null;
+                    if (aggressor != null && aggressor.ProfileId == dead.ProfileId && string.IsNullOrEmpty(killer))
+                    {
+                        self = true;
+                    }
+
                     if (aggressor != null && aggressor.ProfileId != dead.ProfileId)
                     {
                         far = Vector3.Distance(aggressor.Position, dead.Position);
@@ -610,6 +617,10 @@ namespace Satellite.Client
                             to.Append(",\"kk\":");
                             Text(to, killerKind);
                         }
+                    }
+                    else if (self)
+                    {
+                        to.Append(",\"self\":1");
                     }
 
                     if (!string.IsNullOrEmpty(weapon))
