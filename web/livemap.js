@@ -169,7 +169,7 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, killLines: true, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true, keyStates: true,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, killLines: true, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true, keyStates: false,
     myQuests: true, otherLoot: 30, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -2444,8 +2444,8 @@
         if (!s) continue;
         const open = loot && loot.open.has(l.id);
         const rim = open ? '#3ddc5a' : LAYERS.locks.col;
-        // its key: with the player (bright), in their stash (gold), or not had (dim); off: as before, one colour
-        const has = prefs.keyStates !== false && quests ? myKeys[l.key] || 0 : -1;
+        // its key: with the player (bright), in their stash (gold), or not had (dim); off (the default): one colour
+        const has = prefs.keyStates === true && quests ? myKeys[l.key] || 0 : -1;
         const ink = has === 1 ? KEY_WITH : has === 2 ? KEY_STASH : has === 0 ? KEY_NONE : SPAWN_INK;
         put(s, l.p, badge(open ? 'i:unlocked' : LOCK_GLYPH[l.kind] || 'i:lock', '#1a1a24', rim, ink, 'hex', size));
         if (match) ring(s, size * 0.85);
@@ -4579,7 +4579,7 @@
     ['filtersLoot', ['Layer loose', 'Layer boxes', 'Layer bodies']]
   ];
   // the switches under another one that start on
-  const SUB_ON = ['seenDead', 'corpseKind', 'allCorpses', 'myExits', 'botKills', 'keyStates'];
+  const SUB_ON = ['seenDead', 'corpseKind', 'allCorpses', 'myExits', 'botKills'];
   const FILTER_SUBS = {
     'Corpse': [['allCorpses', T('All corpses, not only player kills')], ['myCorpses', T('Only my kills'), T('Only the bodies of those you killed yourself. Bodies have a ring when a person killed them: gold for your kills, white for another player\'s.')],
       ['botKills', T('PMCs killed by bots'), T('A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players\' (white). Pointing at a body says who killed it.')], ['seenDead', T('Corpses I\'ve been close to')], ['corpseKind', T('Show what each corpse was')]],
