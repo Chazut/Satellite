@@ -3217,7 +3217,7 @@
     return killTipKept;
   }
   const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitMain', 'ORBIT'], ['optOrbitRush', 'ORBIT'], ['optOrbitField', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
-    ['optRosterGhosts', 'ORBIT'], ['optSquadParts', 'COMET']];
+    ['optRosterGhosts', 'ORBIT'], ['optSquadParts', 'COMET'], ['optPhobosField', 'Phobos']];
   const modHere = n => (prefs.brains || []).includes(n);
   const modOn = n => modHere(n) && prefs['bot' + n] !== false;
   function nameBotDetails() {
