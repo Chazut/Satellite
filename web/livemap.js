@@ -2704,7 +2704,7 @@
       }
 
       // Where loose loot can spawn: a hollow ring each, in the colour of the dearest thing it can spawn of the kinds
-      // shown, worth at least what's asked (any, up close); a search rings the points that can spawn what's searched for.
+      // shown, worth at least what's asked (however close); a search rings the points that can spawn what's searched for.
       if (lootTable && sameMap(lootTable.loc, map.loc) && !isHidden('Layer lootSpawns')) {
         const tn = lootTable.names;
         const pictures = Math.min(vw, vh) / zoom <= Math.max(prefs.closeSpan, SPAWN_PICTURES);
@@ -2717,7 +2717,7 @@
           // a quest item's: with the quest items' switch, whatever it's worth; only the player's quests' while those are asked for
           const wanted = pt.quest && mine ? can.map(i => wants.items.get(i[0]) || wants.fItems.get(i[0])).find(Boolean) : null;
           if (pt.quest && !looking && (isHidden('Layer quest') || (mine && !wanted))) continue;
-          if (looking ? !match : (!pt.quest && best < minWorth() && !close) || gone([pt.x, pt.y, pt.z])) continue;
+          if (looking ? !match : (!pt.quest && best < minWorth()) || gone([pt.x, pt.y, pt.z])) continue;
           found++;
           if (match) for (const i of can) if (tnHits(i[0])) note((tn[i[0]] || {}).n || i[0], T('Can spawn'), [pt.x, pt.y]);
           const s = onScreen(pt.x, pt.y);
