@@ -3,9 +3,18 @@
 #   .\build.ps1 -SPTPath D:\SPT
 #   .\build.ps1 -SPTPath D:\SPT -NoInstall      (build and zip only)
 #   .\build.ps1 -SPTPath D:\SPT -NoMaps         (only the zip without maps: quicker, for trying a change)
+#   .\build.ps1 -SPTPath D:\SPT -Recording      (with raid recording: the server's Recorder, the History tab and
+#                                               replays. Without it, none of that is built or on the page: it isn't
+#                                               in public releases yet)
 #   .\build.ps1 -Addons Factory-Classic,Laboratory-Halloween2026
 #                                               (only those add-on zips, by the name in the zip's; nothing else is
 #                                               built, zipped or installed, so the other zips stay as released)
+#   .\build.ps1 -SPTPath D:\SPT -SkipAddons bigmap~backport
+#                                               (add-on maps in the SPT folder that aren't released: no zip, and
+#                                               not in addons.json)
+#   .\build.ps1 -Addons Customs-Classic -AddonVersion 1.0.0
+#                                               (the add-on zips under a version of their own: a new add-on's first
+#                                               release is 1.0.0 whatever the mod's version is)
 # A build for release makes two zips of the mod: Satellite-<version>.zip, with every one of the game's own maps, and
 # Satellite-<version>-NoMaps.zip, the same without the maps folder, for updating over a slow or capped line.
 # The maps come from the SPT folder's Satellite\maps. A build with maps stops if one of the game's own is missing.
@@ -19,7 +28,10 @@ param(
     [string] $SPTPath = '',
     [switch] $NoInstall,
     [switch] $NoMaps,
-    [string[]] $Addons = @()
+    [switch] $Recording,
+    [string[]] $Addons = @(),
+    [string] $AddonVersion = '',
+    [string[]] $SkipAddons = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,14 +56,25 @@ if ($metadataVersion -ne $version -or $pluginVersion -ne $version) {
 
 $addonsOnly = $Addons.Count -gt 0
 if ($addonsOnly -and $NoMaps) { throw '-Addons makes add-on zips, which are maps: leave out -NoMaps.' }
+if ($AddonVersion -and $AddonVersion -notmatch '^\d+\.\d+\.\d+$') { throw "-AddonVersion takes a version like 1.0.0, not '$AddonVersion'." }
+$addonVersion = if ($AddonVersion) { $AddonVersion } else { $version }
 
 # the SDK may be installed per-user, so it may not be on PATH
 $userDotnet = Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe'
 $dotnet = if (Test-Path $userDotnet) { $userDotnet } else { 'dotnet' }
 
+# Python with Pillow makes the release maps' tiles WebP (tools/webp_tiles.py): checked before anything is built
+$python = $null
+if (-not $NoMaps) {
+    $python = (Get-Command python.exe -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -notmatch 'WindowsApps' } | Select-Object -First 1).Source
+    if (-not $python) { throw 'Python is needed to make the maps'' tiles WebP: install it from python.org, then pip install pillow (or build with -NoMaps).' }
+    & $python -c 'import PIL' 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Pillow is needed to make the maps' tiles WebP: $python -m pip install pillow (or build with -NoMaps)." }
+}
+
 $dist = Join-Path $root 'dist'
 if (-not $addonsOnly) {
-    & $dotnet build $serverProject -c Release --nologo
+    & $dotnet build $serverProject -c Release --nologo "-p:Recording=$(if ($Recording) { 'true' } else { 'false' })"
     if ($LASTEXITCODE -ne 0) { throw 'Server build failed.' }
     $serverDll = Join-Path $root "$name.Server\bin\Release\$name.Server.dll"
 
@@ -77,6 +100,14 @@ if (-not $addonsOnly) {
     New-Item -ItemType Directory -Force $mod | Out-Null
     Copy-Item -LiteralPath $serverDll -Destination $mod
     Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $mod -Recurse
+    if (-not $Recording) {
+        # the page without raid recording (see RECORDING in livemap.js)
+        $page = Join-Path $mod 'web\livemap.js'
+        $text = [IO.File]::ReadAllText($page)
+        $flag = '  const RECORDING = true;'
+        if (-not $text.Contains($flag)) { throw "livemap.js has no '$flag' to turn recording off with." }
+        [IO.File]::WriteAllText($page, $text.Replace($flag, '  const RECORDING = false;'), (New-Object System.Text.UTF8Encoding $false))
+    }
     Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $mod
     # config.jsonc isn't packed: the server writes the default the first time it starts, so an update never overwrites
     # the owner's own
@@ -110,9 +141,11 @@ function Label([string] $loc) {
     ($loc -split '~' | ForEach-Object { $_.Substring(0, 1).ToUpper() + $_.Substring(1) }) -join '-'
 }
 
-# the zip an add-on map goes in: its own, but Factory's day and night maps of one version share one ("Factory-Classic")
+# the zip an add-on map goes in: its own, but Factory's day and night maps of one version share one ("Factory-Classic"),
+# and a version of Customs goes by the map's name, not its location id ("bigmap~classic": "Customs-Classic")
 function AddonZip([string] $loc) {
     if ($loc -match '^factory4_(day|night)(~.+)$') { return "$name-Addon-$(Label ('factory' + $Matches[2]))" }
+    if ($loc -match '^bigmap(~.+)$') { return "$name-Addon-$(Label ('customs' + $Matches[1]))" }
     "$name-Addon-$(Label $loc)"
 }
 
@@ -177,6 +210,10 @@ function PackTiles([string] $mapsDir) {
         if ($versions.Count -ne 1) { throw "$($map.Name) has $($versions.Count) capture folders; it should have one." }
         [SatelliteTiles]::Pack($versions[0].FullName) | Out-Null
     }
+    # then the tiles WebP, half the size of the JPEGs captured (tools/webp_tiles.py; a pack that's WebP already is
+    # only read). A release is never made with JPEG tiles: no Python or Pillow stops the build.
+    & $python (Join-Path $root 'tools\webp_tiles.py') $mapsDir
+    if ($LASTEXITCODE -ne 0) { throw "Couldn't make the tiles in $mapsDir WebP." }
 }
 
 # the game's own locations; any other map (a version of one, after a "~", or a map a mod adds) is an add-on
@@ -190,10 +227,11 @@ if (-not $NoMaps) {
     # a release always has every one of the game's own maps: stop before anything is packed if one is missing
     $lacking = @($gameMaps | Where-Object { -not (Test-Path -LiteralPath (Join-Path $mapsFrom "$_\meta.json")) })
     if ($lacking.Count) { throw "No map of $($lacking -join ', ') in $mapsFrom. Scan them first, or build with -NoMaps." }
-    $addonFolders = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $gameMaps -cnotcontains $_.Name -and -not $_.Name.EndsWith('@snow') })
-    # the maps with snow on the ground ("<map>@snow"): all in one add-on, and not in addons.json (without one, the
-    # page shows the map without snow, so there's nothing to tell a player they're missing)
-    $snowMaps = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $_.Name.EndsWith('@snow') })
+    $addonFolders = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $gameMaps -cnotcontains $_.Name -and -not $_.Name.Contains('@') -and $SkipAddons -notcontains $_.Name })
+    # the maps of a season with snow on the ground ("<map>@snow", "<map>@lateautumn", "<map>@earlyspring"): each
+    # season's in one add-on, and not in addons.json (without one, the page shows the map itself, so there's nothing
+    # to tell a player they're missing)
+    $snowMaps = @(Get-ChildItem -LiteralPath $mapsFrom -Directory | Where-Object { $_.Name.Contains('@') -and $SkipAddons -notcontains $_.Name })
 
     # addons.json: what tells each add-on in a raid (its scenes) and the zip it comes in, so the server can say which
     # add-on a player is missing. Kept next to this script, so a build with -NoMaps still has it.
@@ -230,24 +268,28 @@ if ($addonsOnly) {
     $groups = @($groups | Where-Object { $wanted -contains $_.Name })
 }
 foreach ($group in $groups) {
-    $addonStage = Join-Path $dist "$($group.Name)-$version"
+    $addonStage = Join-Path $dist "$($group.Name)-$addonVersion"
     if (Test-Path -LiteralPath $addonStage) { Remove-Item -LiteralPath $addonStage -Recurse -Force }
     $addonMaps = Join-Path $addonStage "SPT_Runtime\user\mods\$name\maps"
     New-Item -ItemType Directory -Force $addonMaps | Out-Null
     foreach ($map in $group.Group) { Copy-Item -LiteralPath $map.FullName -Destination $addonMaps -Recurse }
     PackTiles $addonMaps
-    Pack $addonStage (Join-Path $dist "$($group.Name)-$version.zip")
+    Pack $addonStage (Join-Path $dist "$($group.Name)-$addonVersion.zip")
 }
 
-# the snow add-on: every snow map in one zip
-if ($snowMaps.Count -and -not $addonsOnly) {
-    $snowStage = Join-Path $dist "$name-Addon-Snow-$version"
+# the season add-ons: each season's maps in one zip (Snow, LateAutumn, EarlySpring)
+$seasonZips = [ordered]@{ '@snow' = 'Snow'; '@lateautumn' = 'LateAutumn'; '@earlyspring' = 'EarlySpring' }
+foreach ($season in $seasonZips.Keys) {
+    $seasonMaps = @($snowMaps | Where-Object { $_.Name.EndsWith($season) })
+    if (-not $seasonMaps.Count -or $addonsOnly) { continue }
+    $label = $seasonZips[$season]
+    $snowStage = Join-Path $dist "$name-Addon-$label-$version"
     if (Test-Path -LiteralPath $snowStage) { Remove-Item -LiteralPath $snowStage -Recurse -Force }
     $snowTo = Join-Path $snowStage "SPT_Runtime\user\mods\$name\maps"
     New-Item -ItemType Directory -Force $snowTo | Out-Null
-    foreach ($map in $snowMaps) { Copy-Item -LiteralPath $map.FullName -Destination $snowTo -Recurse }
+    foreach ($map in $seasonMaps) { Copy-Item -LiteralPath $map.FullName -Destination $snowTo -Recurse }
     PackTiles $snowTo
-    Pack $snowStage (Join-Path $dist "$name-Addon-Snow-$version.zip")
+    Pack $snowStage (Join-Path $dist "$name-Addon-$label-$version.zip")
 }
 
 if (-not $NoInstall -and -not $addonsOnly) {
@@ -282,6 +324,8 @@ if (-not $NoInstall -and -not $addonsOnly) {
         New-Item -ItemType Directory -Force $scannerDest | Out-Null
         # with the tool that works the buildings' outlines out after each capture (it needs Node.js)
         Copy-Item -LiteralPath (Join-Path $root 'tools\outlines.js') -Destination $scannerDest -Force
+        # and the one that makes each map's tiles WebP once it's captured (it needs Python with Pillow)
+        Copy-Item -LiteralPath (Join-Path $root 'tools\webp_tiles.py') -Destination $scannerDest -Force
         try { Copy-Item -LiteralPath $scannerDll -Destination $scannerDest -Force -ErrorAction Stop; Write-Host "Installed the map scanner to $scannerDest" }
         catch { Write-Warning "Couldn't copy the map scanner into $scannerDest. Close the game and build again. ($($_.Exception.Message))" }
     }

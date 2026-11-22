@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using EFT;
+using UnityEngine;
 
 namespace Satellite.Client
 {
@@ -619,6 +621,60 @@ namespace Satellite.Client
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        // What the bot has decided to do this moment, finer than its layer: SAIN's own decision when SAIN has one
+        // ("SAIN:Search", "SAIN:ThrowGrenade", "SAIN:FirstAid"), else the game's ("simplePatrol", "heal",
+        // "throwGrenadeFromPlace"). A raid's behaviour chart is drawn from these.
+        private static bool _sainLooked;
+        private static Type _sainBot;
+        private static readonly Dictionary<string, Component> SainBots = new Dictionary<string, Component>();
+        private static readonly string[] SainDecisions = { "CurrentSelfDecision", "CurrentCombatDecision", "CurrentSquadDecision" };
+
+        internal static void ForgetDecisions()
+        {
+            SainBots.Clear();
+        }
+
+        internal static string Decision(Player player, BotOwner bot)
+        {
+            try
+            {
+                if (!_sainLooked)
+                {
+                    _sainLooked = true;
+                    _sainBot = Types.Find("SAIN.Components.BotComponent");
+                }
+
+                if (_sainBot != null && player != null && !string.IsNullOrEmpty(player.ProfileId))
+                {
+                    if (!SainBots.TryGetValue(player.ProfileId, out var sain) || sain == null)
+                    {
+                        sain = player.gameObject.GetComponent(_sainBot);
+                        SainBots[player.ProfileId] = sain;
+                    }
+
+                    var decision = sain != null ? Hooks.Get(sain, "Decision") : null;
+                    if (decision != null)
+                    {
+                        foreach (var name in SainDecisions)
+                        {
+                            var said = Convert.ToString(Hooks.Get(decision, name));
+                            if (!string.IsNullOrEmpty(said) && said != "None" && said != "0")
+                            {
+                                return "SAIN:" + said;
+                            }
+                        }
+                    }
+                }
+
+                var last = bot != null && bot.Brain != null ? Hooks.Get(bot.Brain, "LastDecision") : null;
+                return last != null ? last.ToString() : null;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 

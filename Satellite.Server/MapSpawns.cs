@@ -25,6 +25,29 @@ public partial class LiveMapRoute
     // made once for each location, and kept packed too: it runs to megabytes
     private readonly Dictionary<string, (Answer Answer, int Flea)> _spawns = new(StringComparer.Ordinal);
 
+    // the items of the game's events that aren't on now, as SPT's own loot leaves them out (SeasonalEventService); none
+    // when it can't be asked
+    private HashSet<string> InactiveEventItems()
+    {
+        try
+        {
+            // found by its name: SPT's own service, wherever a version keeps it
+            var type = typeof(SPTarkov.Server.Core.Services.Locales.LocaleService).Assembly.GetTypes()
+                .FirstOrDefault(t => t.Name == "SeasonalEventService");
+            var seasonal = type != null ? services.GetService(type) : null;
+            if (seasonal?.GetType().GetMethod("GetInactiveSeasonalEventItems", Type.EmptyTypes)?.Invoke(seasonal, null) is System.Collections.IEnumerable items)
+            {
+                return new HashSet<string>(items.Cast<object>().Select(t => t.ToString() ?? ""), StringComparer.Ordinal);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Warning($"[Satellite] Couldn't tell which event items are out of season; they're shown with the rest: {ex.Message}");
+        }
+
+        return new HashSet<string>(StringComparer.Ordinal);
+    }
+
     private Answer SpawnsFor(string location)
     {
         location = WithoutSnow(location);
@@ -90,6 +113,9 @@ public partial class LiveMapRoute
 
             return yes;
         }
+        // the items of the game's events that aren't on now (Halloween's pumpkins in November): SPT takes them out of a
+        // point before it spawns anything there, and a point left with nothing spawns nothing
+        var offSeason = InactiveEventItems();
         var looseLoot = found.LooseLoot?.Value;
         // each point drawn as it is, its number (a weight, 1: always), whether it's forced, its id and its place, to work
         // its chance out after (the server goes by both: see below)
@@ -139,6 +165,21 @@ public partial class LiveMapRoute
                     }
 
                     shares[root.Template.ToString()] = 1;
+                }
+
+                // an event's items out of season: gone from the point, the rest weighed among themselves
+                if (offSeason.Count > 0 && shares.Keys.Any(offSeason.Contains))
+                {
+                    var inSeason = shares.Where(s => !offSeason.Contains(s.Key)).ToList();
+                    var sum = inSeason.Sum(s => s.Value);
+                    if (sum <= 0)
+                    {
+                        // nothing left to spawn here: still drawn by the server, so it's counted below, but not shown
+                        drawn.Add((new JsonArray(0, 0, 0, 0.0, new JsonArray()), Math.Max(0, chance), isForced, template.Id ?? "", place ?? template.Id ?? ""));
+                        continue;
+                    }
+
+                    shares = inSeason.ToDictionary(s => s.Key, s => s.Value / sum, StringComparer.Ordinal);
                 }
 
                 var list = new JsonArray();
@@ -250,7 +291,7 @@ public partial class LiveMapRoute
                     .Where(c => c.Weight > 0).ToList();
                 var countTotal = counts.Sum(c => c.Weight);
                 var items = (details.ItemDistribution ?? []).Select(i => (Tpl: i.Tpl.ToString(), Weight: Convert.ToDouble(i.RelativeProbability)))
-                    .Where(i => i.Weight > 0).ToList();
+                    .Where(i => i.Weight > 0 && !offSeason.Contains(i.Tpl)).ToList();
                 var itemTotal = items.Sum(i => i.Weight);
                 if (countTotal <= 0 || itemTotal <= 0)
                 {

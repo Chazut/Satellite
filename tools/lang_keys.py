@@ -32,7 +32,7 @@ for m in re.finditer(r"const lockName = kind => T\(\{(.*?)\}", js):
     for v in re.findall(r":\s*" + STR, m.group(1)):
         keys.setdefault(unquote(v), 'lock kind')
 # the words of the tables looked up as they're shown: the rows of buttons (segment), the bot mods
-for name in ['LOOT_MODES', 'INTEL']:
+for name in ['LOOT_MODES', 'INTEL', 'EX_FROM']:
     found = re.search(r"const " + name + r" = \[(.*?)\];", js, re.S)
     if not found:
         continue
@@ -105,7 +105,7 @@ if len(sys.argv) > 1 and sys.argv[1] == 'check':
                 if names(f) != names(k):
                     wrong.append(k)
         print(code, len(table), 'words;', len(missing), 'missing;', len(extra), 'not used;', len(wrong), 'with other {names}')
-        for k in missing[:15]:
+        for k in missing[:60]:
             print('   missing:', k[:100])
         for k in extra[:10]:
             print('   not used:', k[:100])

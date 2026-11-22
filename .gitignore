@@ -19,3 +19,6 @@ _References/
 .vs/
 .vscode/
 *.user
+
+# Python bytecode
+__pycache__/

@@ -5,6 +5,10 @@
 // only looks: it sends nothing to the game, and its options are its own (kept in this browser).
 (() => {
   const $ = id => document.getElementById(id);
+  // Raid recording (the History tab, replays): build.ps1 sets this false for a release without it, and then nothing of
+  // it is on the page (everything marked data-rec in index.html is hidden).
+  const RECORDING = true;
+  if (!RECORDING) document.documentElement.classList.add('norec');
   // the page's own words, in the language picked (see lang.js), before anything else is written
   window.fumsLangs.translatePage(document.body);
   const stage = $('stage');
@@ -29,6 +33,9 @@
     });
   }
   let debugAt = 0;
+  // the notice shut with its ×: kept shut until it says something else (a percentage going up isn't that)
+  let noticeShut = '';
+  const noticeKey = m => String(m || '').replace(/\d+%/g, '');
 
   const ZOOM_MIN_DIVIDER = 1.1;
   // as close as it goes: screen pixels to a metre
@@ -44,21 +51,27 @@
   };
   // A map is kept by its location id; when a mod swapped in another version of the location, the version follows a
   // "~" ("Interchange~backport"). The location alone is what quests and the map's turn go by.
-  // A map can also come with snow on the ground, as "<map>@snow" (the snow add-on): shown in place of the map in a raid
-  // whose season has snow ("sea" in the report), when it's installed.
-  const SNOW = '@snow', SNOWY_SEASONS = ['Winter', 'AutumnLate', 'SpringEarly', 'Storm'];
-  const isSnow = loc => String(loc || '').endsWith(SNOW);
-  const noSnow = loc => isSnow(loc) ? String(loc).slice(0, -SNOW.length) : String(loc || '');
+  // A map can also come for a season with snow on the ground (the season add-ons): "<map>@snow" for winter (all under
+  // snow), "<map>@lateautumn" and "<map>@earlyspring" (patches of it). One is shown in place of the map in a raid of
+  // its season ("sea" in the report), when it's installed.
+  const SEASON_MAPS = { Winter: '@snow', AutumnLate: '@lateautumn', SpringEarly: '@earlyspring' };
+  const SEASON_NAMES = { '@snow': T('snow'), '@lateautumn': T('late autumn'), '@earlyspring': T('early spring') };
+  const seasonOf = loc => Object.values(SEASON_MAPS).find(s => String(loc || '').endsWith(s)) || '';
+  const isSnow = loc => !!seasonOf(loc);
+  const noSnow = loc => { const s = seasonOf(loc); return s ? String(loc).slice(0, -s.length) : String(loc || ''); };
   const baseOf = loc => noSnow(loc).split('~')[0];
   const sameLoc = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+  // the places, raid loot and loot spawns of a map are the same in every season: the server sends them without one
+  const sameMap = (a, b) => !!a && !!b && noSnow(a) === noSnow(b);
   // The map shown for a location: its snow map in a snowy raid, when there is one; its own; or, for a version of it
   // (Interchange~backport) that isn't here, the location's own map, so the raid is still shown (maps come in add-ons,
   // and one may not be installed); null: none.
-  const snowyRaid = () => !!report && !!report.raid && SNOWY_SEASONS.includes(report.sea);
+  const raidSeason = () => !!report && !!report.raid && SEASON_MAPS[report.sea] || '';
   const plainMapFor = loc => maps.find(m => m.loc === loc) || (String(loc || '').includes('~') && maps.find(m => m.loc === baseOf(loc))) || null;
   const mapFor = loc => {
     const plain = plainMapFor(loc);
-    if (plain && snowyRaid() && !isSnow(loc)) return maps.find(m => m.loc === plain.loc + SNOW) || plain;
+    const season = raidSeason();
+    if (plain && season && !isSnow(loc)) return maps.find(m => m.loc === plain.loc + season) || plain;
     return plain;
   };
   // the location a raid's things are shown on: its map's (see mapFor)
@@ -98,6 +111,10 @@
     'RUAF Remnant': { name: T('RUAF remnant'), col: '#f08e75', shape: 'arrow', size: 1.05, order: 5 },
     'UNTAR': { name: 'UNTAR', col: '#8ec9ff', shape: 'arrow', size: 1.05, order: 5 },
     'ISB': { name: T('ISB special forces'), col: '#5c6cff', shape: 'arrow', size: 1.05, order: 5 },
+    'ISB WT': { name: T('ISB White Tusks'), col: '#f4ead2', shape: 'arrow', size: 1.1, label: true, order: 5.5 },
+    'Bloodhound': { name: T('Bloodhounds'), col: '#e0457b', shape: 'arrow', size: 1.05, order: 4 },
+    'Mercenary': { name: T('Mercenaries'), col: '#d9b23a', shape: 'arrow', size: 1.05, order: 5 },
+    'Combine': { name: T('Combine'), col: '#6f8fb8', shape: 'arrow', size: 1.05, order: 5 },
     'Civilian': { name: T('Civilians'), col: '#adebe1', shape: 'arrow', size: 0.9, order: 2 },
     'Infected': { name: T('Infected'), col: '#b84a32', shape: 'arrow', size: 1, order: 3 },
     'Sniper': { name: T('Sniper scavs'), col: '#fff6c8', shape: 'arrow', size: 1, order: 3 },
@@ -138,12 +155,14 @@
   const LAYERS = {
     quest: { name: T('Quest items'), col: '#ffbf00', server: 'loose' },
     questZones: { name: T('Quest places'), col: '#ffbf00', server: null },
+    firItems: { name: T('Found-in-raid needs'), col: '#f5a3ff', server: 'loose' },
     btrRoad: { name: T('BTR road and stops'), col: '#a3c45c', server: null },
     loose: { name: T('Loose loot'), col: '#6fd38f', server: 'loose' },
     lootSpawns: { name: T('Loot spawn points'), col: '#e6d38a', server: 'loose' },
     boxes: { name: T('Containers'), col: '#b07d4a', server: 'contents' },
     bodies: { name: T('Corpse loot'), col: '#a9b1bd', server: 'contents' },
     locks: { name: T('Locked doors'), col: '#ff9a00', server: 'locks' },
+    switches: { name: T('Switches'), col: '#5fd0c8', server: 'switches' },
     spawnPmc: { name: T('PMC spawns'), col: '#ff5148', server: 'spawns' },
     spawnScav: { name: T('Scav spawns'), col: '#f2e24a', server: 'spawns' },
     spawnBoss: { name: T('Boss spawns'), col: '#c77dff', server: 'spawns' }
@@ -168,7 +187,26 @@
   };
   // a lock, by what it's on
   const LOCK_GLYPH = { Door: 'i:lock', Trunk: 'i:trunk', KeycardDoor: 'i:keycard' };
+  // a room's light switch, by its id or name ("switch_custom_Light_00012"), as the plugin tells them too;
+  // every other switch is a power switch (a lever, a gate's switch, the power for an extract)
+  const LIGHT_SWITCH = /(^|[^a-z])lights?([^a-z]|$)/i;
+  // things the game counts among its switches that aren't one anybody looks for (Interchange's "urinal (3)")
+  const NOT_A_SWITCH = /urinal|toilet|sink|shower/i;
+  // a switch's own name, plainly: "reserve_electric_switcher_lever" is "reserve electric switcher lever"
+  // what a switch is, by its name or id, the first that fits (in English too, for a search): Kiba's alarm on
+  // Interchange ("Node_Alarm_Kiba"), its saferoom's reader, Reserve's lever for an extract ("autoId_00632_EXFIL"),
+  // its hermetic door ("Node_GatesButton"), D-2's power ("autoId_00000_D2_LEVER")
+  const SWITCH_KINDS = [
+    [/alarm/i, T('Alarm switch'), 'Alarm switch'], [/keycard/i, T('Keycard reader'), 'Keycard reader'],
+    [/exfil|extract/i, T('Extract switch'), 'Extract switch'], [/door|shutter|gate/i, T('Door switch'), 'Door switch'],
+    [/lever|electric|power/i, T('Power switch'), 'Power switch'], [/button|panel|console|reset|interval/i, T('Button'), 'Button']
+  ];
+  const switchKind = w => w.light ? [T('Light switch'), 'Light switch']
+    : (SWITCH_KINDS.find(k => k[0].test((w.nm || '') + ' ' + w.id)) || [null, T('Switch'), 'Switch']).slice(1);
+  const switchPlain = w =>String(w.nm && !/^switch$/i.test(w.nm) ? w.nm : w.id || '').replace(/[_\s]*\(?\d+\)?$/, '').replace(/_+/g, ' ').trim().slice(0, 48);
   const SPAWN_LETTER = { spawnPmc: 'P', spawnScav: 'S', spawnBoss: 'B' };
+  // what they're called in English too, for a search
+  const SPAWN_EN = { spawnPmc: 'PMC spawn', spawnScav: 'Scav spawn', spawnBoss: 'Boss spawn' };
 
   // ---- what the page remembers ---------------------------------------------------------------------------------
   // spanIn, spanOut: how close auto zoom goes indoors and outdoors, as metres across the screen's short side
@@ -181,10 +219,10 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, killLines: true, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true, keyStates: false,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true, keyStates: false,
     myQuests: true, otherLoot: 30, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
-    orbitNames: false, orbitHear: false, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
+    orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
     latin: true,
@@ -205,6 +243,16 @@
   // areaKinds: the kinds shown only as a rough area (before this: PMCs alone, areaPmc)
   if (!Array.isArray(prefs.areaKinds)) prefs.areaKinds = prefs.areaPmc ? ['Enemy Player'] : [];
   delete prefs.areaPmc;
+  // (once: ORBIT's squad plans and ghost fights used to start on; every page has them off now, until turned on)
+  if (!prefs.botPlansOff) { prefs.orbitMain = false; prefs.orbitRush = false; prefs.orbitFights = false; prefs.botPlansOff = true; }
+  // the Loot tab's Explorer: where its items are from ('real': this raid, 'can': what can spawn), of which kind ('' any,
+  // a kind of LOOT_KINDS, or 'quest'), of the wishlist ('' any, 'all' on it, or one of its groups '0'..'4'), in what
+  // order, and whether the whole list is shown
+  if (!['real', 'can'].includes(prefs.exFrom)) prefs.exFrom = 'real';
+  if (typeof prefs.exKind !== 'string') prefs.exKind = '';
+  if (!['', 'all', '0', '1', '2', '3', '4'].includes(prefs.exWish)) prefs.exWish = '';
+  if (!['worth', 'total', 'name', 'count', 'chance'].includes(prefs.exSort)) prefs.exSort = 'worth';
+  if (typeof prefs.exMore !== 'boolean') prefs.exMore = false;
   if (!['own', 'in', 'hide'].includes(prefs.rosterGhosts)) prefs.rosterGhosts = 'in';
   // ghosts are listed with their kind, like any bot, unless asked otherwise (a page from the hour they weren't: put back once)
   if (!prefs.ghostsIn) { prefs.ghostsIn = true; prefs.rosterGhosts = 'in'; prefs.rosterShut = prefs.rosterShut.filter(k => k !== 'Ghosts'); }
@@ -263,6 +311,7 @@
   if (typeof prefs.wishOnly !== 'boolean') prefs.wishOnly = false;
   if (typeof prefs.myQuestItems !== 'boolean') prefs.myQuestItems = prefs.myQuests !== false;
   if (typeof prefs.myQuestPlaces !== 'boolean') prefs.myQuestPlaces = prefs.myQuests !== false;
+  if (typeof prefs.friendQuests !== 'boolean') prefs.friendQuests = true;
   if (!Array.isArray(prefs.alerts)) prefs.alerts = [];
   if (!Array.isArray(prefs.has)) prefs.has = null;
   if (!Array.isArray(prefs.brains)) prefs.brains = null;
@@ -394,16 +443,21 @@
   let tipFor = null;
   // the player's started quests: { sid, list: [{ id, name, trader, loc, goals }], zones: { zone id: quest name }, names }
   let quests = null;
+  // a recorded raid being played back (see "raid history"): the live game is set aside meanwhile
+  let replay = null;
+  const REPLAY_SID = 'replay';
   // the items on the player's wishlist (a Set of templates; null while not known, or from a server that doesn't say),
   // and the same as text, so what's worked out from it is worked out again when it changes
-  let wish = null, wishPrint = '';
+  // wishGroup: tpl -> its wishlist group, as the game numbers them (0 Tasks, 1 Hideout, 2 Barter, 3 Equipment, 4 Other);
+  // empty from a server that doesn't say
+  let wish = null, wishPrint = '', wishGroup = new Map();
   // the player's keys (with the quests): key template -> 1 with them, 2 in their stash
   let myKeys = {}, myKeysPrint = '';
   let questsAsking = false, questsAskedAt = -1e9, questsFor = '';
   let questsPrint = null;
   let find = '';                // what the search box asks for, lower case; '' for nothing
   // The menu: one panel with a tab each for the raid, its loot, the quests, the map and the settings.
-  const TABS = ['raid', 'loot', 'quests', 'map', 'settings'];
+  const TABS = ['raid', 'loot', 'quests', 'map'].concat(RECORDING ? ['history'] : [], ['settings']);
   let tab = TABS.includes(prefs.tab) ? prefs.tab : 'raid';
   // A phone, upright or on its side: the menu is a sheet (from the bottom, or down the right), and the map's buttons
   // are round ones down its right edge (see placeQuick).
@@ -609,7 +663,7 @@
       : /^[0-9a-f]{8}$/.test(version || '') ? T('another version') : version || '';
     const title = PLACES[base] || (typeof raw.name === 'string' && raw.name ? T(raw.name) : base);
     return {
-      loc: raw.loc, v: raw.v, base, title, name: title + (vname ? ' (' + vname + ')' : ''), tile: raw.tile, cols: raw.cols, rows: raw.rows,
+      loc: raw.loc, v: raw.v, base, title, vname, name: title + (vname ? ' (' + vname + ')' : ''), tile: raw.tile, cols: raw.cols, rows: raw.rows,
       small: !!raw.small, floors: readFloors(raw.floors),
       rawZones: zones.filter(z => z.k !== 'claymore' && !z.off),
       zones: zoneAreas(zones.filter(z => z.k !== 'claymore' && !z.off)),
@@ -804,6 +858,8 @@
   // "anything else"). While only the wishlist is shown, it's whether it's on the wishlist, whatever its kind.
   const kindOn = (names, tpl) => {
     const entry = names[tpl] || {};
+    // an item picked by its whole name (from the search's list or the Explorer) is found whatever its kind
+    if (findExact && (findHits(entry.n) || findHits(entry.s))) return true;
     if (wishOnly()) return !!entry.q || wish.has(tpl);
     if (!prefs.lootOff.length) return true;
     return !!entry.q || !prefs.lootOff.includes(entry.g || 'other');
@@ -1653,6 +1709,7 @@
     $('optTurn').value = prefs.turns && prefs.turns[map.loc] !== undefined ? String(prefs.turns[map.loc]) : 'auto';
     setZoomLimits();
     $('map').value = map.loc;
+    mapBtnSays();
     if (!keepPlace) {
       zoom = zoomTarget = zoomMin;
       centreOn((map.min.x + map.max.x) / 2, (map.min.y + map.max.y) / 2);
@@ -1814,6 +1871,9 @@
     trunk: [['M2.500 16.500v-4l2.500-1 2.500-4.500h8l3 4.500 3 1v4z', 's'], [ring(7.500, 17, 2) + ring(16.500, 17, 2), 'f'], ['M8.500 11.500h7', 's']],
     keycard: [['M2.500 5.500h19v13h-19z', 's'], ['M2.500 8.500h19v3h-19z', 'f'], ['M5.500 15h5', 's']],
     stop: [['M12 21.500V10.500', 's'], ['M6.500 3h11v7.500h-11z', 's'], ['M9 6.800h6', 's']],
+    // a switch: the sign for power; a room's light switch: a bulb
+    power: [['M7.100 6.600a7.500 7.500 0 1 0 9.800 0', 's'], ['M12 2.800v8.700', 's']],
+    bulb: [['M12 2.800a6 6 0 0 0-3.600 10.800c.700.500 1.100 1.300 1.100 2.100v.600h5v-.600c0-.800.400-1.600 1.100-2.100A6 6 0 0 0 12 2.800z', 's'], ['M9.500 19.200h5M10.500 21.700h3', 's']],
     // a die
     // a die showing five: a solid rounded face, its pips cut out
     mixed: [['M6.5 3.5h11a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3v-11a3 3 0 0 1 3-3z' + ring(8.2, 8.2, 1.5) + ring(15.8, 8.2, 1.5) + ring(12, 12, 1.5) + ring(8.2, 15.8, 1.5) + ring(15.8, 15.8, 1.5), 'f']],
@@ -1832,7 +1892,7 @@
   // the box of the map's spawn kinds: while the spawn points are shown
   let spawnIndexFor = null;
   function showSpawnIndex() {
-    const table = lootTable && map && lootTable.loc === map.loc && !isHidden('Layer lootSpawns') ? lootTable : null;
+    const table = lootTable && map && sameMap(lootTable.loc, map.loc) && !isHidden('Layer lootSpawns') ? lootTable : null;
     const box = $('spawnIndex');
     if (table === spawnIndexFor) return;
     spawnIndexFor = table;
@@ -1929,11 +1989,21 @@
   }
   // what was found, by name and kind, under the box: { label, kind, spots: [[east, north],..] }
   let findShown = '', findNext = new Map();
+  // The list's tabs: what was found, by what it is. findGroup: the tab shown ('all': every one); it goes back to all
+  // when a search finds nothing under it.
+  const FIND_GROUPS = [['all', T('All')], ['items', T('Items')], ['objects', T('Objects')], ['spawns', T('Spawns')], ['quests', T('Quests')], ['extracts', T('Extracts')]];
+  let findGroup = 'all';
   function showFindList(results, looking) {
     const list = $('findList');
     const open = looking && findOpen;
-    const rows = !open ? [] : [...results.values()].sort((a, b) => b.spots.length - a.spots.length || a.label.localeCompare(b.label)).slice(0, 40);
-    const print = open ? find + '|' + rows.map(r => r.kind + r.label + r.spots.length).join('|') : '';
+    const all = !open ? [] : [...results.values()];
+    const counts = {};
+    for (const r of all) counts[r.group] = (counts[r.group] || 0) + 1;
+    if (findGroup !== 'all' && !counts[findGroup]) findGroup = 'all';
+    const tabs = FIND_GROUPS.filter(([g]) => g === 'all' || counts[g]);
+    const rows = all.filter(r => findGroup === 'all' || r.group === findGroup)
+      .sort((a, b) => b.spots.length - a.spots.length || a.label.localeCompare(b.label)).slice(0, 40);
+    const print = open ? find + '|' + findGroup + '|' + tabs.map(t => t[0] + (counts[t[0]] || 0)).join() + '|' + rows.map(r => r.kind + r.label + r.spots.length).join('|') : '';
     if (print === findShown) return;
     findShown = print;
     list.hidden = !open;
@@ -1943,6 +2013,22 @@
     list.style.top = (box.bottom + 6) + 'px';
     list.style.width = Math.min(window.innerWidth - 16, Math.max(box.width, 320)) + 'px';
     list.textContent = '';
+    // the tabs, when what was found is of more than one kind
+    if (tabs.length > 2) {
+      const bar = document.createElement('div');
+      bar.className = 'tabs';
+      for (const [g, name] of tabs) {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'tab' + (g === findGroup ? ' on' : '');
+        tab.textContent = name + (g === 'all' ? '' : ' ' + counts[g]);
+        // the box keeps the keyboard
+        tab.onpointerdown = e => e.preventDefault();
+        tab.onclick = () => { findGroup = g; findShown = ''; dirty = true; };
+        bar.appendChild(tab);
+      }
+      list.appendChild(bar);
+    }
     if (!rows.length) {
       const none = document.createElement('div');
       none.className = 'none';
@@ -2022,6 +2108,11 @@
       loc: raw.loc, names: raw.names || {},
       boxes: list(raw.boxes).filter(b => at3(b.p) && b.id),
       locks: list(raw.locks).filter(l => at3(l.p) && l.key),
+      // the game's switches that are in the scene (not one left switched off in it); others it has are left out
+      // till it's known what they are
+      switches: list(raw.switches).filter(w => at3(w.p) && typeof w.id === 'string' && w.id && w.t === 'Switch' && w.on !== 0 && !NOT_A_SWITCH.test(w.nm || ''))
+        // or by what it's in: one or two have an id that doesn't say (Customs' power plant basement: "switch_develop_00000")
+        .map(w => Object.assign(w, { light: LIGHT_SWITCH.test(w.id + ' ' + (w.nm || '')) || /Toggle_Light_Switch/i.test(w.up || '') })),
       spawns: list(raw.spawns).filter(s => at3(s.p)).map(s => Object.assign(s, { kind: spawnKind(s) })),
       zones: list(raw.zones).filter(z => at3(z.p) && typeof z.id === 'string'),
       exits: list(raw.exits).filter(e => at3(e.p) && typeof e.name === 'string'),
@@ -2080,7 +2171,7 @@
   // The map's zones are sorted again once its places (with the stops and containers) are in.
   function placeZones() {
     if (!map) return;
-    const here = places && places.loc === map.loc ? places : null;
+    const here = places && sameMap(places.loc, map.loc) ? places : null;
     const stops = here ? here.stops : [];
     const boxes = here ? here.boxes : [];
     const near = (p, z, by) => {
@@ -2127,39 +2218,70 @@
     if (answer && answer.sid && answer.sid !== sid) return;
     takeQuests(answer, sid);
   }
+  // Started quests as the page marks them: only true quest items count (the ones that exist for a quest alone, picked
+  // up where the quest says). Ordinary items a quest wants are loot like any other here, and a goal that is only about
+  // them isn't listed (what's wanted found in raid is marked apart: see firOf).
+  const questList = (raw, names) => list(raw).filter(q => q && typeof q.name === 'string').map(q => Object.assign({}, q, {
+    goals: list(q.goals).map(g => {
+      const asked = list(g.items);
+      const items = asked.filter(tpl => (names[tpl] || {}).q);
+      return Object.assign({}, g, { items, plain: asked.length > 0 && !items.length && !list(g.zones).length });
+    }).filter(g => !g.plain)
+  })).filter(q => q.goals.length);
+  // the ordinary items started quests want found in raid: tpl -> [quest, goal, whose ('' the player's own)]
+  const firOf = (raw, names, who, into) => {
+    for (const q of list(raw)) {
+      for (const g of list(q && q.goals)) {
+        if (!g || !g.fir) continue;
+        for (const tpl of list(g.items)) if (!(names[tpl] || {}).q && !into.has(tpl)) into.set(tpl, [q, g, who]);
+      }
+    }
+    return into;
+  };
   function takeQuests(answer, whose) {
     questsFor = whose;
+    const names = answer && answer.names || {};
     quests = answer && !answer.none ? {
       sid: answer.sid,
-      // Only true quest items count (the ones that exist for a quest alone, picked up where the quest says).
-      // Ordinary items a quest wants found in raid or handed over are loot like any other: never marked, and a
-      // goal that is only about them isn't listed.
-      list: list(answer.quests).filter(q => q && typeof q.name === 'string').map(q => Object.assign(q, {
-        goals: list(q.goals).map(g => {
-          const asked = list(g.items);
-          const items = asked.filter(tpl => ((answer.names || {})[tpl] || {}).q);
-          return Object.assign(g, { items, plain: asked.length > 0 && !items.length && !list(g.zones).length });
-        }).filter(g => !g.plain)
-      })).filter(q => q.goals.length),
-      zones: answer.zones || {}, names: answer.names || {}
+      list: questList(answer.quests, names),
+      fir: firOf(answer.quests, names, '', new Map()),
+      // the other players in the same Fika raid, and their quests
+      friends: list(answer.friends).filter(f => f && typeof f.sid === 'string').map(f => {
+        const who = typeof f.name === 'string' && f.name ? latin(f.name) : T('A friend');
+        return { sid: f.sid, who, list: questList(f.quests, names), fir: firOf(f.quests, names, who, new Map()) };
+      }),
+      zones: answer.zones || {}, names
     } : null;
     const wished = answer && Array.isArray(answer.wish) ? answer.wish.filter(t => typeof t === 'string').sort() : null;
     wish = wished ? new Set(wished) : null;
     myKeys = answer && answer.keys && typeof answer.keys === 'object' ? answer.keys : {};
     myKeysPrint = Object.keys(myKeys).sort().map(k => k + myKeys[k]).join(',');
     wishPrint = wished ? wished.join(',') : '';
+    wishGroup = new Map(answer && answer.wishG && typeof answer.wishG === 'object' ? Object.entries(answer.wishG).filter(([, g]) => Number.isInteger(g)) : []);
     dirty = true;
   }
-  // what the started quests want: { items: tpl -> [quest, goal], zones: zone id -> [quest, goal] }
+  // What the started quests want: { items: tpl -> [quest, goal], zones: zone id -> [quest, goal] }; the same of the
+  // friends in the raid (fItems, fZones: [quest, goal, whose], with "Friends' quests" on); and fir: tpl -> [quest, goal,
+  // whose], the ordinary items wanted found in raid, the friends' too with that on.
   function questWants() {
-    const items = new Map(), zones = new Map();
+    const items = new Map(), zones = new Map(), fItems = new Map(), fZones = new Map(), fir = new Map();
     for (const q of quests ? quests.list : []) {
       for (const goal of q.goals) {
         for (const tpl of list(goal.items)) if (!items.has(tpl)) items.set(tpl, [q, goal]);
         for (const z of list(goal.zones)) if (!zones.has(z)) zones.set(z, [q, goal]);
       }
     }
-    return { items, zones };
+    if (quests) for (const [tpl, w] of quests.fir) fir.set(tpl, w);
+    for (const f of quests && prefs.friendQuests ? quests.friends : []) {
+      for (const q of f.list) {
+        for (const goal of q.goals) {
+          for (const tpl of list(goal.items)) if (!items.has(tpl) && !fItems.has(tpl)) fItems.set(tpl, [q, goal, f.who]);
+          for (const z of list(goal.zones)) if (!zones.has(z) && !fZones.has(z)) fZones.set(z, [q, goal, f.who]);
+        }
+      }
+      for (const [tpl, w] of f.fir) if (!fir.has(tpl)) fir.set(tpl, w);
+    }
+    return { items, zones, fItems, fZones, fir };
   }
 
   // What lies about in the raid: asked for when the game says it changed, one question at a time.
@@ -2181,7 +2303,7 @@
     if (!answer || answer.none) return;
     things = readThings(answer);
     dirty = true;
-    if (!places || places.loc !== things.loc) loadPlaces(false);
+    if (!places || !sameMap(places.loc, things.loc)) loadPlaces(false);
   }
   // the loot as the stream brings it (see listen): the game shown's, numbered as its reports number it
   function streamThings(answer) {
@@ -2284,12 +2406,13 @@
     let found = 0;
     const looking = find.length >= 2;
     const results = new Map();
-    // something found: by its name and what it is, with where it is
-    const note = (label, kind, p) => {
+    // something found: by its name and what it is, with where it is, and which of the list's tabs it's under
+    // (FIND_GROUPS)
+    const note = (label, kind, p, group) => {
       if (!looking || !label) return;
       const key = kind + '|' + label;
       let r = results.get(key);
-      if (!r) results.set(key, r = { label, kind, spots: [] });
+      if (!r) results.set(key, r = { label, kind, group: group || 'items', spots: [] });
       r.spots.push([p[0], p[1]]);
     };
     const tell = () => {
@@ -2301,8 +2424,8 @@
     };
     if (!map) return tell();
     const raidHere = inRaidHere();
-    const loot = raidHere && things && things.loc === map.loc ? things : null;
-    const shown = places && places.loc === map.loc ? places : null;
+    const loot = raidHere && things && sameMap(things.loc, map.loc) ? things : null;
+    const shown = places && sameMap(places.loc, map.loc) ? places : null;
     if (!shown && !loot) return tell();
     const names = Object.assign({}, quests ? quests.names : {}, shown ? shown.names : {}, loot ? loot.names : {});
     const nameOf = tpl => (names[tpl] || {}).n || tpl;
@@ -2364,16 +2487,21 @@
       // where it is, for a press on it (see pressed: one on another floor of the building shown goes to that floor)
       thingsPut.push({ x: s[0], y: s[1], r: w / 2, p });
     };
-    const ring = (s, radius) => {
+    const ring = (s, radius, col = LAYERS.quest.col) => {
       ctx.beginPath();
       ctx.arc(s[0], s[1], radius, 0, Math.PI * 2);
       ctx.lineWidth = 4;
       ctx.strokeStyle = '#000';
       ctx.stroke();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = LAYERS.quest.col;
+      ctx.strokeStyle = col;
       ctx.stroke();
     };
+    // what's wanted found in raid is marked (its own switch, "Found-in-raid needs")
+    const firOn = !isHidden('Layer firItems');
+    const wantedFor = tpl => mine && (wants.items.has(tpl) || wants.fItems.has(tpl));
+    // said after an item in a list: wanted for a quest, or wanted found in raid
+    const tagOf = tpl => wantedFor(tpl) ? ' · ' + T('quest') : firOn && wants.fir.has(tpl) ? ' · ' + T('found in raid') : '';
     ctx.save();
     ctx.lineJoin = 'round';
 
@@ -2405,16 +2533,46 @@
         }
       }
 
-      if (!looking) {
-        for (const sp of shown.spawns) {
-          if (isHidden('Layer ' + sp.kind)) continue;
-          const s = onScreen(sp.p[0], sp.p[1]);
+      // the spawn points; while searching, the ones found: by what they are ("PMC spawn") or by a boss that can
+      // spawn there ("Reshala")
+      for (const sp of shown.spawns) {
+        const title = sp.kind === 'spawnPmc' ? T('PMC spawn') : sp.kind === 'spawnScav' ? T('Scav spawn') : sp.kind === 'spawnBoss' ? T('Boss spawn') : T('Spawn');
+        // what spawns there (the bosses of the zone, with their chances), where it is and, for a PMC, the entry
+        const who = sp.kind === 'spawnBoss' ? bossesAt(shown.bosses, sp.zone) : [];
+        let match = false;
+        if (looking) {
+          const boss = who.map(l => l.trim().split(' · ')[0]).find(n => hits(n));
+          match = !!boss || hits(title) || hits(SPAWN_EN[sp.kind] || 'Spawn');
+          if (!match) continue;
+          found++;
+          note(boss || title, T('Spawn'), sp.p, 'spawns');
+        } else if (isHidden('Layer ' + sp.kind)) continue;
+        const s = onScreen(sp.p[0], sp.p[1]);
+        if (!s) continue;
+        put(s, sp.p, badge(SPAWN_LETTER[sp.kind], LAYERS[sp.kind].col, '#0c0c12', '#0c0c12', 'round', size * 0.95));
+        if (match) ring(s, size * 0.85);
+        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title,
+          lines: [...(who.length ? [T('Who can spawn here:'), ...who] : []), sp.zone ? T('Zone:') + ' ' + zoneName(sp.zone) : '', sp.infil ? T('Entry:') + ' ' + sp.infil : ''] } });
+      }
+
+      // while searching, the extracts found by their name, each once
+      if (looking) {
+        const named = new Set();
+        for (const e of shown.exits) {
+          const name = e.text || e.name;
+          if (!hits(name) && !hits(e.name)) continue;
+          const key = name + '|' + Math.round(e.p[0] / 30) + '|' + Math.round(e.p[1] / 30);
+          if (named.has(key)) continue;
+          named.add(key);
+          found++;
+          note(name, T('Extract'), e.p, 'extracts');
+          const s = onScreen(e.p[0], e.p[1]);
           if (!s) continue;
-          put(s, sp.p, badge(SPAWN_LETTER[sp.kind], LAYERS[sp.kind].col, '#0c0c12', '#0c0c12', 'round', size * 0.95));
-          // what spawns there (the bosses of the zone, with their chances), where it is and, for a PMC, the entry
-          const who = sp.kind === 'spawnBoss' ? bossesAt(shown.bosses, sp.zone) : [];
-          thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: (sp.kind === 'spawnPmc' ? T('PMC spawn') : sp.kind === 'spawnScav' ? T('Scav spawn') : sp.kind === 'spawnBoss' ? T('Boss spawn') : T('Spawn')),
-            lines: [...(who.length ? [T('Who can spawn here:'), ...who] : []), sp.zone ? T('Zone:') + ' ' + zoneName(sp.zone) : '', sp.infil ? T('Entry:') + ' ' + sp.infil : ''] } });
+          const col = e.scav ? KINDS.Scav.col : '#8fe3a0';
+          put(s, e.p, badge('', 'rgba(12,12,18,0.75)', col, col, 'diamond', size * 0.8));
+          label(name, 11 * scale, s[0], s[1] + size * 0.6, s[1] - size * 0.6, col);
+          ring(s, size * 0.85);
+          thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: name, lines: [e.scav ? T('Scav extract') : T('PMC extract')] } });
         }
       }
 
@@ -2455,7 +2613,7 @@
         const match = looking && (hits(nameOf(l.key)) || hits(l.kind));
         if (!match && (isHidden('Layer locks') || gone(l.p))) continue;
         if (match) found++;
-        if (match) note(hits(nameOf(l.key)) ? nameOf(l.key) : lockName(l.kind), T('Lock'), l.p);
+        if (match) note(hits(nameOf(l.key)) ? nameOf(l.key) : lockName(l.kind), T('Lock'), l.p, 'objects');
         const s = onScreen(l.p[0], l.p[1]);
         if (!s) continue;
         const open = loot && loot.open.has(l.id);
@@ -2469,6 +2627,26 @@
         thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: lockName(l.kind) + ' · ' + (open ? T('open now') : T('locked')), lines: [T('Key:') + ' ' + nameOf(l.key), keyLine].filter(Boolean) } });
       }
 
+      // Switches: power switches, levers and the like (a room's light switches only when asked for). In a raid, or
+      // played back, each as it stands then (the "switch" events): green once it's switched on. A search finds them
+      // all, the light switches too, by what they are or by their own name ("lever").
+      for (const w of shown ? shown.switches : []) {
+        const [label, english] = switchKind(w);
+        const plain = switchPlain(w);
+        // (by "switch" too, whatever it is: a reader or a button is one in the game)
+        const match = looking && (hits(label) || hits(english) || hits(plain) || hits(T('Switch')) || hits('switch'));
+        if (!match && (isHidden('Layer switches') || (w.light && !prefs.lightSwitches) || gone(w.p))) continue;
+        if (match) { found++; note(label, T('Switch'), w.p, 'objects'); }
+        const s = onScreen(w.p[0], w.p[1]);
+        if (!s) continue;
+        const now = switchNow.get(w.id);
+        const on = !!now && now.d.st === 'Open';
+        const rim = on ? '#3ddc5a' : LAYERS.switches.col;
+        put(s, w.p, badge(w.light ? 'i:bulb' : 'i:power', '#1a1a24', rim, on ? '#3ddc5a' : SPAWN_INK, 'square', size * 0.9));
+        if (match) ring(s, size * 0.85);
+        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: label + (now ? ' · ' + (on ? T('Switched on') : T('Not switched')) : ''), lines: [plain] } });
+      }
+
       for (const b of shown.boxes) {
         if (boxHidden(b)) continue;
         if (prefs.loot === 'off') continue;
@@ -2478,31 +2656,33 @@
         // what's in it: only when it may be known (prefs.peek), and only of the kinds of loot shown
         const items = loot && peeking() ? loot.inside[b.id] || [] : null;
         // not known what's in it now (no raid here, or it's not shown): what one can hold, from the loot tables
-        const table = !items && lootTable && lootTable.loc === map.loc && !isHidden('Layer lootSpawns') ? lootTable : null;
+        const table = !items && lootTable && sameMap(lootTable.loc, map.loc) && !isHidden('Layer lootSpawns') ? lootTable : null;
         const canHits = looking && table ? canHold(table, b.tpl) : [];
         const counted = items ? items.filter(i => kindOn(names, i[0])) : null;
         const total = counted ? counted.reduce((sum, i) => sum + worthOf(i[0], i[1]), 0) : 0;
-        const forQuest = !!items && mine && items.some(i => wants.items.has(i[0]));
+        const forQuest = !!items && items.some(i => wantedFor(i[0]));
+        const forFir = !!items && !forQuest && firOn && items.some(i => wants.fir.has(i[0]));
         const match = looking && ((items || []).some(i => itemHits(i[0])) || itemHits(b.tpl) || canHits.length > 0);
         // in a raid: the ones worth looking in, and every one up close; out of a raid, where they stand, up close
         const worth = !!items && total >= minWorth() && total > 0;
-        if (looking ? !match : isHidden('Layer boxes') || !(worth || close || forQuest)) continue;
+        if (looking ? !match : isHidden('Layer boxes') || !(worth || close || forQuest || forFir)) continue;
         found++;
         if (worth && !looking) inBuilding(b, b.p, total, true);
         if (match) {
           for (const i of items || []) if (itemHits(i[0])) note(nameOf(i[0]), T('In a container'), b.p);
-          if (itemHits(b.tpl)) note(nameOf(b.tpl), T('Container'), b.p);
+          if (itemHits(b.tpl)) note(nameOf(b.tpl), T('Container'), b.p, 'objects');
           for (const name of canHits) note(name, T('Can be in a container'), b.p);
         }
         const s = onScreen(b.p[0], b.p[1]);
         if (!s) continue;
-        const rim = forQuest ? LAYERS.quest.col : worth ? worthCol(total) : '#7c7f8f';
+        const rim = forQuest ? LAYERS.quest.col : forFir ? LAYERS.firItems.col : worth ? worthCol(total) : '#7c7f8f';
         put(s, b.p, badge(BOX_GLYPH[(names[b.tpl] || {}).c] || 'i:boxCrate', '#1a1a24', rim, SPAWN_INK, 'square', size));
         if (match || forQuest) ring(s, size * 0.85);
+        else if (forFir) ring(s, size * 0.85, LAYERS.firItems.col);
         // (what the box by the pointer lists: worked out only when the container is pointed at)
         const listed = () => {
           const lines = (counted || []).slice().sort((a, c) => worthOf(c[0], c[1]) - worthOf(a[0], a[1])).slice(0, 10)
-            .map(i => nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '') + ' · ' + roubles(worthOf(i[0], i[1])) + (mine && wants.items.has(i[0]) ? ' · ' + T('quest') : ''));
+            .map(i => nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '') + ' · ' + roubles(worthOf(i[0], i[1])) + tagOf(i[0]));
           if (counted && counted.length > 10) lines.push(T('…and {n} more', { n: counted.length - 10 }));
           if (items && !items.length) lines.push(T('Empty'));
           else if (items && items.length > counted.length) lines.push(notShown(items.length - counted.length));
@@ -2525,7 +2705,7 @@
 
       // Where loose loot can spawn: a hollow ring each, in the colour of the dearest thing it can spawn of the kinds
       // shown, worth at least what's asked (any, up close); a search rings the points that can spawn what's searched for.
-      if (lootTable && lootTable.loc === map.loc && !isHidden('Layer lootSpawns')) {
+      if (lootTable && sameMap(lootTable.loc, map.loc) && !isHidden('Layer lootSpawns')) {
         const tn = lootTable.names;
         const pictures = Math.min(vw, vh) / zoom <= Math.max(prefs.closeSpan, SPAWN_PICTURES);
         const tnHits = tpl => hits((tn[tpl] || {}).n) || hits((tn[tpl] || {}).s);
@@ -2535,7 +2715,7 @@
           const best = (tn[can[0][0]] || {}).p || 0;
           const match = looking && can.some(i => tnHits(i[0]));
           // a quest item's: with the quest items' switch, whatever it's worth; only the player's quests' while those are asked for
-          const wanted = pt.quest && mine ? can.map(i => wants.items.get(i[0])).find(Boolean) : null;
+          const wanted = pt.quest && mine ? can.map(i => wants.items.get(i[0]) || wants.fItems.get(i[0])).find(Boolean) : null;
           if (pt.quest && !looking && (isHidden('Layer quest') || (mine && !wanted))) continue;
           if (looking ? !match : (!pt.quest && best < minWorth() && !close) || gone([pt.x, pt.y, pt.z])) continue;
           found++;
@@ -2583,18 +2763,18 @@
       // the places quests send you: the player's quests', or every quest's
       if (!isHidden('Layer questZones') && quests) {
         for (const z of shown.zones) {
-          const want = wants.zones.get(z.id);
-          const quest = want ? want[0].name : minePlaces ? null : quests.zones[z.id];
+          const want = wants.zones.get(z.id) || wants.fZones.get(z.id);
+          const quest = want ? want[0].name + (want[2] ? ' · ' + want[2] : '') : minePlaces ? null : quests.zones[z.id];
           if (!quest) continue;
           const goal = want ? want[1].text : '';
           if (looking && !hits(quest) && !hits(goal)) continue;
           found++;
-          note(quest, T('Quest'), z.p);
+          note(quest, T('Quest'), z.p, 'quests');
           const s = onScreen(z.p[0], z.p[1]);
           if (!s) { if (want) questOff.push({ p: z.p, t: quest }); continue; }
           put(s, z.p, badge('i:star', LAYERS.quest.col, '#0c0c12', '#0c0c12', 'round', size * 1.1));
           if (want || zoom >= 3) label(quest, 11 * scale, s[0], s[1] + size * 0.7, s[1] - size * 0.7, LAYERS.quest.col, away(z.p) ? 0.5 : 1);
-          thingsDrawn.push({ x: s[0], y: s[1], r: size * 0.6, tip: { title: quest, lines: [goal, want && want[0].trader ? T('From {trader}', { trader: want[0].trader }) : '', want ? '' : T('Not a quest you have started')] } });
+          thingsDrawn.push({ x: s[0], y: s[1], r: size * 0.6, tip: { title: quest, lines: [goal, want && want[2] ? T("{who}'s quest", { who: want[2] }) : '', want && want[0].trader ? T('From {trader}', { trader: want[0].trader }) : '', want ? '' : T('Not a quest you have started')] } });
         }
       }
     }
@@ -2628,11 +2808,11 @@
           mark.ring = true;
           found++;
           for (const i of items) if (itemHits(i[0])) note(nameOf(i[0]), T('On a body'), b.p);
-          if (hits(b.who)) note(latin(b.who), T('Body'), b.p);
+          if (hits(b.who)) note(latin(b.who), T('Body'), b.p, 'objects');
         }
         if (tipOn) {
           const lines = counted.slice().sort((a, c) => worthOf(c[0], c[1]) - worthOf(a[0], a[1])).slice(0, 12)
-            .map(i => nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '') + ' · ' + roubles(worthOf(i[0], i[1])) + (mine && wants.items.has(i[0]) ? ' · ' + T('quest') : ''));
+            .map(i => nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '') + ' · ' + roubles(worthOf(i[0], i[1])) + tagOf(i[0]));
           if (counted.length > 12) lines.push(T('…and {n} more', { n: counted.length - 12 }));
           if (peeking() && !items.length) lines.push(T('Nothing on it'));
           else if (items.length > counted.length) lines.push(notShown(items.length - counted.length));
@@ -2662,17 +2842,19 @@
       // quest items over the rest
       const order = loot.loose.slice().sort((a, b) => (a.q ? 1 : 0) - (b.q ? 1 : 0));
       for (const it of order) {
-        const want = mine ? wants.items.get(it.tpl) : null;
-        // a quest item of a quest the player hasn't started is left off, while only theirs are shown
+        const want = mine ? wants.items.get(it.tpl) || wants.fItems.get(it.tpl) : null;
+        // a quest item of a quest the player (or a friend) hasn't started is left off, while only theirs are shown
         if (it.q && mine && !want) continue;
         const quest = it.q || !!want;
         if (!quest && !lootReal()) continue;
+        // an ordinary item a started quest wants found in raid: marked in its own colour, whatever it's worth
+        const fir = !quest && firOn ? wants.fir.get(it.tpl) : null;
         const match = looking && itemHits(it.tpl);
-        if (looking ? !match : quest ? isHidden('Layer quest') : isHidden('Layer loose') || it.worth < minWorth() || !kindOn(names, it.tpl) || gone([it.x, it.y, it.z])) continue;
+        if (looking ? !match : quest ? isHidden('Layer quest') : fir ? gone([it.x, it.y, it.z]) : isHidden('Layer loose') || it.worth < minWorth() || !kindOn(names, it.tpl) || gone([it.x, it.y, it.z])) continue;
         found++;
         note(nameOf(it.tpl), T('Loose'), [it.x, it.y]);
         if (!quest && !looking) inBuilding(it, [it.x, it.y, it.z], it.worth, false);
-        if (!quest && !match && prefs.lootArea) {
+        if (!quest && !fir && !match && prefs.lootArea) {
           const cx = Math.floor(it.x / LOOT_CELL), cy = Math.floor(it.y / LOOT_CELL), key = cx + ':' + cy;
           let cell = cells.get(key);
           if (!cell) cells.set(key, cell = { x: (cx + 0.5) * LOOT_CELL, y: (cy + 0.5) * LOOT_CELL, n: 0, worth: 0, best: 0 });
@@ -2685,6 +2867,8 @@
         if (!s) { if (want) questOff.push({ p: [it.x, it.y], t: nameOf(it.tpl) }); continue; }
         if (quest) {
           put(s, [it.x, it.y, it.z], badge('!', LAYERS.quest.col, '#0c0c12', '#0c0c12', 'diamond', size * 1.05));
+        } else if (fir) {
+          put(s, [it.x, it.y, it.z], badge('F', LAYERS.firItems.col, '#0c0c12', '#0c0c12', 'diamond', size * 0.95));
         } else {
           ctx.globalAlpha = away([it.x, it.y, it.z]) ? Math.max(0.15, faint) : 1;
           ctx.beginPath();
@@ -2696,13 +2880,16 @@
           ctx.stroke();
           ctx.globalAlpha = 1;
         }
-        if (match) ring(s, quest ? size * 0.9 : r + 4);
+        const marked = quest || !!fir;
+        if (match) ring(s, marked ? size * 0.9 : r + 4);
         const short = (names[it.tpl] || {}).s || nameOf(it.tpl);
-        const named = match || (quest && zoom >= 3) || (prefs.itemNames && close);
-        if (named) write(short, 10 * scale, s[0], s[1] + (quest ? size * 0.7 : r * 1.3), quest ? LAYERS.quest.col : '#e8e9eb', away([it.x, it.y, it.z]) ? 0.5 : 0.95);
+        const named = match || (marked && zoom >= 3) || (prefs.itemNames && close);
+        if (named) write(short, 10 * scale, s[0], s[1] + (marked ? size * 0.7 : r * 1.3), quest ? LAYERS.quest.col : fir ? LAYERS.firItems.col : '#e8e9eb', away([it.x, it.y, it.z]) ? 0.5 : 0.95);
         // its worth beside its name, in its colour as a container's is (a quest item says whose quest instead)
+        const whose = w => w && w[2] ? T("{who}'s quest", { who: w[2] }) : '';
         const why = want ? want[0].name + (want[1].text ? ': ' + want[1].text : '') : it.q ? T('Quest item') : '';
-        thingsDrawn.push({ x: s[0], y: s[1], r: quest ? size / 2 : r * 1.2, tip: { title: nameOf(it.tpl) + (it.n > 1 ? ' ×' + it.n : '') + (why ? '' : ' · ' + roubles(it.worth)), lines: [why] } });
+        const firWhy = fir ? T('Wanted found in raid for {quest}', { quest: fir[0].name }) + (fir[1].text ? ': ' + fir[1].text : '') : '';
+        thingsDrawn.push({ x: s[0], y: s[1], r: marked ? size / 2 : r * 1.2, tip: { title: nameOf(it.tpl) + (it.n > 1 ? ' ×' + it.n : '') + (why ? '' : ' · ' + roubles(it.worth)), lines: [why, whose(want), firWhy, whose(fir)] } });
       }
       for (const cell of cells.values()) {
         const s = toScreen(cell.x, cell.y), across = LOOT_CELL * 0.62 * zoom;
@@ -2870,7 +3057,7 @@
   // What a marker is called: a body says what it was ("Scav · name") when asked to, a PMC their level.
   const ONE = { 'Enemy Player': T('PMC'), 'Friendly Player': T('Player'), 'Main Player': T('Player'), 'Sniper': T('Sniper scav'), 'Other AI': T('Bot'),
     Scav: T('Scav'), Smuggler: T('Smuggler'), Raider: T('Raider'), Rogue: T('Rogue'), 'Black Division': T('Black Division'), RUAF: T('RUAF'),
-    'RUAF Remnant': T('RUAF remnant'), UNTAR: 'UNTAR', ISB: T('ISB'), Civilian: T('Civilian'), Infected: T('Infected'), Guard: T('Guard'), Cultist: T('Cultist'), Goon: T('Goon'),
+    'RUAF Remnant': T('RUAF remnant'), UNTAR: 'UNTAR', ISB: T('ISB'), 'ISB WT': 'ISB WT', Bloodhound: T('Bloodhound'), Mercenary: T('Mercenary'), Combine: T('Combine'), Civilian: T('Civilian'), Infected: T('Infected'), Guard: T('Guard'), Cultist: T('Cultist'), Goon: T('Goon'),
     Boss: T('Boss'), Corpse: T('Body'), Extract: T('Extract'), Transit: T('Transit'), Airdrop: T('Airdrop'), BTR: T('BTR') };
   const DROPS = { Common: T('Airdrop'), Supply: T('Supply airdrop'), Medical: T('Medical airdrop'), Weapon: T('Weapon airdrop') };
   // an airdrop's crate: what's in it and its worth, once the game tells (when container contents are shown)
@@ -2981,18 +3168,9 @@
     const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').trim();
     return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
   }
-  const likeOf = m => [DIFFICULTY[m.df] || m.df, m.ps].filter(Boolean).join(' · ');
-  const hasDetails = m => prefs.botDetails && !!(m.df || m.ps || m.ly || m.gh);
-  // What bots are like and are up to has a switch for each mod that says it: SAIN (personality, and that it's in a
-  // fight), ORBIT (going about the map, or parked as a ghost), COMET (its move in a fight, and what its squad is doing
-  // together). A switch is greyed, and can't be pressed, while the game hasn't that mod (remembered, so it's right
-  // out of a raid too). With any of them on, a bot's difficulty and the game's own brain are shown as well.
-  const BOT_MODS = { SAIN: "Each bot's SAIN personality, and when SAIN has it in a fight (a red ring round its marker).",
-    ORBIT: 'What ORBIT has each bot heading for, and the bots it has parked as ghosts, far from every player.',
-    COMET: "The move COMET has each bot making in a fight, and what its squad is doing together: tags in the Raid list, lines on the map to where each is sent, and the squad's events under the list." };
   // Who killed a body: 'me' (the player shown), 'player' (somebody else playing), 'ai' (a bot, as the raid's kill
   // events say) or '' (not known, or they killed themselves). By the body's own "kb" (the killer's profile id), else by
-  // the raid's kill events (an older plugin, and every kill by a bot).
+  // the raid's kill events (an older plugin, an older recording, and every kill by a bot).
   let ownIds = [];
   const killOf = m => m.pid ? killEvents.find(k => k.p === m.pid) : null;
   function killedBy(m) {
@@ -3008,6 +3186,18 @@
   }
   // the bot that killed a body, as the tip names it: its name, else what it was
   const botKiller = m => { const e = killOf(m); return e ? (e.d.kn ? latin(e.d.kn) : ONE[e.d.kk] || e.d.kk || '') : ''; };
+  // a body that was a PMC's (a person playing or a PMC bot)
+  const PMC_KINDS = ['Main Player', 'Friendly Player', 'Enemy Player'];
+  const wasPmc = m => { const e = killOf(m); return PMC_KINDS.includes(m.was) || !!(e && PMC_KINDS.includes(e.d.vk)); };
+  const likeOf = m => [DIFFICULTY[m.df] || m.df, m.ps].filter(Boolean).join(' · ');
+  const hasDetails = m => prefs.botDetails && !!(m.df || m.ps || m.ly || m.gh);
+  // What bots are like and are up to has a switch for each mod that says it: SAIN (personality, and that it's in a
+  // fight), ORBIT (going about the map, or parked as a ghost), COMET (its move in a fight, and what its squad is doing
+  // together). A switch is greyed, and can't be pressed, while the game hasn't that mod (remembered, so it's right
+  // out of a raid too). With any of them on, a bot's difficulty and the game's own brain are shown as well.
+  const BOT_MODS = { SAIN: "Each bot's SAIN personality, and when SAIN has it in a fight (a red ring round its marker).",
+    ORBIT: 'What ORBIT has each bot heading for, and the bots it has parked as ghosts, far from every player.',
+    COMET: "The move COMET has each bot making in a fight, and what its squad is doing together: tags in the Raid list, lines on the map to where each is sent, and the squad's events under the list." };
   // the line saying who killed a body, or '' when that's not known
   function killerLine(m) {
     const by = killedBy(m);
@@ -3026,10 +3216,7 @@
     if (!killTipKept || killTipKept.title !== title || killTipKept.lines[0] !== line) killTipKept = { title, lines: [line] };
     return killTipKept;
   }
-  // a body that was a PMC's (a person playing or a PMC bot)
-  const PMC_KINDS = ['Main Player', 'Friendly Player', 'Enemy Player'];
-  const wasPmc = m => { const e = killOf(m); return PMC_KINDS.includes(m.was) || !!(e && PMC_KINDS.includes(e.d.vk)); };
-  const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
+  const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitMain', 'ORBIT'], ['optOrbitRush', 'ORBIT'], ['optOrbitField', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
     ['optRosterGhosts', 'ORBIT'], ['optSquadParts', 'COMET']];
   const modHere = n => (prefs.brains || []).includes(n);
   const modOn = n => modHere(n) && prefs['bot' + n] !== false;
@@ -3102,7 +3289,7 @@
     if (!m.botTip) {
       const brain = hasDetails(m) ? brainOf(m) : null, like = hasDetails(m) ? likeOf(m) : '';
       m.botTip = { title: (m.t || ONE[m.c] || m.c) + (carried && carried.total ? ' · ' + roubles(carried.total) : ''),
-        lines: [(ONE[m.c] || m.c) + (like ? ' · ' + like : ''), brain ? brain.by + ': ' + brain.text : '',
+        lines: [(ONE[m.c] || m.c) + (m.bl ? ' · ' + T('Lv {n}', { n: m.bl }) : '') + (like ? ' · ' + like : ''), m.dn ? T('Down: can be got up again') : '', brain ? brain.by + ': ' + brain.text : '',
           m.ch ? T('PBT cheater') : '', prefs.health && Array.isArray(m.hp) ? T('Health {hp} / {max}', { hp: m.hp[0], max: m.hp[1] }) : '',
           hasDetails(m) && m.sq ? T('Squad:') + ' ' + squadSaid(m.sq) + (squadFoe(m.sq) ? ' · ' + T('against {who}', { who: squadFoe(m.sq) }) : '') : ''].concat(carried ? carried.lines : []) };
     }
@@ -3631,7 +3818,7 @@
   const topOf = b => b.top === undefined ? (b.top = Math.max(...b.parts.map(p => p.t))) : b.top;
   const overIt = (b, x, y, z) => Number.isFinite(z) && z > topOf(b) + UNDER_BY && inBox(b.box, x, y) && inLoops(b.l, x, y);
   function underOf(b) {
-    const shown = places && map && places.loc === map.loc ? places : null, table = lootTable && map && lootTable.loc === map.loc ? lootTable : null;
+    const shown = places && map && sameMap(places.loc, map.loc) ? places : null, table = lootTable && map && sameMap(lootTable.loc, map.loc) ? lootTable : null;
     const key = (shown ? 1 : 0) + ':' + (table ? table.points.length : 0);
     if (b.underKey !== key) {
       b.underKey = key;
@@ -3774,77 +3961,25 @@
   const SHOT_MS = 900;
   let tracers = [];
   function takeShots(list, now) {
-    if (!Array.isArray(list) || !prefs.shots) return;
-    for (const s of list) if (Array.isArray(s) && s.length >= 5) tracers.push({ who: s[0], a: [s[1], s[2]], b: [s[3], s[4]], at: now });
+    if (!Array.isArray(list) || (!prefs.shots && prefs.hitFlash === false)) return;
+    for (const s of list) {
+      if (!Array.isArray(s) || s.length < 5) continue;
+      tracers.push({ who: s[0], a: [s[1], s[2]], b: [s[3], s[4]], at: now });
+      // (a sixth: the marker of whoever it hit)
+      if (s[5] && !replaySeeking) hitFlashes.push({ id: s[5], at: now });
+    }
+    if (hitFlashes.length > 60) hitFlashes.splice(0, hitFlashes.length - 60);
+    // a grenade going off (its fragments, all from one spot): a burst there, and an arc to it from the thrower
+    if (!replaySeeking && prefs.grenades !== false) {
+      for (const b of blastsOf(list, id => { const m = liveById.get(id); return m && Number.isFinite(m.cx) ? [m.cx, m.cy] : null; })) {
+        const thrower = b.who ? liveById.get(b.who) : null;
+        blastMarks.push({ x: b.x, y: b.y, at: now, fx: thrower ? thrower.cx : NaN, fy: thrower ? thrower.cy : NaN });
+      }
+      if (blastMarks.length > 30) blastMarks.splice(0, blastMarks.length - 30);
+    }
     if (tracers.length > 400) tracers.splice(0, tracers.length - 400);
     dirty = true;
   }
-  // Kills on the map: for a few seconds a line from where the killer stood to where the other died, and a mark there
-  // with who it was. (An older plugin doesn't say where: nothing is drawn for its kills.)
-  const KILL_MS = 12000;
-  function drawKills(scale) {
-    if (prefs.killLines === false) return;
-    const now = performance.now();
-    const list = killEvents.filter(e => now - e.at < KILL_MS);
-    if (!list.length) return;
-    ctx.save();
-    ctx.lineCap = 'round';
-    for (const e of list) {
-      const d = e.d;
-      // Never more than the map shows anyway: the line from the killer, and their name, only when their kind is shown
-      // (the player always is); the kill itself when the one who died is shown, or the player or a friend shown
-      // killed them.
-      const seen = kind => !!kind && !isHidden(kind) && !prefs.areaKinds.includes(kind);
-      const byUs = d.kk === 'Main Player' || (d.kk === 'Friendly Player' && seen(d.kk));
-      const killerSeen = d.kk === 'Main Player' || seen(d.kk);
-      if (!Array.isArray(d.at) || !(seen(d.vk || 'None') || byUs)) continue;
-      const age = now - e.at, s = toScreen(d.at[0], d.at[1]), r = 7 * scale;
-      ctx.globalAlpha = Math.min(1, (KILL_MS - age) / 2500);
-      if (killerSeen && Array.isArray(d.ka)) {
-        const k = toScreen(d.ka[0], d.ka[1]);
-        for (const [width, col] of [[4.5, 'rgba(0,0,0,0.75)'], [2, inkOf((KINDS[d.kk] || OTHER).col)]]) {
-          ctx.beginPath();
-          ctx.moveTo(k[0], k[1]);
-          ctx.lineTo(s[0], s[1]);
-          ctx.setLineDash(width === 2 ? [7 * scale, 6 * scale] : []);
-          ctx.lineWidth = width * scale;
-          ctx.strokeStyle = col;
-          ctx.stroke();
-        }
-        ctx.setLineDash([]);
-      }
-      // a red disc with a white cross: somebody died here
-      ctx.beginPath();
-      ctx.arc(s[0], s[1], r * 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#c8322c';
-      ctx.fill();
-      ctx.lineWidth = 2 * scale;
-      ctx.strokeStyle = '#000';
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(s[0] - r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] + r * 0.6, s[1] + r * 0.6);
-      ctx.moveTo(s[0] + r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] - r * 0.6, s[1] + r * 0.6);
-      ctx.lineWidth = 2.4 * scale;
-      ctx.strokeStyle = '#fff';
-      ctx.stroke();
-      const text = (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn && killerSeen ? '  ←  ' + latin(d.kn) : '');
-      if (text) {
-        ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
-        // above the mark: under it is where the body's own name goes
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-        ctx.strokeText(text, s[0], s[1] - r * 1.9);
-        ctx.fillStyle = '#ffd9d6';
-        ctx.fillText(text, s[0], s[1] - r * 1.9);
-      }
-    }
-    ctx.restore();
-    dirty = true;
-  }
-
   function drawShots() {
     if (!tracers.length) return;
     const now = performance.now();
@@ -3982,6 +4117,16 @@
       ctx.fill();
       ctx.restore();
       write(T('Heard shots'), 9 * scale, l[0], l[1] + 7 * scale, '#9fd8ff', left * 0.9);
+      // going to look: an ear by it
+      if (g.inv) {
+        ctx.save();
+        ctx.globalAlpha = left;
+        ctx.font = Math.round(15 * scale) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('👂', l[0] + 12 * scale, l[1] - 12 * scale);
+        ctx.restore();
+      }
     }
     dirty = true;
   }
@@ -4120,7 +4265,13 @@
     }
   }
 
+  // the REC sign: the raid shown live is being recorded on the server (its reports say "rec"), not in a replay
+  function showRec() {
+    const on = prefs.recSign !== false && !replay && !!report && report.rec === 1 && inRaidHere();
+    if ($('recBadge').hidden === on) $('recBadge').hidden = !on;
+  }
   function draw() {
+    showRec();
     const ratio = pixelRatio();
     if (canvas.width !== Math.round(vw * ratio) || canvas.height !== Math.round(vh * ratio)) {
       canvas.width = Math.round(vw * ratio);
@@ -4133,6 +4284,7 @@
     if (!map) return;
     const scale = prefs.scale;
     drawZones(scale);
+    drawHeat();
     drawFloorEdge();
     drawHovered();
     drawThings(scale);
@@ -4156,10 +4308,17 @@
         dirty = true;
       }
     }
+    drawMini();
+    showKey();
     if (!inRaidHere()) return;
     // the player shown, by the ids a body's killer may be told by
     const mainNow = live.find(m => m.c === 'Main Player');
-    ownIds = [sid, mainNow && mainNow.pid].filter(Boolean);
+    ownIds = [replay ? replay.about.sid : sid, mainNow && mainNow.pid].filter(Boolean);
+    drawOrbitField(scale);
+    drawPhobosField(scale);
+    drawSwitches(scale);
+    drawOrbitMain(scale);
+    drawTrails(scale);
     let top = null;
     // the corpses first, under everyone: the ones a player killed, or every one when asked
     if (!isHidden('Corpse')) {
@@ -4202,12 +4361,17 @@
       // a secret extract not found yet, unless those are wanted too
       if (m.c === 'Extract' && !prefs.secretExits && m.st === 3) continue;
       if (inArea(m)) continue;
+      if (m.dyn && m.c !== 'Main Player' && offFloor(m.cx, m.cy, m.cz)) continue;
       if (pointed === m.id) { top = m; continue; }
       drawMarker(m, false, scale);
     }
+    drawBadges(scale);
     drawAreas(scale);
     drawShots();
+    drawHits(scale);
+    drawBlasts(scale);
     drawKills(scale);
+    drawFloats(scale);
     drawPlane(scale);
     drawHeadings(scale);
     drawSquads(scale);
@@ -4231,7 +4395,7 @@
   }
 
   // ---- what the game says --------------------------------------------------------------------------------------
-  const connected = () => performance.now() - heard < 4500 && !!report;
+  const connected = () => (replay ? true : performance.now() - heard < 4500) && !!report;
   const inRaid = () => connected() && !!report.raid;
   const inRaidHere = () => inRaid() && !!map && map.loc === shownLoc(report.loc);
 
@@ -4274,11 +4438,15 @@
     const now = performance.now();
     const d = message.d;
     if (!d || message.age > 5000) return;
+    // while a recorded raid plays, only its reports are taken; the game's own wait until it's left
+    if (replay ? !message.rp : message.rp) return;
     const known = sessions.get(message.sid) || {};
     known.heard = now;
     if (d.raid !== undefined) known.raid = d.raid;
-    sessions.set(message.sid, known);
-    if (prefs.player) {
+    if (!message.rp) sessions.set(message.sid, known);
+    if (message.rp) {
+      if (sid !== message.sid) { forget(); sid = message.sid; }
+    } else if (prefs.player) {
       // a player was picked: theirs and nobody else's, whenever they play
       if (message.sid !== prefs.player.sid) return;
       if (sid !== message.sid) { forget(); sid = message.sid; }
@@ -4289,7 +4457,7 @@
       sid = message.sid;
     }
     // from here on only that game is listened to: the others then needn't report at all
-    if (streamFor !== (prefs.player ? prefs.player.sid : sid)) listen();
+    if (!message.rp && streamFor !== (prefs.player ? prefs.player.sid : sid)) listen();
     if (message.sid !== sid) return;
     heard = now;
     const moving = d.t === 'fast' || d.t === 'full';
@@ -4377,10 +4545,11 @@
       if (Array.isArray(d.has) && d.has.join('|') !== (prefs.has || ['?']).join('|')) { prefs.has = d.has; save(); }
       if (Array.isArray(d.brains) && d.brains.join('|') !== (prefs.brains || ['?']).join('|')) { prefs.brains = d.brains; save(); nameBotDetails(); }
       if (!prefs.seenInfected && live.some(m => m.c === 'Infected')) { prefs.seenInfected = true; save(); }
+      for (const kind of SEEN_KINDS) if (!list(prefs.seenKinds).includes(kind) && live.some(m => m.c === kind)) { prefs.seenKinds = list(prefs.seenKinds).concat(kind); save(); filtersPrint = null; }
       announce();
       remember();
       // a page opened in the middle of a raid: what lies about is there already
-      if (d.raid && !things && performance.now() - thingsTriedAt > 5000) loadThings();
+      if (d.raid && !things && !replay && performance.now() - thingsTriedAt > 5000) loadThings();
       if (!d.raid && things) things = null;
     }
     raidChanged();
@@ -4389,7 +4558,7 @@
 
   // "The Goons have been spotted on the map": said once a raid for each kind asked for (each boss by name), whether
   // or not its markers are shown. Where they are isn't said.
-  const ALERTS = ['Goon', 'Boss', 'Cultist', 'Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'Raider', 'Rogue', 'Enemy Player', 'Infected', 'Airdrop'];
+  const ALERTS = ['Goon', 'Boss', 'Cultist', 'Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'ISB WT', 'Raider', 'Rogue', 'Enemy Player', 'Infected', 'Airdrop'];
   const spotted = new Set();
   let alertRaid = '';
   // a short two-note chime, made in the page (no sound file): only for alerts, and only when switched on
@@ -4412,6 +4581,7 @@
     } catch (e) { /* no sound here */ }
   }
   function announce() {
+    if (replay) return;
     const raid = report && report.raid ? sid + '|' + report.loc : '';
     if (raid !== alertRaid) { alertRaid = raid; spotted.clear(); }
     if (!raid) return;
@@ -4477,6 +4647,7 @@
     thingsHave = -1;
     quests = null;
     wish = null;
+    wishGroup = new Map();
     wishPrint = '';
     questsFor = '';
     questsAskedAt = -1e9;
@@ -4533,11 +4704,18 @@
     }
     pick.value = wanted;
   }
+  // A server that doesn't answer the map (stopped, restarting, or started without Satellite, as when SPT loads no
+  // mods): the page asks less and less often, up to once a minute, so it never fills the server's window with
+  // requests nobody answers. One answer puts it back to asking as usual.
+  let awayUntil = 0, awayFor = 0;
+  const serverAway = () => performance.now() < awayUntil;
+  const missed = () => { awayFor = Math.min(60000, awayFor ? awayFor * 2 : 5000); awayUntil = performance.now() + awayFor; };
+  const answered = r => { if (!r.ok) { missed(); throw new Error('HTTP ' + r.status); } awayFor = 0; awayUntil = 0; return r; };
   async function askGames() {
     let answer = null;
     try {
-      answer = await (await fetch('api/games')).json();
-    } catch (e) { /* asked again in a moment */ }
+      answer = await answered(await fetch('api/games')).json();
+    } catch (e) { if (!(e instanceof Error && /^HTTP/.test(e.message))) missed(); }
     takeGames(answer);
   }
   // the games as api/games answers, asked for or brought by the stream (see listen)
@@ -4589,8 +4767,11 @@
   }
   // A kind only a mod brings has a switch only where that mod is installed (the game says which: "has"), and the
   // infected once they've been met. Never by who is in the raid: a switch that came and went would give them away.
-  const MOD_KINDS = ['Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'Civilian'];
-  const available = c => MOD_KINDS.includes(c) ? !prefs.has || prefs.has.includes(c) : c === 'Infected' ? !!prefs.seenInfected : true;
+  const MOD_KINDS = ['Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'ISB WT', 'Civilian'];
+  // (the arena's fighters, mercenaries and the Combine: once one has been met, as the infected)
+  const SEEN_KINDS = ['Bloodhound', 'Mercenary', 'Combine'];
+  const available = c => MOD_KINDS.includes(c) ? !prefs.has || prefs.has.includes(c) : c === 'Infected' ? !!prefs.seenInfected
+    : SEEN_KINDS.includes(c) ? list(prefs.seenKinds).includes(c) : true;
   let filtersPrint = null;      // nothing drawn yet: the first look always draws the list
   // the switches, in groups; a few have a switch of their own under them (a prefs key, and what it says)
   // who's shown, in sections with a title each: a section none of whose kinds this game has isn't listed
@@ -4600,8 +4781,8 @@
     [T('Bosses'), ['Boss', 'Guard', 'Goon', 'Cultist']],
     // the rest of the game's own: raiders, rogues, smugglers, the infected (an event), and every bot not named
     // (event and arena bots, a mod's own)
-    [T('Other'), ['Raider', 'Rogue', 'Smuggler', 'Infected', 'Other AI']],
-    [T('Modded bots'), ['Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'Civilian']],
+    [T('Other'), ['Raider', 'Rogue', 'Smuggler', 'Bloodhound', 'Infected', 'Other AI']],
+    [T('Modded bots'), ['Black Division', 'RUAF', 'RUAF Remnant', 'UNTAR', 'ISB', 'ISB WT', 'Mercenary', 'Combine', 'Civilian']],
     [T('Corpses'), ['Corpse']]
   ];
   const SECTION_OF = {};
@@ -4619,7 +4800,7 @@
   };
   const FILTER_GROUPS = [
     ['filtersPeople', PEOPLE_SECTIONS.flatMap(s => s[1])],
-    ['filtersMap', ['BTR', 'Airdrop', 'Layer btrRoad', 'Zone mine', 'Zone sniper', 'Layer locks', 'Layer spawnPmc', 'Layer spawnScav', 'Layer spawnBoss', 'Extract', 'Transit']],
+    ['filtersMap', ['BTR', 'Airdrop', 'Layer btrRoad', 'Zone mine', 'Zone sniper', 'Layer locks', 'Layer switches', 'Layer spawnPmc', 'Layer spawnScav', 'Layer spawnBoss', 'Extract', 'Transit']],
     ['filtersLoot', ['Layer loose', 'Layer boxes', 'Layer bodies']]
   ];
   // the switches under another one that start on
@@ -4629,6 +4810,7 @@
       ['botKills', T('PMCs killed by bots'), T('A red ring round the body of a PMC a bot killed, so it stands apart from your kills (gold) and other players\' (white). Pointing at a body says who killed it.')], ['seenDead', T('Corpses I\'ve been close to')], ['corpseKind', T('Show what each corpse was')]],
     'Layer loose': [['lootArea', T('Rough areas only')]],
     'Layer locks': [['keyStates', T('My keys'), T("The lock's key: bright when you have it with you, gold when it's in your stash, dim when you don't have it.")]],
+    'Layer switches': [['lightSwitches', T('Light switches'), T('The switches for the lights in a room. Off: only power switches, levers and the like.')]],
     'Extract': [['myExits', T('Mine only'), T('In a raid: only the extracts you can take this raid.')], ['goneExits', T('Closed ones'), T('Extracts that are no longer there this raid, such as a vehicle that has left, are shown in red. Off: they are hidden.')],
       ['secretExits', T('Secret ones not found yet'), T('Secret extracts show once you pick up their note. On: the ones not found yet are shown too, in purple.')]]
   };
@@ -4647,36 +4829,6 @@
     for (const layer of Object.keys(LAYERS)) looks['Layer ' + layer] = LAYERS[layer];
     listAlerts(off);
     if (!keepColors) listColors();
-    // "Rough area only": a switch for each kind that can be shown so
-    {
-      const grid = $('areaKinds');
-      grid.textContent = '';
-      let section = '';
-      for (const kind of FILTER_GROUPS[0][1].filter(k => AREA_ABLE.includes(k))) {
-        if (!available(kind) || off.includes(kind)) continue;
-        section = sectionHead(grid, kind, section);
-        const row = document.createElement('label'), input = document.createElement('input'), swatch = document.createElement('i'), span = document.createElement('span');
-        row.className = 'row';
-        input.type = 'checkbox';
-        input.checked = prefs.areaKinds.includes(kind);
-        input.onchange = () => {
-          prefs.areaKinds = prefs.areaKinds.filter(k => k !== kind).concat(input.checked ? [kind] : []);
-          save();
-          dirty = true;
-          rosterPrint = null;
-          tipFor = null;
-          squadPanePrint = '';
-          const now = chased !== null ? liveById.get(chased) : null;
-          if (now && inArea(now)) chase(null);
-          listRoster();
-        };
-        swatch.className = 'swatch';
-        paintSwatch(swatch, KINDS[kind].col);
-        span.textContent = KINDS[kind].name;
-        row.append(input, swatch, span);
-        grid.appendChild(row);
-      }
-    }
     // "Point to who's off the screen": a switch for each kind that can have an arrow
     {
       const grid = $('edgeKinds');
@@ -4710,7 +4862,7 @@
         const look = looks[category];
         if (!look || !available(category)) continue;
         section = sectionHead(grid, category, section);
-        const main = grid.appendChild(filterRow(category, look.name, look.col, off.includes(category)));
+        const main = grid.appendChild(box === 'filtersPeople' ? whoRow(category, look.name, look.col, off.includes(category)) : filterRow(category, look.name, look.col, off.includes(category)));
         // one or two short switches under another: on one line beside each other, under a row of its own
         const subs = FILTER_SUBS[category] || [];
         let line = grid;
@@ -4742,7 +4894,7 @@
   function colorGroups() {
     return [[T('The page'), ['Page primary', 'Page secondary']], [T('People and bots'), FILTER_GROUPS[0][1]],
       [T('On the map'), FILTER_GROUPS[1][1].filter(k => k !== 'Extract')],
-      [T('Loot'), ['Layer quest', 'Layer questZones'].concat(FILTER_GROUPS[2][1])]];
+      [T('Loot'), ['Layer quest', 'Layer questZones', 'Layer firItems'].concat(FILTER_GROUPS[2][1])]];
   }
   function setCol(key, col) {
     const look = colLook(key);
@@ -4898,6 +5050,59 @@
       box.appendChild(row);
     }
   }
+  // Who's shown, under Raid: each kind Off (no marker, no row), Rough area (only a circle they're somewhere in, while
+  // they move; see AREA_ABLE) or On. Kept as before: Off is the kind hidden, Rough area is it in prefs.areaKinds.
+  const WHO_STATES = [['off', T('Off'), T('Not on the map, not in the Raid list.')],
+    ['area', T('Area'), T('No marker, name or row saying where they are: only a circle they are somewhere in, while they have been moving. Area size sets how big.')],
+    ['on', T('On'), T('On the map and in the Raid list.')]];
+  const whoState = kind => switchedOff(kind) ? 'off' : prefs.areaKinds.includes(kind) ? 'area' : 'on';
+  function setWho(kind, state) {
+    if (state === 'area' && !AREA_ABLE.includes(kind)) state = 'on';
+    if (state === whoState(kind)) return;
+    prefs.areaKinds = prefs.areaKinds.filter(k => k !== kind).concat(state === 'area' ? [kind] : []);
+    setHidden(kind, state === 'off');
+    tipFor = null;
+    squadPanePrint = '';
+    const now = chased !== null ? liveById.get(chased) : null;
+    if (now && (inArea(now) || isHidden(now.c))) chase(null);
+    listRoster();
+  }
+  function whoRow(kind, name, col, barred) {
+    const row = document.createElement('div');
+    row.className = 'row who';
+    row.dataset.kind = kind;
+    const swatch = document.createElement('i');
+    swatch.className = 'swatch';
+    swatch.style.background = col;
+    const span = document.createElement('span');
+    span.textContent = name + (barred ? ' ' + T('(off on the server)') : '');
+    const seg = document.createElement('div');
+    seg.className = 'seg tri';
+    seg.setAttribute('role', 'group');
+    seg.setAttribute('aria-label', name);
+    const show = () => { for (const b of seg.children) b.classList.toggle('on', !barred && b.dataset.v === whoState(kind)); };
+    for (const [v, text, title] of WHO_STATES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.v = v;
+      b.textContent = text;
+      b.title = title;
+      // a kind that can't be shown as an area (the people playing with you, the corpses): no middle choice
+      if (v === 'area' && !AREA_ABLE.includes(kind)) { b.disabled = true; b.classList.add('none'); b.textContent = '–'; b.title = T('Always shown where they are, or not at all.'); }
+      if (barred) b.disabled = true;
+      b.onclick = () => { setWho(kind, v); show(); };
+      seg.appendChild(b);
+    }
+    if (barred) {
+      row.classList.add('blocked');
+      row.title = T('Turned off on the server, for every page: config.jsonc in the mod\'s folder');
+    }
+    // (the switches over the list: All on, All as areas, All off, Default)
+    row.setTo = state => { if (!barred) { setWho(kind, state); show(); } };
+    show();
+    row.append(swatch, span, seg);
+    return row;
+  }
   function filterRow(category, name, col, barred) {
     {
       const row = document.createElement('label');
@@ -4925,8 +5130,8 @@
   // The player's started quests, in the options: each goal not done yet, and a button to the places on this map it
   // sends them to (the quest's place, or where an item it wants lies now).
   function listQuests() {
-    const shownPlaces = map && places && places.loc === map.loc ? places : null;
-    const loot = inRaidHere() && things && things.loc === map.loc ? things : null;
+    const shownPlaces = map && places && sameMap(places.loc, map.loc) ? places : null;
+    const loot = inRaidHere() && things && sameMap(things.loc, map.loc) ? things : null;
     const where = goal => {
       const at = [];
       for (const z of shownPlaces ? shownPlaces.zones : []) if (list(goal.zones).includes(z.id)) at.push(z.p);
@@ -4937,13 +5142,14 @@
       }
       return at;
     };
-    const rows = (quests ? quests.list : []).map(q => {
+    const all = quests ? quests.list.concat(prefs.friendQuests ? quests.friends.flatMap(f => f.list.map(q => Object.assign({}, q, { who: f.who }))) : []) : [];
+    const rows = all.map(q => {
       const goals = q.goals.map(g => ({ g, at: where(g) }));
       const here = goals.some(x => x.at.length) || sameLoc(q.loc, map && map.base)
         || q.goals.some(g => list(g.locs).some(l => sameLoc(l, map && map.base)));
       return { q, goals, here };
     }).sort((a, b) => (b.here ? 1 : 0) - (a.here ? 1 : 0) || a.q.name.localeCompare(b.q.name));
-    const print = JSON.stringify([!!quests, map && map.loc, inRaidHere(), rows.map(r => [r.q.id, r.goals.map(x => x.g.id + ':' + x.at.length)])]);
+    const print = JSON.stringify([!!quests, map && map.loc, inRaidHere(), rows.map(r => [r.q.id, r.q.who || '', r.goals.map(x => x.g.id + ':' + x.at.length)])]);
     if (print === questsPrint) return;
     questsPrint = print;
     const box = $('questList');
@@ -4956,7 +5162,7 @@
       item.open = here;
       const head = document.createElement('summary');
       const elsewhere = !here && q.loc ? locationName(q.loc) : '';
-      head.textContent = q.name + (q.trader ? ' · ' + q.trader : '') + (here ? ' · ' + T('on this map') : elsewhere ? ' · ' + elsewhere : '');
+      head.textContent = q.name + (q.who ? ' · ' + T("{who}'s quest", { who: q.who }) : '') + (q.trader ? ' · ' + q.trader : '') + (here ? ' · ' + T('on this map') : elsewhere ? ' · ' + elsewhere : '');
       item.appendChild(head);
       for (const { g, at } of goals) {
         const row = document.createElement('div');
@@ -4997,8 +5203,8 @@
   // playing, then bosses and their like, the PMCs by the group they came in with, and the scavs last.
   // the Raid list's order: friends, then bosses (and the Goons), their guards, Black Division, PMCs, Rogues, the
   // kinds mods bring and the cultists, Raiders, and the scavs last
-  const ROSTER = ['Friendly Player', 'Boss', 'Goon', 'Guard', 'Black Division', 'ISB', 'Enemy Player', 'Rogue', 'RUAF', 'RUAF Remnant', 'UNTAR', 'Cultist',
-    'Smuggler', 'Civilian', 'Infected', 'Other AI', 'Raider', 'Scav', 'Sniper'];
+  const ROSTER = ['Friendly Player', 'Boss', 'Goon', 'Guard', 'Black Division', 'ISB WT', 'ISB', 'Enemy Player', 'Rogue', 'RUAF', 'RUAF Remnant', 'UNTAR', 'Cultist',
+    'Bloodhound', 'Mercenary', 'Combine', 'Smuggler', 'Civilian', 'Infected', 'Other AI', 'Raider', 'Scav', 'Sniper'];
   // the kinds that can be shown as a rough area only, each with its switch
   const AREA_ABLE = ROSTER.filter(k => k !== 'Friendly Player');
   let rosterPrint = null, bestPrint = null;
@@ -5321,12 +5527,18 @@
       if (e.k === 'loot' || e.k === 'orbit.wake' || e.k === 'orbit.fight' || e.k === 'orbit.hear') {
         eventsSeen.add(e.n);
         otherEvents.push(e);
+        if (fresh && e.k === 'loot') floatLoot(e);
         if (otherEvents.length > 600) otherEvents.splice(0, otherEvents.length - 600);
         if (fresh && e.k === 'orbit.fight' && Array.isArray(e.d.a) && Array.isArray(e.d.b)) ghostMarks.push({ k: 'fight', a: e.d.a, b: e.d.b, n: e.d.n, until: performance.now() + FIGHT_MS });
-        if (fresh && e.k === 'orbit.hear' && Array.isArray(e.d.l) && Array.isArray(e.d.s)) ghostMarks.push({ k: 'hear', l: e.d.l, s: e.d.s, r: e.d.r || 0, until: performance.now() + HEAR_MS });
+        if (fresh && e.k === 'orbit.hear' && Array.isArray(e.d.l) && Array.isArray(e.d.s)) ghostMarks.push({ k: 'hear', l: e.d.l, s: e.d.s, r: e.d.r || 0, inv: !!e.d.inv, until: performance.now() + HEAR_MS });
         others = true;
         continue;
       }
+      if (e.k === 'switch') { eventsSeen.add(e.n); if (e.d.id) switchNow.set(e.d.id, e); dirty = true; continue; }
+      if (e.k === 'orbit.main') { eventsSeen.add(e.n); orbitMain = e; dirty = true; continue; }
+      if (e.k === 'orbit.field') { eventsSeen.add(e.n); orbitField = e; dirty = true; continue; }
+      if (e.k === 'phobos.field') { eventsSeen.add(e.n); phobosField = e; dirty = true; continue; }
+      if (e.k === 'drop') { eventsSeen.add(e.n); if (fresh) floatLoot(e); continue; }
       if (e.k !== 'comet.squad') continue;
       eventsSeen.add(e.n);
       squadEvents.push(e);
@@ -5351,9 +5563,12 @@
       otherEvents = [];
       ghostMarks = [];
       killEvents = [];
+      switchNow = new Map();
+      orbitMain = orbitField = phobosField = null;
       eventsSeen = new Set();
+      if (!replay) forgetSquads();
       showKills();
-      if (rid) {
+      if (rid && !replay) {
         fetch('api/events?after=0' + (sid ? '&session=' + encodeURIComponent(sid) : '')).then(r => r.json())
           .then(j => { if (j && j.rid === eventsRaid) addEvents(j.ev); }).catch(() => {});
       }
@@ -5489,7 +5704,7 @@
   let otherEvents = [];
   const EVENT_KINDS = [['tactic', 'Tactic', 'What each squad is doing together (COMET). Press one, or a bot in one, to see its members.'], ['all', 'All'], ['squad', 'Squads'], ['loot', 'Loot'], ['orbit', 'ORBIT']];
   const eventKind = e => e.k === 'comet.squad' ? 'squad' : e.k === 'loot' ? 'loot' : 'orbit';
-  const lootWorth = d => { const n = things && things.names ? things.names[d.tpl] : null; return n && n.p ? n.p * (d.q || 1) : NaN; };
+  const lootWorth = d => { const n = things && things.names ? things.names[d.tpl] : replay && replay.names ? replay.names[d.tpl] : null; return n && n.p ? n.p * (d.q || 1) : NaN; };
   function eventListed(e, tab) {
     const kind = eventKind(e);
     if (tab !== 'all' && tab !== kind) return false;
@@ -5865,12 +6080,13 @@
     $('bestCanBox').hidden = !lootCan();
     $('bestNone').hidden = !($('bestRealBox').hidden && $('bestCanBox').hidden);
     if ($('panel').hidden || tab !== 'loot') return;
+    listExplore();
     listBestCan();
     if (!lootReal()) return;
-    const loot = inRaidHere() && things && things.loc === map.loc ? things : null;
-    const shownPlaces = map && places && places.loc === map.loc ? places : null;
+    const loot = inRaidHere() && things && sameMap(things.loc, map.loc) ? things : null;
+    const shownPlaces = map && places && sameMap(places.loc, map.loc) ? places : null;
     const flags = ['Layer loose', 'Layer boxes', 'Layer bodies', 'Corpse'].map(isHidden).join('') + prefs.allCorpses;
-    const print = [!!loot, thingsHave, !!shownPlaces, map && map.loc, flags, live.filter(m => m.c === 'Corpse').length, prefs.bestMore, peeking(), prefs.loot, lootPrint()].join('|');
+    const print = [!!loot, thingsHave, !!shownPlaces, map && map.loc, flags, live.filter(m => m.c === 'Corpse').length, killEvents.length, prefs.bestMore, peeking(), prefs.loot, lootPrint()].join('|');
     if (print === bestPrint) return;
     bestPrint = print;
     const box = $('bestLoot');
@@ -5934,7 +6150,7 @@
   const canNext = new Map();
   function listBestCan() {
     if (!lootCan()) return;
-    const table = lootTable && map && lootTable.loc === map.loc ? lootTable : null;
+    const table = lootTable && map && sameMap(lootTable.loc, map.loc) ? lootTable : null;
     const print = [!!table, map && map.loc, lootPrint(), prefs.bestMore].join('|');
     if (print === bestCanPrint) return;
     bestCanPrint = print;
@@ -5981,6 +6197,190 @@
       more.onclick = () => { prefs.bestMore = !prefs.bestMore; save(); bestPrint = null; listBest(); };
       box.appendChild(more);
     }
+  }
+  // The Loot tab's Explorer: every item on this map, once each with how many there are, to filter and sort. From this
+  // raid (what's really there, of what the page may show: loose loot, and what's in containers and on bodies while
+  // Show what's inside things is on) or from what can spawn. Pressing one searches the map for it by its whole name
+  // (whatever the Kinds of loot switches say) and goes to the nearest; again: the next.
+  const EX_FROM = [
+    ['real', 'In this raid', 'What\'s really there now: loose, and in containers and on bodies while Show what\'s inside things is on.'],
+    ['can', 'Can spawn', 'What the spawn points and containers of this map can have, with the best chance of each.']];
+  const WISH_GROUPS = [T('Tasks'), T('Hideout'), T('Barter'), T('Equipment'), T('Other')];
+  let explorePrint = null, exploreText = '', exploreHave = { key: null, all: null }, exploreOptions = '';
+  const exploreNext = new Map();
+  // the wishlist choice as it can be used now: none while the wishlist isn't known, the whole of it while its groups
+  // aren't (the choice made is kept, and comes back once they are)
+  const exploreWish = () => !wish ? '' : /^[0-4]$/.test(prefs.exWish) && !wishGroup.size ? 'all' : prefs.exWish;
+  const EX_SORTS = [['worth', T('Worth, each')], ['total', T('Worth, all of them')], ['name', T('Name')], ['count', T('Most places')], ['chance', T('Best chance')]];
+  // where the Explorer's items are from: the one picked, if the Loot shown has it
+  const exploreFroms = () => (lootReal() && inRaidHere() ? ['real'] : []).concat(lootCan() ? ['can'] : []);
+  // the items: tpl -> { tpl, name, short, worth (each), g (kind), q, spots [[east, north]..], n (how many), chance }
+  function exploreItems(from) {
+    const found = new Map();
+    const shownPlaces = map && places && sameMap(places.loc, map.loc) ? places : null;
+    const add = (names, tpl, n, p, chance) => {
+      const entry = names[tpl] || {};
+      let e = found.get(tpl);
+      if (!e) found.set(tpl, e = { tpl, name: entry.n || tpl, short: entry.s || entry.n || tpl, worth: entry.p || 0, g: entry.g || 'other', q: !!entry.q, spots: [], n: 0, chance: 0 });
+      e.spots.push([p[0], p[1]]);
+      e.n += n || 1;
+      if (chance) e.chance = Math.max(e.chance, chance);
+    };
+    if (from === 'real') {
+      const loot = inRaidHere() && things && sameMap(things.loc, map.loc) ? things : null;
+      if (!loot) return null;
+      const names = Object.assign({}, quests ? quests.names : {}, shownPlaces ? shownPlaces.names : {}, loot.names);
+      // as the map draws them (see drawThings), so each one pressed is found there
+      const wants = questWants(), mine = prefs.myQuestItems && !!quests;
+      for (const it of loot.loose) {
+        if (it.q && mine && !wants.items.get(it.tpl) && !wants.fItems.get(it.tpl)) continue;
+        add(names, it.tpl, it.n, [it.x, it.y]);
+      }
+      if (peeking() && shownPlaces && prefs.loot !== 'off') {
+        for (const b of shownPlaces.boxes) {
+          if (boxHidden(b) || (loot.have && !loot.have.has(b.id))) continue;
+          for (const i of loot.inside[b.id] || []) add(names, i[0], i[1], b.p);
+        }
+      }
+      if (peeking() && !isHidden('Corpse')) {
+        for (const b of loot.bodies) {
+          if (!b.kp && !prefs.allCorpses) continue;
+          for (const i of loot.inside[b.id] || []) add(names, i[0], i[1], b.p);
+        }
+      }
+      return found;
+    }
+    const table = lootTable && map && sameMap(lootTable.loc, map.loc) ? lootTable : null;
+    if (!table) return null;
+    const tn = table.names;
+    for (const pt of table.points) for (const i of pt.items) add(tn, i[0], 1, [pt.x, pt.y], pt.chance * (+i[1] || 0));
+    // the containers, where the map shows what they can hold (not while what's in them is shown)
+    const loot = inRaidHere() && things && sameMap(things.loc, map.loc) ? things : null;
+    if (shownPlaces && prefs.loot !== 'off' && !(loot && peeking())) {
+      for (const b of shownPlaces.boxes) {
+        if (boxHidden(b) || (loot && lootReal() && loot.have && !loot.have.has(b.id))) continue;
+        const there = table.boxChance[b.id] === undefined ? 1 : table.boxChance[b.id];
+        for (const i of table.boxes[b.tpl] || []) add(tn, i[0], 1, b.p, there * (+i[1] || 0));
+      }
+    }
+    return found;
+  }
+  function listExplore() {
+    const view = document.querySelector('section[data-tab="loot"] > .view[data-view="explore"]');
+    if (!view || view.hidden) return;
+    const froms = exploreFroms();
+    const from = froms.includes(prefs.exFrom) ? prefs.exFrom : froms[0];
+    // (what the items are worked out from: only when this changes are they worked out again, not as a name is typed)
+    const have = [from, inRaidHere(), thingsHave, things && things.loc, things && things.bodies.length, lootTable && lootTable.loc, places && places.loc, map && map.loc,
+      prefs.loot, peeking(), isHidden('Corpse'), prefs.allCorpses, prefs.boxOff.join(), prefs.myQuestItems, !!quests, quests ? quests.list.length : 0].join('|');
+    const print = [have, froms.join(), wishPrint, wishGroup.size, prefs.exKind, prefs.exWish, prefs.exSort, prefs.exMore, exploreText, findExact].join('|');
+    if (print === explorePrint) return;
+    explorePrint = print;
+    $('exFrom').hidden = froms.length < 2;
+    for (const b of $('exFrom').children) b.classList.toggle('on', b.dataset.v === from);
+    // the choices of the wishlist and the order, as they can be had now: the wishlist once it's known, its groups only
+    // from a server that sends them, the best chance only of what can spawn (made again only when that changes)
+    const wished = exploreWish(), sort = prefs.exSort === 'chance' && from !== 'can' ? 'worth' : prefs.exSort;
+    const options = [!!wish, wishGroup.size > 0, from === 'can'].join();
+    if (options !== exploreOptions) {
+      exploreOptions = options;
+      const wishes = $('exWish'), sorts = $('exSort');
+      wishes.textContent = '';
+      wishes.add(new Option(T('Any'), ''));
+      if (wish) wishes.add(new Option(T('On my wishlist'), 'all'));
+      if (wish && wishGroup.size) WISH_GROUPS.forEach((g, i) => wishes.add(new Option(T('Wishlist: {group}', { group: g }), String(i))));
+      sorts.textContent = '';
+      for (const [v, text] of EX_SORTS) if (v !== 'chance' || from === 'can') sorts.add(new Option(text, v));
+    }
+    $('exWishRow').hidden = !wish;
+    $('exWish').value = wished;
+    $('exKind').value = prefs.exKind;
+    $('exSort').value = sort;
+    $('exPeek').hidden = from !== 'real' || peeking();
+    const box = $('exList'), sum = $('exSum');
+    box.textContent = '';
+    sum.textContent = '';
+    if (!from) { box.textContent = T('Loot is switched off. Pick what\'s shown under Filters.'); return; }
+    if (exploreHave.key !== have) exploreHave = { key: have, all: exploreItems(from) };
+    const all = exploreHave.all;
+    if (!all) {
+      box.textContent = from === 'real' ? T('Nothing known of this raid\'s loot yet.') : map ? T('Nothing known yet of what can spawn on this map.') : T('No map.');
+      return;
+    }
+    const words = plain(exploreText).split(' ').filter(Boolean);
+    const rows = [...all.values()].filter(e => {
+      if (prefs.exKind && (prefs.exKind === 'quest' ? !e.q : e.q || e.g !== prefs.exKind)) return false;
+      if (wished === 'all' && !wish.has(e.tpl)) return false;
+      if (/^[0-4]$/.test(wished) && wishGroup.get(e.tpl) !== +wished) return false;
+      if (words.length) { const name = plain(e.name + ' ' + e.short); if (!words.every(w => name.includes(w))) return false; }
+      return true;
+    }).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name)
+      : sort === 'count' ? b.spots.length - a.spots.length || b.worth - a.worth
+      : sort === 'total' ? b.worth * b.n - a.worth * a.n
+      : sort === 'chance' ? b.chance - a.chance || b.worth - a.worth
+      : b.worth - a.worth || a.name.localeCompare(b.name));
+    sum.textContent = TP(rows.length, '{n} item', '{n} items') + (from === 'real' && rows.length ? ' · ' + roubles(rows.reduce((n, e) => n + e.worth * e.n, 0)) : '');
+    if (!rows.length) { box.textContent = all.size ? T('Nothing here matches. Try another kind, or less of the name.') : T('Nothing found'); return; }
+    const most = prefs.exMore ? 400 : 60;
+    const picked = findExact;
+    for (const e of rows.slice(0, most)) {
+      const worth = sort === 'total' ? e.worth * e.n : e.worth;
+      const row = sideRow(e.name + (e.n > 1 ? ' ×' + e.n : ''), worth ? roubles(worth) : '', e.q ? LAYERS.quest.col : worthCol(e.worth), () => exploreGo(e));
+      row.classList.add('exRow');
+      if (picked && plain(e.name) === picked) row.classList.add('on');
+      const kind = e.q ? T('Quest item') : (LOOT_KINDS.find(k => k[0] === e.g) || LOOT_KINDS[LOOT_KINDS.length - 1])[1];
+      const g = wishGroup.get(e.tpl);
+      const lines = [e.name, kind + (e.worth ? ' · ' + roubles(e.worth) + (e.n > 1 ? ' ' + T('each') : '') : '')];
+      lines.push(from === 'can' ? TP(e.spots.length, 'can spawn at {n} point, at best in {p} of raids. Press: the nearest; again: the next.', 'can spawn at {n} points, at best in {p} of raids. Press: the nearest; again: the next.', { p: percent(e.chance) })
+        : TP(e.spots.length, 'In {n} place. Press: go there.', 'In {n} places. Press: the nearest; again: the next.'));
+      if (wish && wish.has(e.tpl)) lines.push(T('On your wishlist') + (g !== undefined && WISH_GROUPS[g] ? ': ' + WISH_GROUPS[g] : ''));
+      row.title = lines.join('\n');
+      const small = row.querySelector('small');
+      if (small) small.style.color = worthCol(e.worth);
+      box.appendChild(row);
+    }
+    if (rows.length > 60) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'moreBtn';
+      more.textContent = prefs.exMore ? T('Show fewer') : T('Show more') + ' (' + Math.min(400, rows.length) + ')';
+      more.onclick = () => { prefs.exMore = !prefs.exMore; save(); listExplore(); };
+      box.appendChild(more);
+    }
+  }
+  // an item of the Explorer pressed: the search box finds it by its whole name, and the map goes to the one nearest
+  // the middle of the screen; pressed again, to the next
+  function exploreGo(e) {
+    if (findExact !== plain(e.name)) {
+      $('find').value = e.name;
+      setFind(e.name, true);
+      findOpen = false;
+      dirty = true;
+    }
+    const mid = toMap(vw / 2, vh / 2);
+    const order = e.spots.slice().sort((a, b) => Math.hypot(a[0] - mid[0], a[1] - mid[1]) - Math.hypot(b[0] - mid[0], b[1] - mid[1]));
+    let seen = exploreNext.get(e.tpl);
+    if (!seen || seen.n !== e.spots.length) exploreNext.set(e.tpl, seen = { n: e.spots.length, at: new Set() });
+    let spot = order.find(p => !seen.at.has(p[0] + ',' + p[1]));
+    if (!spot) { seen.at.clear(); spot = order[0]; }
+    seen.at.add(spot[0] + ',' + spot[1]);
+    goTo(spot[0], spot[1]);
+    listExplore();
+  }
+  {
+    segment($('exFrom'), EX_FROM, v => { prefs.exFrom = v; save(); listExplore(); });
+    const kinds = $('exKind');
+    for (const [v, text] of [['', T('Every kind')]].concat(LOOT_KINDS, [['quest', T('Quest items')]])) kinds.add(new Option(text, v));
+    kinds.onchange = () => { prefs.exKind = kinds.value; save(); listExplore(); };
+    // (the wishlist's and the order's choices are made in listExplore, as they can be had)
+    const wishes = $('exWish');
+    wishes.onchange = () => { prefs.exWish = wishes.value; save(); listExplore(); };
+    const sorts = $('exSort');
+    sorts.onchange = () => { prefs.exSort = sorts.value; save(); listExplore(); };
+    const text = $('exFind');
+    text.oninput = () => { exploreText = text.value; listExplore(); };
+    // (typed letters are the item's name, not the page's keys)
+    text.onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') { text.value = ''; exploreText = ''; listExplore(); } };
   }
   // ---- the menu's tabs ----
   // Settings > On your phone: this PC's address on its network, as a code to scan and as text, asked of the server
@@ -6062,6 +6462,7 @@
   function showTab(name, remember) {
     tab = TABS.includes(name) ? name : 'raid';
     if (tab === 'settings') showPhone();
+    if (tab === 'history') loadHistory();
     for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.tab === tab);
     for (const part of $('panelBody').children) part.hidden = part.dataset.tab !== tab;
     $('panelBody').scrollTop = 0;
@@ -6100,6 +6501,8 @@
   // what the menu covers of a phone's screen (it's beside the map on a bigger one)
   function measureCover() {
     const p = $('panel');
+    // beside the map on a bigger screen: what's laid over the map's middle (a replay's bar) keeps clear of it
+    document.body.style.setProperty('--menu-r', (p.hidden || phone.matches ? 0 : p.offsetWidth + 14) + 'px');
     const next = p.hidden || !phone.matches ? { r: 0, b: 0 }
       : window.innerWidth <= 700 ? { r: 0, b: Math.min(p.offsetHeight, vh * 0.6) } : { r: Math.min(p.offsetWidth, vw * 0.6), b: 0 };
     if (next.r === cover.r && next.b === cover.b) return;
@@ -6207,7 +6610,10 @@
     const who = shown ? gameName(shown) : prefs.player ? gameName(prefs.player) : '';
     let kind = 'gone', says = prefs.player ? T('{who} isn\'t playing', { who }) : T('Game not connected');
     if (serverLost) says = T('Server not reachable');
-    else if (connected()) {
+    else if (replay && report) {
+      kind = 'raid';
+      says = T('Replay') + ' · ' + placeName(report.loc) + (replay.about.name ? ' · ' + latin(replay.about.name) : '');
+    } else if (connected()) {
       kind = report.raid ? 'raid' : 'menu';
       says = report.raid ? T('In raid') + ' · ' + placeName(report.loc) : T('Not in a raid');
       if (who) says = who + ' · ' + says;
@@ -6244,7 +6650,8 @@
       soft = false;
       message = capturing ? T('Capturing the map of {map}…', { map: placeName(report.loc) }) + ' ' + Math.round(100 * report.cap[0] / report.cap[1]) + '%' : missing;
       warned = warn && !capturing;
-    } else if (raidMap && raidMap.loc !== report.loc && !capturing) {
+    // (the raid's season map in place of its map is the right map, not another one)
+    } else if (raidMap && noSnow(raidMap.loc) !== noSnow(report.loc) && !capturing) {
       message = missing + ' ' + (addonFor(report.loc) ? T('Showing {map} until then: markers may not line up with it.', { map: raidMap.name }) : T('Showing {map} instead: markers may not line up with it.', { map: raidMap.name }));
       warned = warn;
     } else if (inRaid() && report.cap && report.cap[1] > 0) {
@@ -6253,9 +6660,9 @@
       soft = false;
       message = T('No maps yet. Start a raid with the game plugin installed: it captures the location\'s map a few seconds in, and the map shows here.');
     }
-    notice.hidden = !message;
+    notice.hidden = !message || noticeKey(message) === noticeShut;
     notice.className = [soft ? 'soft' : '', warned ? 'warn' : ''].filter(Boolean).join(' ');
-    if (notice.textContent !== message) notice.textContent = message;
+    if ($('noticeText').textContent !== message) $('noticeText').textContent = message;
 
     const player = me && inRaidHere() ? T('Player:') + ' ' + me.x.toFixed(1) + ' ' + me.y.toFixed(1) + ' · ' + T('height') + ' ' + me.z.toFixed(1) : '';
     if ($('playerAt').textContent !== player) $('playerAt').textContent = player;
@@ -6263,7 +6670,7 @@
     $('follow').classList.toggle('paused', prefs.follow && roaming && inRaidHere());
     $('follow').disabled = !inRaidHere();
     $('follow').title = inRaidHere() ? (prefs.follow && roaming ? T('Set aside while you look about: it follows the player again once they move on, or press (;)') : T('Keep the player in the middle (;)')) : T('Follows the player once they\'re in a raid on this map');
-    $('map').hidden = !maps.length;
+    $('map').hidden = $('mapBtn').hidden = !maps.length;
     listFilters();
     loadQuests(false);
     listQuests();
@@ -6415,6 +6822,8 @@
     playHeld();
     const began = performance.now();
     const dt = Math.min(0.1, (now - last) / 1000);
+    // (a replay keeps time through a slow frame: it isn't held to a tenth of a second as the gliding is)
+    playReplay(Math.min(1, Math.max(0, (now - last) / 1000)));
     last = now;
     if (map) {
       const raidHere = inRaidHere();
@@ -6563,7 +6972,7 @@
       // stays open until then, however long it's looked at)
       const walked = roamFrom && me && raidHere && Math.hypot(me.x - roamFrom[0], me.y - roamFrom[1]) > WALK_BACK;
       // (not by itself after a pause: standing still to look about the map, it kept being taken back)
-      if (roaming && !dragging && walked) { roaming = false; roamFrom = null; zoomAt = null; opened = 0; dirty = true; backToPlayer(); }
+      if (roaming && !dragging && walked && !replay) { roaming = false; roamFrom = null; zoomAt = null; opened = 0; dirty = true; backToPlayer(); }
       if (chased !== null) {
         const them = raidHere ? liveById.get(chased) : null;
         if (!them || !Number.isFinite(them.cx)) chase(null);
@@ -6816,6 +7225,7 @@
     const step = 80;
     switch (e.key) {
       case ';': setFollow(true); break;
+      case ' ': if (replay) { e.preventDefault(); $('replayPlay').click(); } break;
       case 'f': case 'F': fullScreen(); break;
       case 'h': case 'H': document.body.classList.toggle('bare'); break;
       case 'm': case 'M': togglePanel(); break;
@@ -6834,7 +7244,7 @@
       case 'b': case 'B': if (!e.repeat) revealDown(); break;
       case ']': case 'PageUp': stepFloor(1); break;
       case '[': case 'PageDown': stepFloor(-1); break;
-      case 'Escape': if (opened) { opened = 0; dirty = true; } else if (find) { $('findClear').click(); } else togglePanel(false); break;
+      case 'Escape': if (!raidWin.hidden) rvShut(false); else if (!histWin.hidden) openHistWin(false); else if (opened) { opened = 0; dirty = true; } else if (find) { $('findClear').click(); } else togglePanel(false); break;
       default: return;
     }
     e.preventDefault();
@@ -6867,7 +7277,10 @@
   };
   $('panelClose').onclick = () => togglePanel(false);
   $('sideClose').onclick = () => toggleSide(false);
+  $('noticeClose').onclick = () => { noticeShut = noticeKey($('noticeText').textContent); $('notice').hidden = true; };
   $('listBtn').onclick = () => toggleSide();
+  // always opens the History tab: pressed while it's open, it stays open and looks for new raids
+  $('histBtn').onclick = () => openHistWin();
   $('optSwap').checked = !!prefs.swap;
   $('optSwap').onchange = e => { prefs.swap = e.target.checked; save(); sidesNow(); keepOnMap(); dirty = true; };
   for (const b of $('tabs').children) b.onclick = () => showTab(b.dataset.tab);
@@ -6880,6 +7293,7 @@
       for (const b of nav.children) b.classList.toggle('on', b.dataset.view === view);
       for (const v of part.querySelectorAll(':scope > .view')) v.hidden = v.dataset.view !== view;
       if (remember) { prefs.views = Object.assign({}, prefs.views, { [name]: view }); save(); $('panelBody').scrollTop = 0; }
+      if (remember && name === 'loot') { explorePrint = null; listBest(); }
     };
     for (const b of nav.children) b.onclick = () => show(b.dataset.view, true);
     show((prefs.views || {})[name]);
@@ -6964,7 +7378,35 @@
       head.append(back);
       before.before(head);
     };
-    for (const id of ['boxKinds', 'filtersPeople', 'areaKinds', 'edgeKinds', 'filtersMap', 'filtersLoot', 'alerts']) {
+    // Who's shown: each kind on, as an area or off, all at once; Default: every kind on, and the switches under them
+    // as they were the first time
+    {
+      const grid = $('filtersPeople'), head = document.createElement('div');
+      head.className = 'filterHead';
+      head.append(T('Switch') + ' ');
+      const rows = () => [...grid.querySelectorAll(':scope > .row.who')];
+      for (const [text, state, title] of [[T('All on'), 'on'], [T('All as areas'), 'area', T('Every kind that can be shown as a rough area, as one. The rest are left as they are.')], [T('All off'), 'off']]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'linkBtn';
+        button.textContent = text;
+        if (title) button.title = title;
+        button.onclick = () => { for (const row of rows()) if (state !== 'area' || AREA_ABLE.includes(row.dataset.kind)) row.setTo(state); };
+        head.append(button, ' ');
+      }
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'linkBtn';
+      back.textContent = T('Default');
+      back.title = T('These switches back as they were the first time the page was opened');
+      back.onclick = () => {
+        for (const row of rows()) row.setTo('on');
+        for (const input of grid.querySelectorAll('label.row > input[type="checkbox"]')) if (!input.disabled && input.checked !== (input.dataset.def === '1')) input.click();
+      };
+      head.append(back);
+      grid.before(head);
+    }
+    for (const id of ['boxKinds', 'edgeKinds', 'filtersMap', 'filtersLoot', 'alerts']) {
       both($(id), () => $(id).querySelectorAll(':scope > label.row:not(.sub) > input[type="checkbox"]'),
         () => $(id).querySelectorAll('label.row > input[type="checkbox"]'));
     }
@@ -7042,10 +7484,103 @@
   for (const group of document.querySelectorAll('details.group[data-group]')) {
     const name = group.dataset.group;
     if (prefs.groups && typeof prefs.groups[name] === 'boolean') group.open = prefs.groups[name];
-    group.addEventListener('toggle', () => { prefs.groups = Object.assign({}, prefs.groups, { [name]: group.open }); save(); });
+    group.addEventListener('toggle', () => { if (finding) return; prefs.groups = Object.assign({}, prefs.groups, { [name]: group.open }); save(); });
   }
-  for (const [id, key] of [['optItemNames', 'itemNames'], ['optWishOnly', 'wishOnly'], ['optKillLines', 'killLines'],['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'],
-    ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optMyName', 'myName'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
+  // ---- finding a setting: the options of every tab at once, by what they say and do ------------------------------
+  // A word also finds the words that go with it (PMC: players, USEC, BEAR, teams, friends), so a search shows all
+  // that's to do with a thing, not only the rows that happen to name it. Every word typed must be found.
+  const FIND_ALIKE = {
+    pmc: ['pmc', 'player', 'usec', 'bear', 'team', 'squad', 'friend', 'people'],
+    player: ['player', 'pmc', 'people', 'friend', 'team'], friend: ['friend', 'fika', 'team', 'player'],
+    scav: ['scav', 'bot', 'ai'], bot: ['bot', 'ai', 'scav', 'sain', 'orbit', 'comet', 'phobos', 'questingbots', 'boss'], ai: ['ai', 'bot', 'scav'],
+    boss: ['boss', 'guard', 'goon', 'follower'], loot: ['loot', 'item', 'container', 'crate', 'worth', 'wish'], item: ['item', 'loot'],
+    quest: ['quest', 'task', 'found in raid', 'found-in-raid'], fir: ['found in raid', 'found-in-raid', 'fir'], kill: ['kill', 'death', 'dead', 'died', 'corpse', 'feed', 'body'],
+    colour: ['colour', 'color'], color: ['colour', 'color'], name: ['name', 'label'], size: ['size', 'big', 'scale'],
+    phone: ['phone', 'mobile', 'touch'], sound: ['sound', 'alert', 'beep'], alert: ['alert', 'sound', 'warn'],
+    shot: ['shot', 'gun', 'bullet', 'hit', 'grenade'], door: ['door', 'lock', 'key', 'switch'], key: ['key', 'lock', 'door', 'keycard'],
+    extract: ['extract', 'exit', 'transit'], building: ['building', 'roof', 'floor'], floor: ['floor', 'building', 'level']
+  };
+  const FIND_TABS = ['raid', 'loot', 'quests', 'map', 'settings'], FIND_VIEWS = ['filters', 'options'];
+  let finding = false;
+  const findWasOpen = new Map();
+  const findTerms = q => q.toLowerCase().split(/\s+/).filter(Boolean).map(w => FIND_ALIKE[w] || FIND_ALIKE[w.replace(/s$/, '')] || [w]);
+  const findSays = (el, words) => { const text = (el.textContent + ' ' + (el.title || '')).toLowerCase(); return words.every(alike => alike.some(a => text.includes(a))); };
+  // marks what of a part is shown: a row that says the words, or all of a group whose heading does; true: any is
+  function findMark(part, words, all, inGroup) {
+    let any = false;
+    for (const el of part.children) {
+      if (el.tagName === 'SUMMARY') continue;
+      let shown = false;
+      if (el.matches('.view')) shown = FIND_VIEWS.includes(el.dataset.view) && findMark(el, words, all, inGroup);
+      // (the quests themselves aren't settings)
+      else if (el.hidden || el.matches('nav.subTabs, #questList')) shown = false;
+      else if (el.tagName === 'DETAILS') {
+        const head = el.querySelector(':scope > summary');
+        shown = findMark(el, words, all || (!!head && findSays(head, words)), true);
+        if (shown) { if (!findWasOpen.has(el)) findWasOpen.set(el, el.open); el.open = true; }
+      } else if (el.matches('.row')) shown = all || findSays(el, words);
+      else if (el.querySelector('.row')) shown = findMark(el, words, all, inGroup);
+      else shown = inGroup && (all || findSays(el, words));
+      el.classList.toggle('findOut', !shown);
+      any = any || shown;
+    }
+    // A switch under another (Secret ones not found yet, under Extracts) means nothing on its own: found, it brings the
+    // row it's under; that row found brings the switches under it.
+    const kids = [...part.children];
+    const under = el => el.matches('.row.sub, .subLine');
+    for (let i = 0; i < kids.length; i++) {
+      if (!under(kids[i])) continue;
+      let main = i - 1;
+      while (main >= 0 && under(kids[main])) main--;
+      if (main < 0 || !kids[main].matches('.row')) continue;
+      if (!kids[i].classList.contains('findOut')) kids[main].classList.remove('findOut');
+      else if (!kids[main].classList.contains('findOut') && !kids[main].hidden) {
+        kids[i].classList.remove('findOut');
+        for (const inner of kids[i].querySelectorAll('.findOut')) if (!inner.hidden) inner.classList.remove('findOut');
+      }
+    }
+    return any;
+  }
+  function findSettings() {
+    const words = findTerms($('setFind').value.trim());
+    const body = $('panelBody');
+    for (const el of body.querySelectorAll('.findOut, .findIn')) el.classList.remove('findOut', 'findIn');
+    finding = words.length > 0;
+    $('setFindClear').hidden = !$('setFind').value;
+    $('panel').classList.toggle('finding', finding);
+    if (!finding) {
+      for (const [group, open] of findWasOpen) group.open = open;
+      findWasOpen.clear();
+      $('setFindNone').hidden = true;
+      showTab(tab, false);
+      return;
+    }
+    let any = false;
+    for (const part of body.children) {
+      const name = part.dataset.tab;
+      const shown = FIND_TABS.includes(name) && findMark(part, words, false, false);
+      part.classList.toggle('findIn', shown);
+      if (shown) part.dataset.findName = $('tabs').querySelector('[data-tab="' + name + '"]').textContent;
+      any = any || shown;
+    }
+    for (const view of body.querySelectorAll('.view')) view.classList.toggle('findIn', !view.classList.contains('findOut') && FIND_VIEWS.includes(view.dataset.view));
+    $('setFindNone').hidden = any;
+  }
+  $('setFind').oninput = () => { $('panelBody').scrollTop = 0; findSettings(); };
+  $('setFind').onkeydown = e => { if (e.key === 'Escape') { e.target.value = ''; findSettings(); } };
+  $('setFindClear').onpointerdown = e => e.preventDefault();
+  $('setFindClear').onclick = e => { e.preventDefault(); $('setFind').value = ''; findSettings(); $('setFind').focus(); };
+  // the lists in the tabs are made again as the raid goes on: what's made while searching is searched too
+  {
+    let again = false;
+    new MutationObserver(() => {
+      if (!finding || again) return;
+      again = true;
+      requestAnimationFrame(() => { again = false; findSettings(); });
+    }).observe($('panelBody'), { childList: true, subtree: true });
+  }
+  for (const [id, key] of [['optItemNames', 'itemNames'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
+    ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optMyName', 'myName'], ['optRecSign', 'recSign'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],
     ['optOrbitFights', 'orbitFights'], ['optOrbitHear', 'orbitHear'], ['optRoofLoot', 'roofLoot'], ['optRoofTotals', 'roofTotals'], ['optRoofTotalsUnder', 'roofTotalsUnder'], ['optAlertSound', 'alertSound'], ['optFeedKeep', 'feedKeep'], ['optFeedBox', 'feedBox']]) {
@@ -7053,6 +7588,8 @@
     $(id).onchange = e => { prefs[key] = e.target.checked; save(); dirty = true; rosterPrint = bestPrint = null; tipFor = null; feedPrint = ''; listRoster(); showKills(); };
   }
   $('optAwake').addEventListener('change', keepAwake);
+  $('optTrailMs').value = String(prefs.trailMs);
+  $('optTrailMs').onchange = e => { prefs.trailMs = +e.target.value; save(); dirty = true; };
   // Smooth over a slow connection: as picked, else by where the page was opened from (see smoothing)
   $('optSmooth').checked = smoothing();
   $('optSmooth').onchange = e => { prefs.smooth = e.target.checked; dropHeld(); save(); };
@@ -7177,7 +7714,7 @@
     $('lootKindsNone').onclick = all(false);
   }
   // quest items and quest places: each on or off, as the switches under "Show on this page" are
-  for (const [id, category] of [['optQuestItems', 'Layer quest'], ['optQuestPlaces', 'Layer questZones']]) {
+  for (const [id, category] of [['optQuestItems', 'Layer quest'], ['optQuestPlaces', 'Layer questZones'], ['optFirItems', 'Layer firItems']]) {
     $(id).checked = !isHidden(category);
     $(id).onchange = e => setHidden(category, !e.target.checked);
   }
@@ -7237,10 +7774,101 @@
   }
   $('backRaid').onclick = backToRaid;
   $('status').onclick = () => { if (awayFromRaid()) backToRaid(); };
-  $('map').onchange = e => {
-    const next = maps.find(m => m.loc === e.target.value);
-    if (next) { prefs.map = next.loc; save(); showMap(next, false); showStatus(); }
+  const pickMap = next => { if (next) { prefs.map = next.loc; save(); showMap(next, false); showStatus(); } };
+  $('map').onchange = e => pickMap(maps.find(m => m.loc === e.target.value));
+  // ---- the map menu (wide screens): a row for each location; its versions and season maps beside the one pointed
+  // at, so the list stays one line a location however many versions there are
+  const seasonSays = m => isSnow(m.loc) ? ' · ' + SEASON_NAMES[seasonOf(m.loc)] : '';
+  // a version by its own name: "Customs - Fums" under Customs is "Fums"
+  const mapVariant = m => {
+    // a season map is said as the map it's the season of, when there is that one
+    const own = isSnow(m.loc) && maps.find(x => x.loc === noSnow(m.loc));
+    let v = (own || m).vname || '';
+    for (const name of [m.title, m.title.replace(/\s*\(.*\)$/, '')]) if (v.toLowerCase().startsWith(name.toLowerCase() + ' - ')) { v = v.slice(name.length + 3); break; }
+    // the location's own map, captured before its version had a name: the game's own, as MapVariants calls it
+    return (v || T('Vanilla')) + seasonSays(m);
   };
+  // the maps by location, in the order of the list; in each, the location's own first, then each version, its season
+  // maps after it
+  function mapGroups() {
+    const groups = new Map();
+    for (const m of maps) {
+      const key = String(m.base).toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(m);
+    }
+    const order = m => [noSnow(m.loc).includes('~') ? 1 : 0, mapVariant(m).toLowerCase(), isSnow(m.loc) ? 1 : 0];
+    for (const list of groups.values()) list.sort((a, b) => { const x = order(a), y = order(b); return x[0] - y[0] || x[1].localeCompare(y[1]) || x[2] - y[2]; });
+    return [...groups.values()];
+  }
+  function mapBtnSays() {
+    $('mapBtnText').textContent = map ? map.name + seasonSays(map) : '';
+  }
+  const mapRow = (text, note) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'mapRow';
+    row.appendChild(document.createElement('b')).textContent = text;
+    if (note) row.appendChild(document.createElement('small')).textContent = note;
+    return row;
+  };
+  let mapSubFor = null, mapSubTimer = 0;
+  function openMapSub(row, group) {
+    clearTimeout(mapSubTimer);
+    for (const r of $('mapMenu').children) r.classList.toggle('open', r === row && !!group);
+    const sub = $('mapSub');
+    mapSubFor = group ? row : null;
+    if (!group) { sub.hidden = true; return; }
+    sub.textContent = '';
+    for (const m of group) {
+      const pick = mapRow(mapVariant(m));
+      pick.classList.toggle('on', !!map && m.loc === map.loc);
+      pick.onclick = () => { openMapMenu(false); pickMap(m); };
+      sub.appendChild(pick);
+    }
+    sub.hidden = false;
+    // beside the row, kept on the screen
+    const r = row.getBoundingClientRect(), w = sub.offsetWidth, h = sub.offsetHeight;
+    sub.style.left = (r.right + w + 6 <= innerWidth ? r.right + 4 : Math.max(4, r.left - w - 4)) + 'px';
+    sub.style.top = Math.max(4, Math.min(r.top - 5, innerHeight - h - 8)) + 'px';
+  }
+  function openMapMenu(open) {
+    const menu = $('mapMenu');
+    clearTimeout(mapSubTimer);
+    $('mapSub').hidden = true;
+    mapSubFor = null;
+    $('mapBtn').setAttribute('aria-expanded', String(!!open));
+    $('mapBtn').classList.toggle('on', !!open);
+    if (!open) { menu.hidden = true; return; }
+    menu.textContent = '';
+    for (const group of mapGroups()) {
+      const one = group.length === 1 ? group[0] : null;
+      const row = mapRow(one ? one.name + seasonSays(one) : group[0].title, one ? '' : '›');
+      row.classList.toggle('on', !!map && group.some(m => m.loc === map.loc));
+      if (one) {
+        row.onclick = () => { openMapMenu(false); pickMap(one); };
+        row.onpointerenter = () => { clearTimeout(mapSubTimer); mapSubTimer = setTimeout(() => openMapSub(row, null), 150); };
+      } else {
+        row.onclick = () => openMapSub(row, group);
+        // a short wait, so going across to the menu beside it over the rows between doesn't swap it
+        row.onpointerenter = () => { clearTimeout(mapSubTimer); if (mapSubFor !== row) mapSubTimer = setTimeout(() => openMapSub(row, group), mapSubFor ? 150 : 0); };
+      }
+      menu.appendChild(row);
+    }
+    menu.hidden = false;
+    const b = $('mapBtn').getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(b.left, innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = (b.bottom + 4) + 'px';
+  }
+  $('mapBtn').onclick = () => openMapMenu($('mapMenu').hidden);
+  $('mapSub').onpointerenter = () => clearTimeout(mapSubTimer);
+  document.addEventListener('pointerdown', e => {
+    if (!$('mapMenu').hidden && !e.target.closest('#mapMenu, #mapSub, #mapBtn')) openMapMenu(false);
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('mapMenu').hidden) { e.stopPropagation(); openMapMenu(false); }
+  }, true);
+  window.addEventListener('resize', () => { if (!$('mapMenu').hidden) openMapMenu(false); });
   $('session').onchange = e => {
     const game = games.find(g => g.sid === e.target.value);
     prefs.player = e.target.value ? { sid: e.target.value, name: game ? game.name : (prefs.player || {}).name || '' } : null;
@@ -7258,8 +7886,9 @@
     try {
       // (with the mark of the ones had already: the server then only says they're the same. They run to over a
       // megabyte, which was fetched and read through every few seconds.)
-      answer = await (await fetch('api/maps' + (mapsPrint ? '?have=' + encodeURIComponent(mapsPrint) : ''))).json();
+      answer = await answered(await fetch('api/maps' + (mapsPrint ? '?have=' + encodeURIComponent(mapsPrint) : ''))).json();
     } catch (e) {
+      if (!(e instanceof Error && /^HTTP/.test(e.message))) missed();
       return;
     }
     mapsAsked = true;
@@ -7272,13 +7901,19 @@
     maps = (answer.maps || []).map(readMap).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
     const pick = $('map');
     pick.textContent = '';
-    for (const m of maps) {
-      const o = document.createElement('option');
-      o.value = m.loc;
-      // a snow map: the same name, said to be with snow
-      o.textContent = m.name + (isSnow(m.loc) ? ' · ' + T('snow') : '');
-      pick.appendChild(o);
+    // every location a group under its name, with or without versions and season maps, so the list is all alike
+    for (const group of mapGroups()) {
+      const into = pick.appendChild(document.createElement('optgroup'));
+      into.label = group[0].title;
+      for (const m of group) {
+        const o = document.createElement('option');
+        o.value = m.loc;
+        // a version by its own name ("Classic", "Vanilla"); a snow map said to be with snow
+        o.textContent = mapVariant(m);
+        into.appendChild(o);
+      }
     }
+    if (!$('mapMenu').hidden) openMapMenu(true);
     if (!maps.length) return;
     // the one shown, as it is now (it may have been captured again); else the raid's; else the one last looked at
     const shownNow = map && maps.find(m => m.loc === map.loc);
@@ -7304,6 +7939,2168 @@
   if (DEBUG) window.fumsState = () => ({ shown: floorShown, insideShut, insideShutAt, opened, mine: me && map ? placeInside() : 0, roaming, me, pan: [panX, panY, zoom],
     spots: map && map.floors && map.floors.buildings ? map.floors.buildings.slice(0, 40).map(b => ({ x: (b.box.x0 + b.box.x1) / 2, y: (b.box.y0 + b.box.y1) / 2, h: b.parts[0].h, w: b.box.x1 - b.box.x0, d: b.box.y1 - b.box.y0 })) : [], at: toScreen(me ? me.cx : 0, me ? me.cy : 0) });
   let source = null;
+  // ---- raid history --------------------------------------------------------------------------------------------
+  // The raids the server recorded (api/history), listed on the History tab. One played back is its reports, read
+  // again by take() at the times they came: the page shows it as it showed the raid live, and the live game is set
+  // aside until the replay is left. A recording is lines of "<ms since it began><tab><the report>".
+  // replay: { about, times, lines, full (which lines are full reports), events (every event, "rt" when its report
+  // came), total, at (ms played to), playing, speed, next (the line due next), heat }
+  let historyRaids = null, historyOn = true, historyBusy = false, winsReady = false;
+  const REPLAY_SPEEDS = [0.5, 1, 2, 4, 8, 16];
+  const clockText = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  async function loadHistory() {
+    try {
+      const j = await (await fetch('api/history')).json();
+      historyRaids = list(j.raids).filter(r => r && typeof r.id === 'string');
+      historyOn = j.on !== false;
+      historyInfo = { bytes: j.bytes || 0, keep: j.keep || 30, rr: !!j.rr };
+    } catch (e) { historyRaids = historyRaids || []; }
+    listHistory();
+  }
+  function listHistory(note) {
+    if (winsReady) showWins();
+    const box = $('historyList');
+    box.textContent = '';
+    $('historyNote').textContent = note || (!historyRaids ? T('Loading…')
+      : !historyOn && !historyRaids.length ? T('Raids aren\'t recorded: history.record is off in the server\'s config.jsonc.')
+      : !historyRaids.length ? T('No raids recorded yet. Play one: it shows here once it has begun.') : '');
+    $('historyNote').hidden = !$('historyNote').textContent;
+    for (const r of historyRaids || []) {
+      const row = document.createElement('div');
+      row.className = 'histRow' + (replay && replay.about.id === r.id ? ' on' : '');
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'histPlay';
+      play.title = T('Play this raid back on the map');
+      const name = document.createElement('b'), when = document.createElement('small'), what = document.createElement('span');
+      name.textContent = placeName(r.loc);
+      when.textContent = new Date(r.began).toLocaleString(document.documentElement.lang || undefined, { dateStyle: 'medium', timeStyle: 'short' });
+      what.textContent = [clockText(r.ms - (r.lead || 0)), r.name ? latin(r.name) + (r.hl ? ' (' + T('headless') + ')' : '') : '', TP(r.kills || 0, '{n} kill', '{n} kills') + (r.mine ? ' (' + T('{n} yours', { n: r.mine }) + ')' : ''),
+        r.exit ? (EXITS[r.exit] || r.exit) + (r.exitName && r.exit === 'Survived' ? ' (' + r.exitName + ')' : '') : r.died ? T('died') : '', r.live ? T('recording now') : '', r.imported ? T('imported') : ''].filter(Boolean).join(' · ');
+      play.append(name, when, what);
+      play.onclick = () => startReplay(r);
+      row.appendChild(play);
+      const look = document.createElement('button');
+      look.type = 'button';
+      look.className = 'histDrop histLook';
+      look.textContent = '☰';
+      look.title = T('Look into this raid');
+      look.onclick = () => startReplay(r, true);
+      row.appendChild(look);
+      if (!r.live) {
+        const give = document.createElement('a');
+        give.className = 'histDrop histGive';
+        give.href = 'api/history/export?id=' + encodeURIComponent(r.id);
+        give.download = '';
+        give.textContent = '⭳';
+        give.title = T('Export this raid as a zip, to share.');
+        row.appendChild(give);
+        const drop = document.createElement('button');
+        drop.type = 'button';
+        drop.className = 'histDrop';
+        drop.textContent = '×';
+        drop.title = T('Delete this recording. Press twice.');
+        drop.onclick = async () => {
+          if (!drop.classList.contains('sure')) { drop.classList.add('sure'); setTimeout(() => drop.classList.remove('sure'), 3000); return; }
+          try { await fetch('api/history/delete?id=' + encodeURIComponent(r.id), { method: 'POST' }); } catch (e) { /* listed again all the same */ }
+          if (replay && replay.about.id === r.id) leaveReplay();
+          loadHistory();
+        };
+        row.appendChild(drop);
+      }
+      box.appendChild(row);
+    }
+  }
+
+  async function startReplay(about, review) {
+    if (historyBusy) return;
+    // (the raid being played already: only looked into)
+    if (review && replay && replay.about.id === about.id) { rvOpen('overview'); return; }
+    historyBusy = true;
+    listHistory(T('Loading the raid…'));
+    let text = '';
+    try {
+      const answer = await fetch('api/history/rec?id=' + encodeURIComponent(about.id));
+      if (!answer.ok) throw new Error('gone');
+      text = await answer.text();
+    } catch (e) { historyBusy = false; listHistory(T('That raid couldn\'t be loaded.')); return; }
+    historyBusy = false;
+    const times = [], lines = [], full = [], events = [], loot = [];
+    for (let from = 0; from < text.length;) {
+      let end = text.indexOf('\n', from);
+      if (end < 0) end = text.length;
+      const tab = text.indexOf('\t', from);
+      if (tab > from && tab < end) {
+        const t = +text.slice(from, tab), line = text.slice(tab + 1, end);
+        if (Number.isFinite(t) && line.startsWith('{"t":"th"')) loot.push([t, line]);
+        else if (Number.isFinite(t) && line.startsWith('{"t":"f')) {
+          const whole = line.startsWith('{"t":"full"');
+          let fine = true;
+          if (whole && line.includes('"ev":[')) {
+            try { for (const e of JSON.parse(line).ev || []) if (e && e.d && Number.isFinite(e.n)) { e.rt = t; events.push(e); } } catch (err) { fine = false; }
+          }
+          if (fine && !(whole && line.includes('"raid":false'))) { times.push(t); lines.push(line); full.push(whole); }
+        }
+      }
+      from = end + 1;
+    }
+    if (!full.includes(true)) { listHistory(T('That raid couldn\'t be loaded.')); return; }
+    // The wait before the raid began (loaded, nobody moving yet) is left out: the replay starts as the raid does.
+    // What happened in it (switches as they stood) is kept, as of the start.
+    const lead = Number.isFinite(about.lead) ? about.lead : leadOf(times, lines, full);
+    if (lead > 0) {
+      let keep = -1, to = 0;
+      for (let i = 0; i < times.length && times[i] <= lead; i++) if (full[i]) keep = i;
+      for (let i = 0; i < times.length; i++) {
+        if (times[i] <= lead && i !== keep) continue;
+        times[to] = Math.max(0, times[i] - lead); lines[to] = lines[i]; full[to] = full[i]; to++;
+      }
+      times.length = lines.length = full.length = to;
+      for (const e of events) e.rt = Math.max(0, e.rt - lead);
+      for (const l of loot) l[0] = Math.max(0, l[0] - lead);
+    }
+    // (a replay's clock is the recording's own: what the kill feed and the lists say goes by it)
+    for (const e of events) e.t = e.rt;
+    const r = replay = { about, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: true, speed: 1, next: 0, scan: null, names: null, loot, lootAt: -2 };
+    raidWin.hidden = true;
+    forgetSquads();
+    blastMarks = [];
+    // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
+    const asked = [...new Set(events.filter(e => (e.k === 'loot' || e.k === 'drop') && e.d.tpl).map(e => e.d.tpl))];
+    if (asked.length) {
+      fetch('api/history/names', { method: 'POST', body: JSON.stringify(asked) }).then(a => a.json())
+        .then(j => { if (replay === r && j) { r.names = j; squadPanePrint = ''; showSquadPane(); rvShow(); dirty = true; } }).catch(() => {});
+    }
+    forget();
+    sid = REPLAY_SID;
+    seekReplay(0);
+    backToRaid();
+    // the kills along the bar: the player's own, and where they died
+    const ticks = $('replayTicks');
+    ticks.textContent = '';
+    for (const e of events) {
+      if (e.k !== 'kill') continue;
+      const tick = document.createElement('i');
+      tick.style.left = (100 * e.rt / replay.total) + '%';
+      tick.className = e.d.vk === 'Main Player' ? 'died' : e.d.kk === 'Main Player' ? 'mine' : '';
+      ticks.appendChild(tick);
+    }
+    $('replaySpeed').value = '1';
+    $('replayBar').hidden = false;
+    document.body.classList.add('replaying');
+    rnShow();
+    showReplay();
+    listHistory();
+    showStatus();
+    if (phone.matches) togglePanel(false);
+    if (review) rvOpen('overview'); else histWin.hidden = true;
+  }
+  // How long a recording that doesn't say (an older one) waited before anybody moved: when the first of them is
+  // 2 m from where it stood. Nothing, when nobody has moved in its first three minutes.
+  function leadOf(times, lines, full) {
+    const first = new Map();
+    const moved = (id, x, y) => {
+      const was = first.get(id);
+      if (!was) { first.set(id, [x, y]); return false; }
+      return Math.hypot(x - was[0], y - was[1]) > 2;
+    };
+    for (let i = 0; i < times.length && times[i] < 180000; i++) {
+      try {
+        const d = JSON.parse(lines[i]);
+        let go = false;
+        if (full[i]) { for (const m of d.markers || []) if (m.dyn && m.c !== 'Airdrop' && Array.isArray(m.p) && moved(m.id, m.p[0], m.p[1])) go = true; }
+        else for (const row of d.m || []) if (moved(row[0], row[1], row[2])) go = true;
+        if (go) return Math.max(0, times[i] - 1500);
+      } catch (e) { /* a line cut short */ }
+    }
+    return 0;
+  }
+  function feedReplay(i) {
+    try { take({ sid: REPLAY_SID, name: replay.about.name || '', age: 0, rp: 1, d: JSON.parse(replay.lines[i]) }, true); } catch (e) { /* a line cut short */ }
+  }
+  // To a moment of the raid: the last full report before it, the fast ones since, and what had happened by then.
+  function seekReplay(to) {
+    const r = replay;
+    if (!r) return;
+    let t = Math.min(r.total, Math.max(0, to));
+    let last = -1;
+    for (let lo = 0, hi = r.times.length - 1; lo <= hi;) {
+      const mid = (lo + hi) >> 1;
+      if (r.times[mid] <= t) { last = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    let key = last;
+    while (key >= 0 && !r.full[key]) key--;
+    if (key < 0) { key = r.full.indexOf(true); last = key; t = r.times[key]; }
+    replaySeeking = true;
+    feedReplay(key);
+    for (let i = key + 1; i <= last; i++) feedReplay(i);
+    // what had happened by then, none of it told as news
+    eventsSeen = new Set();
+    killEvents = [];
+    otherEvents = [];
+    squadEvents = [];
+    ghostMarks = [];
+    lootFloats = [];
+    switchNow = new Map();
+    blastMarks = [];
+    orbitMain = orbitField = phobosField = null;
+    addEvents(r.events.filter(e => e.rt <= t), false);
+    showKills();
+    squadPanePrint = '';
+    showSquadPane();
+    replaySeeking = false;
+    r.next = last + 1;
+    r.at = t;
+    r.lootAt = -2;
+    replayLoot(r);
+    rosterPrint = null;
+    listRoster();
+    dirty = true;
+  }
+  // What lay about and what everybody carried at this moment of the replay: the last of it recorded by then (the
+  // first, before any was). A raid recorded before this was kept has none.
+  function replayLoot(r) {
+    let at = r.loot.length ? 0 : -1;
+    for (let i = 1; i < r.loot.length && r.loot[i][0] <= r.at; i++) at = i;
+    if (at === r.lootAt) return;
+    r.lootAt = at;
+    try { things = at < 0 ? null : readThings(JSON.parse(r.loot[at][1]).d); } catch (e) { things = null; }
+    bestPrint = rosterPrint = null;
+    tipFor = null;
+    dirty = true;
+  }
+  // each frame: the reports due by now
+  function playReplay(dt) {
+    const r = replay;
+    if (!r || !r.playing) return;
+    r.at += dt * 1000 * r.speed;
+    let fed = -1;
+    while (r.next < r.times.length && r.times[r.next] <= r.at) { fed = r.next; feedReplay(r.next++); }
+    // things glide from one report's place to the next's in the time between them, as fast as the replay goes
+    if (fed > 0) period = Math.min(1000, Math.max(16, (r.times[fed] - r.times[fed - 1]) / r.speed));
+    if (r.at >= r.total) { r.at = r.total; r.playing = false; }
+    replayLoot(r);
+    showReplay();
+    dirty = true;
+  }
+  let replaySeeking = false, replayDragging = false, replayShown = '';
+  function showReplay() {
+    const r = replay;
+    if (!r) return;
+    showBotLine();
+    const said = (r.playing ? 1 : 0) + '|' + Math.floor(r.at / 250) + '|' + (prefs.heat ? 1 : 0) + (prefs.trails === false ? 0 : 1) + (prefs.minimap === false ? 0 : 1);
+    if (said === replayShown) return;
+    replayShown = said;
+    $('replayPlay').textContent = r.playing ? '❚❚' : '▶';
+    $('replayPlay').title = r.playing ? T('Pause (Space)') : T('Play (Space)');
+    $('replayClock').textContent = clockText(r.at) + ' / ' + clockText(r.total);
+    if (!replayDragging) $('replaySeek').value = String(Math.round(1000 * r.at / r.total));
+    $('replayHeat').classList.toggle('on', !!prefs.heat);
+    $('replayTrails').classList.toggle('on', prefs.trails !== false);
+    $('replayMini').classList.toggle('on', prefs.minimap !== false);
+  }
+  // The bot pressed (followed) in a replay: what it was doing over the raid, as a line of colours over the bar, a
+  // colour for each mod that decided for it. Pointing at a stretch says what; pressing goes there.
+  let botLinePrint = '';
+  function showBotLine() {
+    const r = replay, box = $('replayBot'), track = r && chased !== null && r.scan ? r.scan.tracks.get(chased) : null;
+    const print = track ? chased + '|' + track.act.length + '|' + track.t.length : '';
+    if (print === botLinePrint) return;
+    botLinePrint = print;
+    box.hidden = !track;
+    if (!track) return;
+    $('replayBotName').textContent = track.name || ONE[track.c] || track.c;
+    $('replayBotName').style.color = (KINDS[track.c] || OTHER).col;
+    const strip = $('replayBotStrip'), end = track.t[track.t.length - 1];
+    strip.textContent = '';
+    track.act.forEach((a, i) => {
+      const until = i + 1 < track.act.length ? track.act[i + 1].t : end, part = document.createElement('i');
+      part.style.left = (100 * a.t / r.total) + '%';
+      part.style.width = Math.max(0.15, 100 * (until - a.t) / r.total) + '%';
+      part.style.background = a.by ? DOING_COL[a.by] || '#8a8c9a' : '#3a3c48';
+      part.title = clockText(a.t) + (a.by ? ' · ' + (a.by === 'EFT' ? '' : a.by + ': ') + a.text : '');
+      strip.appendChild(part);
+    });
+  }
+  $('replayBotStrip').onclick = e => {
+    if (!replay) return;
+    const box = $('replayBotStrip').getBoundingClientRect();
+    seekReplay(replay.total * Math.min(1, Math.max(0, (e.clientX - box.left) / box.width)));
+    replayShown = '';
+    showReplay();
+  };
+  function leaveReplay() {
+    if (!replay) return;
+    replay = null;
+    replayShown = '';
+    showBotLine();
+    lootFloats = [];
+    forget();
+    sid = '';
+    $('replayBar').hidden = true;
+    raidWin.hidden = true;
+    rnShow();
+    forgetSquads();
+    blastMarks = [];
+    document.body.classList.remove('replaying');
+    listHistory();
+    showStatus();
+    dirty = true;
+  }
+  for (const speed of REPLAY_SPEEDS) {
+    const o = document.createElement('option');
+    o.value = String(speed);
+    o.textContent = (speed === 0.5 ? '½' : speed) + '×';
+    $('replaySpeed').appendChild(o);
+  }
+  $('replaySpeed').value = '1';
+  $('replaySpeed').onchange = e => { if (replay) replay.speed = +e.target.value || 1; };
+  $('replayPlay').onclick = () => {
+    if (!replay) return;
+    if (!replay.playing && replay.at >= replay.total) seekReplay(0);
+    replay.playing = !replay.playing;
+    showReplay();
+  };
+  $('replaySeek').oninput = e => { replayDragging = true; seekReplay(replay ? replay.total * (+e.target.value) / 1000 : 0); replayShown = ''; showReplay(); };
+  $('replaySeek').onchange = () => { replayDragging = false; };
+  $('replayHeat').onclick = () => { prefs.heat = !prefs.heat; save(); replayShown = ''; showReplay(); dirty = true; };
+  $('historyRefresh').onclick = loadHistory;
+
+  // One pass over a replay's full reports, a few at a time so the page stays quick: where everybody was (the heat
+  // map and the trails), and how many of each side were alive (the charts).
+  // groups: the sides the charts count, each in its kind's colour
+  // on another floor than the one shown, while only that floor's people are wanted (Map > Selected floor only)
+  const offFloor = (x, y, z) => !!prefs.floorOnly && Number.isFinite(z) && otherFloor(x, y, z) !== 0;
+  const GROUPS = [['Friendly Player', ['Main Player', 'Friendly Player']], ['Enemy Player', ['Enemy Player']], ['Scav', ['Scav', 'Sniper']],
+    ['Boss', ['Boss', 'Guard', 'Goon', 'Cultist']], ['Other AI', null]];
+  const groupOf = kind => { const i = GROUPS.findIndex(g => g[1] && g[1].includes(kind)); return i < 0 ? GROUPS.length - 1 : i; };
+  function scanReplay(r) {
+    if (r.scan) return r.scan;
+    const s = r.scan = { i: 0, done: false, heat: new Map(), tracks: new Map(), ts: [], alive: GROUPS.map(() => []), botsAlive: [], peak: 0, mods: null, blasts: [], print: '', picture: null };
+    // every shot, by whose it was; a sixth number in one says it hit somebody (a newer plugin's)
+    const whereNow = id => { const tr = s.tracks.get(id); return tr && tr.x.length ? [tr.x[tr.x.length - 1], tr.y[tr.y.length - 1]] : null; };
+    const shotsOf = (rows, t) => {
+      for (const b of blastsOf(rows, whereNow)) s.blasts.push({ t, x: b.x, y: b.y, who: b.who });
+      for (const row of rows || []) {
+        if (!Array.isArray(row) || row.length < 5) continue;
+        const track = s.tracks.get(row[0]);
+        if (track) track.shots++;
+        if (row.length >= 6) { s.hitsKnown = true; if (track) track.hits++; }
+      }
+    };
+    const more = () => {
+      if (replay !== r) return;
+      const until = performance.now() + 10;
+      while (s.i < r.lines.length && performance.now() < until) {
+        if (r.full[s.i]) {
+          try {
+            const counts = GROUPS.map(() => 0), t = r.times[s.i];
+            const d = JSON.parse(r.lines[s.i]);
+            shotsOf(d.sh, t);
+            if (Array.isArray(d.brains)) s.mods = d.brains;
+            if (Array.isArray(d.has) && d.has.length) s.has = d.has;
+            let bots = 0;
+            for (const m of d.markers || []) {
+              if (!m.dyn || !Array.isArray(m.p) || m.c === 'BTR' || m.c === 'Airdrop') continue;
+              let spots = s.heat.get(m.c);
+              if (!spots) s.heat.set(m.c, spots = []);
+              spots.push(m.p[0], m.p[1], m.p[2] || 0);
+              let track = s.tracks.get(m.id);
+              if (!track) s.tracks.set(m.id, track = { c: m.c, name: '', pid: '', shots: 0, hits: 0, t: [], x: [], y: [], act: [], beh: [], first: t, last: t, lv: 0, sd: '', g: '', df: '', ps: '', downs: 0, dn: false });
+              track.c = m.c;
+              track.t.push(t); track.x.push(m.p[0]); track.y.push(m.p[1]);
+              if (m.t) track.name = latin(m.t);
+              if (!track.pid) track.pid = m.pid || m.u || (m.c === 'Main Player' ? r.about.sid || '' : '');
+              // who they are, and what a bot was doing, each time that changed (see the Raid window)
+              track.last = t;
+              if (m.lv || m.bl) track.lv = m.lv || m.bl;
+              if (m.sd) track.sd = m.sd;
+              if (m.g || m.bg) track.g = m.g || 'b' + m.bg;
+              if (m.df) track.df = m.df;
+              if (m.ps) track.ps = m.ps;
+              if (m.dn && !track.dn) track.downs++;
+              track.dn = !!m.dn;
+              if (!PEOPLE.includes(m.c)) {
+                bots++;
+                const b = behaviourOf(m), saidB = b[0] + '|' + b[1] + (m.gh ? '|g' : '');
+                if (!track.beh.length || track.beh[track.beh.length - 1].said !== saidB) track.beh.push({ t, k: b[0], text: b[1], said: saidB, gh: !!m.gh });
+              }
+              // what it was doing, each time that changed (see the bot's line over the replay's bar)
+              const brain = hasDetails(m) ? brainOf(m) : null, said = brain ? brain.by + '|' + brain.text : '';
+              if (!track.act.length || track.act[track.act.length - 1].said !== said) track.act.push({ t, said, by: brain ? brain.by : '', text: brain ? brain.text : '' });
+              counts[groupOf(m.c)]++;
+            }
+            s.ts.push(t);
+            s.botsAlive.push(bots);
+            if (bots > s.peak) s.peak = bots;
+            counts.forEach((n, g) => s.alive[g].push(n));
+          } catch (e) { /* a line cut short */ }
+        } else if (r.lines[s.i].includes('"sh":[')) {
+          try { shotsOf(JSON.parse(r.lines[s.i]).sh, r.times[s.i]); } catch (e) { /* a line cut short */ }
+        }
+        s.i++;
+      }
+      s.done = s.i >= r.lines.length;
+      dirty = true;
+      if (!s.done) setTimeout(more, 0);
+      else rvShow();
+    };
+    more();
+    return s;
+  }
+
+  // The heat map, as Raid Review draws its own: every place somebody was is a soft blob, the blobs add up, and how
+  // much has added up is coloured from blue (a little) through green and yellow to red (a lot). The blobs are a
+  // fixed size on the screen, so it reads the same zoomed in or out. For the kinds of people that are switched on;
+  // the map under it is dimmed. Drawn at half size and kept until the view or the kinds change.
+  const HEAT_CELL = 2, HEAT_R = 9, HEAT_Q = 0.5;
+  let heatStamp = null, heatLut = null;
+  function heatTools() {
+    if (heatStamp) return;
+    const R = HEAT_R * 2;
+    heatStamp = document.createElement('canvas');
+    heatStamp.width = heatStamp.height = R * 2;
+    const g = heatStamp.getContext('2d'), fade = g.createRadialGradient(R, R, HEAT_R * 0.35, R, R, R);
+    fade.addColorStop(0, 'rgba(0,0,0,1)');
+    fade.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = fade;
+    g.fillRect(0, 0, R * 2, R * 2);
+    const strip = document.createElement('canvas');
+    strip.width = 256;
+    strip.height = 1;
+    const sg = strip.getContext('2d'), ramp = sg.createLinearGradient(0, 0, 256, 0);
+    for (const [at, col] of [[0.25, '#2b3cff'], [0.5, '#00d5ff'], [0.65, '#32e84a'], [0.82, '#ffe52b'], [1, '#ff2a1c']]) ramp.addColorStop(at, col);
+    sg.fillStyle = ramp;
+    sg.fillRect(0, 0, 256, 1);
+    heatLut = sg.getImageData(0, 0, 256, 1).data;
+  }
+  function drawHeat() {
+    if (!replay || !prefs.heat || !map) return;
+    const h = scanReplay(replay);
+    const kinds = [...h.heat.keys()].filter(k => !isHidden(k) && !prefs.areaKinds.includes(k));
+    const print = kinds.join(',') + '|' + (h.i >> 6) + '|' + h.done + '|' + map.loc + '|' + (prefs.floorOnly ? floorShown.place + ':' + floorShown.n : '');
+    if (h.print !== print) {
+      // where everybody was, counted in squares of HEAT_CELL metres
+      h.print = print;
+      h.view = '';
+      const w = Math.max(1, Math.ceil((map.max.x - map.min.x) / HEAT_CELL)), tall = Math.max(1, Math.ceil((map.max.y - map.min.y) / HEAT_CELL));
+      const grid = new Uint32Array(w * tall);
+      for (const kind of kinds) {
+        const spots = h.heat.get(kind);
+        for (let i = 0; i < spots.length; i += 3) {
+          if (offFloor(spots[i], spots[i + 1], spots[i + 2])) continue;
+          const cx = Math.floor((spots[i] - map.min.x) / HEAT_CELL), cy = Math.floor((spots[i + 1] - map.min.y) / HEAT_CELL);
+          if (cx >= 0 && cy >= 0 && cx < w && cy < tall) grid[cy * w + cx]++;
+        }
+      }
+      const xs = [], ys = [], ns = [];
+      for (let i = 0; i < grid.length; i++) {
+        if (!grid[i]) continue;
+        xs.push(map.min.x + (i % w + 0.5) * HEAT_CELL);
+        ys.push(map.min.y + (Math.floor(i / w) + 0.5) * HEAT_CELL);
+        ns.push(grid[i]);
+      }
+      // "a lot" is what the busiest twentieth of the squares had
+      const sorted = ns.slice().sort((a, b) => a - b);
+      h.cells = { xs, ys, ns };
+      h.cap = Math.max(3, sorted.length ? sorted[Math.floor(sorted.length * 0.95)] : 3);
+    }
+    heatTools();
+    const W = Math.ceil(vw * HEAT_Q), H = Math.ceil(vh * HEAT_Q);
+    const view = [panX.toFixed(1), panY.toFixed(1), zoom.toFixed(4), turn, W, H].join('|');
+    if (h.view !== view) {
+      h.view = view;
+      if (!h.shown) h.shown = document.createElement('canvas');
+      if (h.shown.width !== W || h.shown.height !== H) { h.shown.width = W; h.shown.height = H; }
+      const g = h.shown.getContext('2d', { willReadFrequently: true });
+      g.clearRect(0, 0, W, H);
+      // the squares on the screen, gathered into cells half a blob wide: one blob each, as strong as what's in it
+      const cell = HEAT_R / 2, R = HEAT_R * 2, across = Math.ceil(W / cell) + 8, cells = new Map(), { xs, ys, ns } = h.cells;
+      for (let i = 0; i < ns.length; i++) {
+        const s = toScreen(xs[i], ys[i]), x = s[0] * HEAT_Q, y = s[1] * HEAT_Q;
+        if (x < -R || y < -R || x > W + R || y > H + R) continue;
+        const key = Math.floor(x / cell) + 4 + (Math.floor(y / cell) + 4) * across;
+        const c = cells.get(key);
+        if (c) { c[0] += x * ns[i]; c[1] += y * ns[i]; c[2] += ns[i]; } else cells.set(key, [x * ns[i], y * ns[i], ns[i]]);
+      }
+      // zoomed out, a cell holds many squares: "a lot" grows with it
+      const cap = h.cap * 1.6 * Math.max(1, cell / HEAT_Q / zoom / HEAT_CELL);
+      for (const c of cells.values()) {
+        g.globalAlpha = Math.min(1, Math.max(0.08, c[2] / cap));
+        g.drawImage(heatStamp, c[0] / c[2] - R, c[1] / c[2] - R);
+      }
+      g.globalAlpha = 1;
+      const image = g.getImageData(0, 0, W, H), px = image.data;
+      for (let i = 3; i < px.length; i += 4) {
+        const a = px[i];
+        if (!a) continue;
+        px[i - 3] = heatLut[a * 4]; px[i - 2] = heatLut[a * 4 + 1]; px[i - 1] = heatLut[a * 4 + 2];
+        px[i] = Math.min(205, 50 + a * 1.1);
+      }
+      g.putImageData(image, 0, 0);
+    }
+    ctx.save();
+    ctx.fillStyle = 'rgba(6, 6, 12, 0.5)';
+    ctx.fillRect(0, 0, vw, vh);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(h.shown, 0, 0, vw, vh);
+    ctx.restore();
+  }
+
+  // Trails, in a replay: where each one has been in the last minute, a line behind them in their kind's colour.
+  const TRAIL_MS = 60000;
+  function drawTrails(scale) {
+    if (!replay || prefs.trails === false) return;
+    const s = scanReplay(replay), at = replay.at, span = prefs.trailMs === 0 ? Infinity : prefs.trailMs || TRAIL_MS;
+    ctx.save();
+    ctx.lineJoin = ctx.lineCap = 'round';
+    for (const [id, track] of s.tracks) {
+      if (isHidden(track.c) || prefs.areaKinds.includes(track.c)) continue;
+      const here = liveById.get(id);
+      if (here && offFloor(here.cx, here.cy, here.cz)) continue;
+      const t = track.t;
+      let hi = -1;
+      for (let lo = 0, top = t.length - 1; lo <= top;) { const mid = (lo + top) >> 1; if (t[mid] <= at) { hi = mid; lo = mid + 1; } else top = mid - 1; }
+      // (gone from the raid: no trail left behind)
+      if (hi < 1 || at - t[hi] > 3000) continue;
+      let from = hi;
+      while (from > 0 && t[from - 1] >= at - span && t[from] - t[from - 1] < 5000) from--;
+      if (hi - from < 1) continue;
+      ctx.beginPath();
+      for (let i = from; i <= hi; i++) { const p = toScreen(track.x[i], track.y[i]); if (i === from) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]); }
+      const now = liveById.get(id);
+      if (now && Number.isFinite(now.cx)) { const p = toScreen(now.cx, now.cy); ctx.lineTo(p[0], p[1]); }
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 4 * scale;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 2 * scale;
+      ctx.strokeStyle = (KINDS[track.c] || OTHER).col;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Kills on the map, live and in a replay: for a few seconds a line from where the killer stood to where the other
+  // died, and a mark there with who it was. (An older plugin doesn't say where: nothing is drawn for its kills.)
+  const KILL_MS = 12000;
+  function drawKills(scale) {
+    if (prefs.killLines === false) return;
+    const now = performance.now();
+    // (in a replay the marks can be left standing: every death so far)
+    const keep = !!replay && !!prefs.killKeep;
+    const list = replay ? replay.events.filter(e => e.k === 'kill' && replay.at >= e.rt && (keep || replay.at - e.rt < KILL_MS))
+      : killEvents.filter(e => now - e.at < KILL_MS);
+    if (!list.length) return;
+    let fresh = false;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const e of list) {
+      const d = e.d;
+      // Never more than the map shows anyway: the line from the killer, and their name, only when their kind is shown
+      // (the player always is); the kill itself when the one who died is shown, or the player or a friend shown
+      // killed them.
+      const seen = kind => !!kind && !isHidden(kind) && !prefs.areaKinds.includes(kind);
+      const byUs = d.kk === 'Main Player' || (d.kk === 'Friendly Player' && seen(d.kk));
+      const killerSeen = d.kk === 'Main Player' || seen(d.kk);
+      if (!Array.isArray(d.at) || offFloor(d.at[0], d.at[1], d.at[2]) || !(seen(d.vk || 'None') || byUs)) continue;
+      const age = replay ? replay.at - e.rt : now - e.at, old = age >= KILL_MS, s = toScreen(d.at[0], d.at[1]), r = (old ? 4.5 : 7) * scale;
+      ctx.globalAlpha = old ? 0.6 : Math.min(1, (KILL_MS - age) / 2500);
+      if (!old) fresh = true;
+      if (killerSeen && Array.isArray(d.ka) && !old) {
+        const k = toScreen(d.ka[0], d.ka[1]);
+        for (const [width, col] of [[4.5, 'rgba(0,0,0,0.75)'], [2, inkOf((KINDS[d.kk] || OTHER).col)]]) {
+          ctx.beginPath();
+          ctx.moveTo(k[0], k[1]);
+          ctx.lineTo(s[0], s[1]);
+          ctx.setLineDash(width === 2 ? [7 * scale, 6 * scale] : []);
+          ctx.lineWidth = width * scale;
+          ctx.strokeStyle = col;
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+      // a red disc with a white cross: somebody died here
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], r * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8322c';
+      ctx.fill();
+      ctx.lineWidth = 2 * scale;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s[0] - r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] + r * 0.6, s[1] + r * 0.6);
+      ctx.moveTo(s[0] + r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] - r * 0.6, s[1] + r * 0.6);
+      ctx.lineWidth = 2.4 * scale;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      const text = old ? '' : (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn && killerSeen ? '  ←  ' + latin(d.kn) : '');
+      if (text) {
+        // above the mark: under it is where the body's own name goes
+        ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+        ctx.strokeText(text, s[0], s[1] - r * 1.9);
+        ctx.fillStyle = '#ffd9d6';
+        ctx.fillText(text, s[0], s[1] - r * 1.9);
+      }
+    }
+    ctx.restore();
+    if (fresh) dirty = true;
+  }
+
+  // ---- a replay's numbers: the leaderboard and the charts ----
+  // who did what, from the raid's events: [{ name, kind, kills, far, items, worth, died: { t, by } }]
+  function raidPeople(r) {
+    const people = new Map();
+    const one = (key, name, kind) => {
+      if (!key) return null;
+      let p = people.get(key);
+      if (!p) people.set(key, p = { key, id: null, name: '', kind: '', kills: 0, killList: [], far: 0, items: 0, drops: 0, worth: 0, died: null, left: null, end: null, shots: 0, hits: 0, gear: 0,
+        sd: '', team: 0, lv: 0, df: '', ps: '', sain: '', spawn: null, downs: 0 });
+      if (name) p.name = latin(name);
+      if (kind) p.kind = kind;
+      return p;
+    };
+    for (const e of r.events) {
+      const d = e.d;
+      if (e.k === 'kill') {
+        const dead = one(e.p || 'n:' + e.nm, e.nm, d.vk), killer = d.k || d.kn ? one(d.k || 'n:' + d.kn, d.kn, d.kk) : null;
+        if (dead) dead.died = { t: e.rt, by: d.kn ? latin(d.kn) : '', w: d.w, m: d.m, bp: d.bp, at: d.at };
+        if (killer && killer !== dead) { killer.kills++; killer.killList.push(e); if (d.m > killer.far) killer.far = d.m; }
+      } else if (e.k === 'loot') {
+        const who = one(e.p || 'n:' + e.nm, e.nm, d.wk), worth = lootWorth(d);
+        if (who) { who.items += d.q || 1; if (Number.isFinite(worth)) who.worth += worth; }
+      } else if (e.k === 'drop') {
+        const who = one(e.p || 'n:' + e.nm, e.nm, d.wk);
+        if (who) who.drops += d.q || 1;
+      } else if (e.k === 'left') {
+        const who = one(e.p, e.nm, d.wk);
+        if (who) who.left = { t: e.rt, x: d.x };
+      } else if (e.k === 'end') {
+        const who = one(e.p || r.about.sid, r.about.name, 'Main Player');
+        if (who) who.end = { st: d.st, ex: d.ex, t: e.rt };
+      }
+    }
+    // what each fired and hit, who they were, and what they came into the raid with (the first loot kept of the raid)
+    let gear = null;
+    try { gear = r.loot.length ? JSON.parse(r.loot[0][1]).d : null; } catch (e) { gear = null; }
+    const mates = new Map();
+    for (const track of r.scan ? r.scan.tracks.values() : []) if (track.g) mates.set(track.g, (mates.get(track.g) || 0) + 1);
+    for (const [id, track] of r.scan ? r.scan.tracks : []) {
+      const who = one(track.pid || 'n:' + track.name, track.name, track.c);
+      if (!who) continue;
+      who.id = id;
+      who.shots += track.shots;
+      who.hits += track.hits;
+      who.sd = track.sd;
+      who.team = track.g && !track.g.startsWith('b') && mates.get(track.g) > 1 ? squadNo(track.g) : 0;
+      who.lv = track.lv;
+      who.df = track.df;
+      who.ps = track.ps;
+      who.sain = [track.df, track.ps].filter(Boolean).join(' ');
+      who.spawn = who.spawn === null ? track.first : Math.min(who.spawn, track.first);
+      who.downs += track.downs;
+      for (const i of gear && gear.carried && track.pid ? gear.carried[track.pid] || [] : []) who.gear += ((gear.names[i[0]] || {}).p || 0) * (i[1] || 1);
+    }
+    return [...people.values()].filter(p => p.name || p.kind);
+  }
+  // A line chart: series [{ name, col, v: [..] }] over times ts (ms), one axis. Pointing at it says each series'
+  // number then; pressing it goes to that moment of the replay.
+  const chartsToLay = [];
+  function lineChart(box, title, ts, series, say) {
+    const wrap = document.createElement('div');
+    wrap.className = 'chart';
+    const head = document.createElement('h4');
+    head.textContent = title;
+    wrap.appendChild(head);
+    if (series.length > 1) {
+      const legend = document.createElement('div');
+      legend.className = 'chartLegend';
+      for (const s of series) { const item = document.createElement('span'), dot = document.createElement('i'); dot.style.background = s.col; item.append(dot, s.name); legend.appendChild(item); }
+      wrap.appendChild(legend);
+    }
+    const plot = document.createElement('div'), c = document.createElement('canvas'), tip = document.createElement('div');
+    plot.className = 'chartPlot';
+    tip.className = 'chartTip';
+    tip.hidden = true;
+    plot.append(c, tip);
+    wrap.appendChild(plot);
+    box.appendChild(wrap);
+    // measured and drawn once every chart is in the page (see showStats): its width is known only then
+    chartsToLay.push(() => {
+    const total = replay.total, w = Math.max(240, plot.clientWidth), h = 150, pad = { l: 34, r: 10, t: 8, b: 20 }, ratio = window.devicePixelRatio || 1;
+    c.width = Math.round(w * ratio);
+    c.height = Math.round(h * ratio);
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+    let top = 1;
+    for (const s of series) for (const v of s.v) if (v > top) top = v;
+    const step = Math.pow(10, Math.floor(Math.log10(top))), nice = Math.ceil(top / step) * step;
+    const X = t => pad.l + (w - pad.l - pad.r) * t / total, Y = v => h - pad.b - (h - pad.t - pad.b) * v / nice;
+    const g = c.getContext('2d');
+    const paint = at => {
+      g.setTransform(ratio, 0, 0, ratio, 0, 0);
+      g.clearRect(0, 0, w, h);
+      g.font = '11px ' + FONT;
+      g.fillStyle = '#8a8c9a';
+      g.strokeStyle = 'rgba(200, 205, 255, 0.09)';
+      g.lineWidth = 1;
+      g.textBaseline = 'middle';
+      g.textAlign = 'right';
+      for (let k = 0; k <= 2; k++) {
+        const v = nice * k / 2, y = Math.round(Y(v)) + 0.5;
+        g.beginPath(); g.moveTo(pad.l, y); g.lineTo(w - pad.r, y); g.stroke();
+        g.fillText(say ? say(v) : String(Math.round(v)), pad.l - 6, y);
+      }
+      g.textBaseline = 'top';
+      for (let k = 0; k <= 4; k++) { g.textAlign = k === 0 ? 'left' : k === 4 ? 'right' : 'center'; g.fillText(clockText(total * k / 4), X(total * k / 4), h - pad.b + 5); }
+      // where the replay is now
+      g.strokeStyle = 'rgba(123, 156, 255, 0.55)';
+      g.beginPath(); g.moveTo(X(replay.at), pad.t); g.lineTo(X(replay.at), h - pad.b); g.stroke();
+      g.lineJoin = g.lineCap = 'round';
+      g.lineWidth = 2;
+      for (const s of series) {
+        g.strokeStyle = s.col;
+        g.beginPath();
+        for (let i = 0; i < ts.length; i++) { if (i) g.lineTo(X(ts[i]), Y(s.v[i])); else g.moveTo(X(ts[i]), Y(s.v[i])); }
+        g.stroke();
+      }
+      if (at >= 0) {
+        g.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        g.lineWidth = 1;
+        g.beginPath(); g.moveTo(X(ts[at]), pad.t); g.lineTo(X(ts[at]), h - pad.b); g.stroke();
+        for (const s of series) {
+          g.beginPath(); g.arc(X(ts[at]), Y(s.v[at]), 4, 0, Math.PI * 2);
+          g.fillStyle = s.col; g.fill();
+          g.lineWidth = 2; g.strokeStyle = '#14141c'; g.stroke();
+        }
+      }
+    };
+    const near = e => {
+      const t = total * (e.clientX - c.getBoundingClientRect().left - pad.l) / (w - pad.l - pad.r);
+      let best = 0;
+      for (let i = 1; i < ts.length; i++) if (Math.abs(ts[i] - t) < Math.abs(ts[best] - t)) best = i;
+      return best;
+    };
+    plot.onmousemove = e => {
+      if (!ts.length) return;
+      const at = near(e);
+      paint(at);
+      tip.textContent = '';
+      const when = document.createElement('b');
+      when.textContent = clockText(ts[at]);
+      tip.appendChild(when);
+      for (const s of series) {
+        const row = document.createElement('span'), dot = document.createElement('i');
+        dot.style.background = s.col;
+        row.append(dot, (series.length > 1 ? s.name + ': ' : '') + (say ? say(s.v[at]) : s.v[at]));
+        tip.appendChild(row);
+      }
+      tip.hidden = false;
+      const x = X(ts[at]);
+      tip.style.left = Math.min(w - 150, Math.max(0, x + (x > w / 2 ? -150 : 12))) + 'px';
+    };
+    plot.onmouseleave = () => { tip.hidden = true; paint(-1); };
+    plot.onclick = e => { if (ts.length) { seekReplay(ts[near(e)]); replayShown = ''; showReplay(); paint(near(e)); } };
+    paint(-1);
+    });
+  }
+  $('replayTrails').onclick = () => { prefs.trails = prefs.trails === false; save(); replayShown = ''; showReplay(); dirty = true; };
+  // a raid from somebody else: its zip, sent to the server
+  $('historyImport').onclick = () => $('historyFile').click();
+  $('historyFile').onchange = async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    listHistory(T('Loading the raid…'));
+    let answer = null;
+    try { answer = await (await fetch('api/history/import', { method: 'POST', body: file })).json(); } catch (err) { /* said below */ }
+    await loadHistory();
+    if (!answer || !answer.ok) listHistory(T('That file isn\'t a raid exported by Satellite or Raid Review.'));
+  };
+
+  // ---- a raid looked into: the Raid window, the History window, and what they need ---------------------------
+  // Everything Raid Review showed of a raid, in Satellite's own way: the raid's summary and leaderboard, its numbers
+  // as charts, every event in a list, what each bot was doing as bars side by side, what ORBIT's squads were out to
+  // do, the loot of the moment, and the upkeep of the recordings. All of it from the replay's own scan and events.
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
+  const PEOPLE = ['Main Player', 'Friendly Player'];
+  // the squads of a raid, numbered as they're first seen, each with a colour of its own
+  const squadNos = new Map();
+  const squadNo = g => { if (!g) return 0; let n = squadNos.get(g); if (!n) squadNos.set(g, n = squadNos.size + 1); return n; };
+  const SQUAD_COLS = ['#4fc3f7', '#ffb74d', '#ba68c8', '#81c784', '#f06292', '#fff176', '#4db6ac', '#ff8a65', '#9fa8da', '#dce775'];
+  const squadCol = n => SQUAD_COLS[(n - 1) % SQUAD_COLS.length];
+  // who has been seen of each squad: one that came in alone is no team, and gets no number
+  const squadSeen = new Map();
+  const squadOf = m => { let set = squadSeen.get(m.g); if (!set) squadSeen.set(m.g, set = new Set()); set.add(m.id); return set.size > 1; };
+  const forgetSquads = () => { squadNos.clear(); squadSeen.clear(); };
+
+  // What a bot is doing, as one of a few sorts (the Behaviour tab's colours): from what it has decided ("dc": SAIN's
+  // decision or the game's), else from the layer deciding for it and where a mod is sending it.
+  const BEH = { combat: [T('Combat'), '#ef5350'], search: [T('Search'), '#f5a623'], movement: [T('Movement'), '#4f8ff7'], cover: [T('Cover'), '#26c6da'],
+    patrol: [T('Patrol'), '#43c463'], orbit: [T('Orbiting'), '#9ccc65'], guard: [T('Guarding'), '#1f8f4e'], squadCover: [T('Waiting in cover'), '#ff8a3d'],
+    ambush: [T('Ambush'), '#d9632b'], medical: [T('Medical'), '#ec5fa8'], loot: [T('Loot'), '#f7d046'], flee: [T('Flee'), '#b06cf0'],
+    extract: [T('Extract'), '#2dd4bf'], grenade: [T('Grenade'), '#ff9d9d'], quest: [T('Quest'), '#f9c6e0'], idle: [T('Idle'), '#4a4f60'],
+    other: [T('Other'), '#858b9c'], pre: [T('Not spawned yet'), '#1d1f29'], dead: [T('Dead'), '#000000'], gone: [T('Extracted'), '#0f5f56'] };
+  const BEH_OF = {};
+  for (const [key, names] of [
+    ['combat', 'shootFromPlace shootFromCover shootToSmoke dogFight suppressFire suppressGrenade suppressStationary attackMoving attackMovingWithSuppress attackMovingFlank axeTarget oneMeleeAttack grenadeSuicide runToStationary shootFromStationary MoveToEngage StandAndShoot ShootDistantEnemy DogFight RushEnemy MeleeAttack FightZombies Freeze PushSuppressedEnemy Suppress Combat Squad'],
+    ['search', 'search Search GroupSearch'],
+    ['movement', 'goToPoint goToPointTactical holdPosition goToEnemy goToEnemyZigZag runToEnemy runToEnemyZigZag Help Regroup'],
+    ['cover', 'goToCoverPoint goToCoverPointTactical runToCover runToCoverZigZag teleportToCover SeekCover ShiftCover Retreat'],
+    ['patrol', 'simplePatrol followerPatrol alternativePatrol standBy peaceful peaceLook peaceHardAim Peace'],
+    ['medical', 'heal healStimulators eatDrink healAnotherTarget FirstAid Surgery Stims'],
+    ['loot', 'botTakeItem botDropItem deadBody goToLootPointNode LootPatrol'],
+    ['flee', 'runAwayGrenade runAwayArtillery runAwayBTR flashed panicSitting turnAwayLight Run AvoidThreat'],
+    ['extract', 'goToExfiltrationPointNode leaveMap Extract'],
+    ['grenade', 'throwGrenadeFromPlace runAndThrowGrenadeFromPlace ThrowGrenade']]) for (const n of names.split(' ')) BEH_OF[n] = key;
+  const BEH_EXITS = ['D-2', 'Bunker Hermetic Door', 'ZB-013', 'Saferoom extraction'];
+  // a mod's objective ("ContainerLoot", "AmbushExtract (Moving)", "MultiStep: D-2 (1/3)") as a sort
+  function goalSort(goal) {
+    const op = /^MultiStep:\s+(.+?)\s+\(\d+\/\d+\)/.exec(goal);
+    if (op && BEH_EXITS.includes(op[1])) return 'extract';
+    if (/Ambush/.test(goal)) return 'ambush';
+    if (/^(AirdropLoot|ContainerLoot|LooseLoot|Corpse)\b/.test(goal)) return 'loot';
+    if (/^Quest\b/.test(goal)) return 'quest';
+    if (/^Exfil\b/.test(goal)) return 'extract';
+    if (/^Synthetic\b/.test(goal)) return 'orbit';
+    if (/^Guarding\b/.test(goal)) return 'guard';
+    if (/^SquadCover\b/.test(goal)) return 'squadCover';
+    return 'movement';
+  }
+  const spaced = s => String(s).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+  // [sort, what it says]
+  function behaviourOf(m) {
+    const dc = m.dc || '', layer = m.ly || '';
+    if (dc.startsWith('QB:')) return ['quest', dc.slice(3)];
+    if (dc.startsWith('LootingBots:')) return ['loot', spaced(dc.slice(12))];
+    if (dc.startsWith('BL:')) return ['movement', spaced(dc.slice(3))];
+    if (dc.startsWith('Orbit:') || dc.startsWith('Phobos:')) { const goal = dc.slice(dc.indexOf(':') + 1); return [goalSort(goal), goal === 'Synthetic' ? '' : spaced(goal)]; }
+    const plain = dc.replace(/^SAIN:/, ''), idle = !dc || dc === 'peaceful' || dc === 'simplePatrol' || dc === 'standBy' || dc === 'SAIN:Peace' || /^\d+$/.test(dc);
+    if (!idle) return [BEH_OF[plain] || 'other', (dc.startsWith('SAIN:') ? 'SAIN · ' : '') + spaced(plain)];
+    // nothing of its own decided: by the layer, and where a mod is sending it
+    if (layer !== 'LootPatrol' && /Loot/.test(layer)) return ['loot', spaced(layer)];
+    if (/Follower|Regroup/.test(layer)) return ['movement', spaced(layer)];
+    if (m.os === 'QuestingBots' && m.ob) return ['quest', m.ob];
+    if (m.ob) return [goalSort(m.ob), (m.os || 'ORBIT') + ' · ' + m.ob];
+    if (/^Orbit/i.test(layer)) return ['orbit', 'ORBIT'];
+    if (dc) return [BEH_OF[plain] || 'patrol', spaced(plain)];
+    // (a recording from before decisions were kept: the layer alone)
+    if (/^COMET/i.test(layer) || m.cm) return [/Search|PostCombat/.test(m.cm || '') ? 'search' : /Cover|FallBack/.test(m.cm || '') ? 'cover' : 'combat', 'COMET' + (m.cm ? ' · ' + spaced(m.cm) : '')];
+    if (/^SAIN/i.test(layer)) return [/Extract/.test(layer) ? 'extract' : /Avoid|Flashed/.test(layer) ? 'flee' : 'combat', layer];
+    if (/Fight|HaveEnemy|Attack|Combat|Pursuit|Chase/i.test(layer)) return ['combat', spaced(layer)];
+    if (/Heal/i.test(layer)) return ['medical', spaced(layer)];
+    if (/Exfil|Leave/i.test(layer)) return ['extract', spaced(layer)];
+    if (/Loot/i.test(layer)) return ['loot', spaced(layer)];
+    if (/Ptrl|Patrol|^Pmc/i.test(layer)) return ['patrol', spaced(layer)];
+    return [layer ? 'other' : 'idle', layer ? spaced(layer) : ''];
+  }
+  // Grenades going off, told by their fragments: many "shots" at once from one spot that isn't the gun of whoever
+  // they're counted to. [{ who, x, y }]
+  function blastsOf(rows, where) {
+    if (!Array.isArray(rows) || rows.length < 6) return [];
+    const from = new Map(), out = [];
+    for (const r of rows) {
+      if (!Array.isArray(r) || r.length < 5) continue;
+      const key = r[0] + '|' + Math.round(r[1] / 2) + '|' + Math.round(r[2] / 2), g = from.get(key);
+      if (g) g.n++; else from.set(key, { n: 1, who: r[0], x: r[1], y: r[2] });
+    }
+    for (const g of from.values()) {
+      if (g.n < 6) continue;
+      const at = g.who ? where(g.who) : null;
+      if (at && Math.hypot(at[0] - g.x, at[1] - g.y) < 3) continue;
+      out.push(g);
+    }
+    return out;
+  }
+  let blastMarks = [];
+  const BLAST_MS = 2600;
+  function drawBlasts(scale) {
+    if (!blastMarks.length) return;
+    const now = performance.now();
+    blastMarks = blastMarks.filter(b => now - b.at < BLAST_MS);
+    if (prefs.grenades === false) { blastMarks = []; return; }
+    ctx.save();
+    for (const b of blastMarks) {
+      const k = (now - b.at) / BLAST_MS, s = toScreen(b.x, b.y), r = Math.max(12 * scale, 7 * zoom) * (0.35 + 0.65 * Math.min(1, k * 3));
+      ctx.globalAlpha = 1 - k;
+      if (Number.isFinite(b.fx)) {
+        // thrown from here: an arc to where it went off
+        const f = toScreen(b.fx, b.fy), mid = [(f[0] + s[0]) / 2, (f[1] + s[1]) / 2 - Math.hypot(s[0] - f[0], s[1] - f[1]) * 0.22];
+        ctx.beginPath();
+        ctx.moveTo(f[0], f[1]);
+        ctx.quadraticCurveTo(mid[0], mid[1], s[0], s[1]);
+        ctx.setLineDash([4 * scale, 5 * scale]);
+        ctx.lineWidth = 1.8 * scale;
+        ctx.strokeStyle = '#ffb74d';
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 152, 0, 0.28)';
+      ctx.fill();
+      ctx.lineWidth = 2.4 * scale;
+      ctx.strokeStyle = '#ffa726';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], 3.2 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff3e0';
+      ctx.fill();
+    }
+    ctx.restore();
+    dirty = true;
+  }
+  // Over the markers: a PMC's or a player's squad as a numbered disc in the squad's colour, and a ring round
+  // somebody who is down and can be got up again.
+  function drawBadges(scale) {
+    const squads = prefs.squadMarks !== false;
+    for (const m of live) if (m.dyn && m.g && m.c !== 'Corpse') squadOf(m);
+    ctx.save();
+    for (const m of live) {
+      if (!m.dyn || m.c === 'Corpse' || isHidden(m.c) || inArea(m) || !Number.isFinite(m.cx)) continue;
+      if (!m.dn && !(squads && m.g && squadOf(m))) continue;
+      if (m.c !== 'Main Player' && offFloor(m.cx, m.cy, m.cz)) continue;
+      const s = toScreen(m.cx, m.cy), r = 8 * scale * (KINDS[m.c] || OTHER).size;
+      if (s[0] < -40 || s[1] < -40 || s[0] > vw + 40 || s[1] > vh + 40) continue;
+      if (m.dn) {
+        const beat = 0.5 + 0.5 * Math.sin(performance.now() / 220);
+        ctx.beginPath();
+        ctx.arc(s[0], s[1], r * (1.5 + 0.25 * beat), 0, Math.PI * 2);
+        ctx.setLineDash([4 * scale, 3 * scale]);
+        ctx.lineWidth = 2.2 * scale;
+        ctx.strokeStyle = '#ff5252';
+        ctx.stroke();
+        ctx.setLineDash([]);
+        dirty = true;
+      }
+      if (squads && m.g && squadOf(m)) {
+        const n = squadNo(m.g), x = s[0] + r * 1.05, y = s[1] - r * 1.05, d = 5.6 * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, d, 0, Math.PI * 2);
+        ctx.fillStyle = squadCol(n);
+        ctx.fill();
+        ctx.lineWidth = 1.4 * scale;
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+        ctx.font = '700 ' + Math.round(8.5 * scale) + 'px ' + FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#10121a';
+        ctx.fillText(String(n), x, y + 0.5);
+      }
+    }
+    ctx.restore();
+  }
+  // which letter an ORBIT squad's objective is drawn with: K kills, L loot, Q quest, E extract camp, A airdrop, and a
+  // rush by where it's to: S spawns, B a boss, R a marked room, N a sniper's overwatch, C one of its own
+  function orbitLetter(o) {
+    if (o.AirdropStage) return 'A';
+    const op = String(o.OperationName || ''), type = String(o.Type || '');
+    if (type === 'Rush' || /Rush|Overwatch/i.test(op)) return /Spawn/i.test(op) ? 'S' : /Boss/i.test(op) ? 'B' : /Marked|Room/i.test(op) ? 'R' : /Sniper|Overwatch/i.test(op) ? 'N' : 'C';
+    if (/Extract|Camp/i.test(type)) return 'E';
+    return ORBIT_LETTER[type] || '•';
+  }
+
+  // ---- the minimap: the whole map small in a corner of a replay, where everybody is on it, where they have been
+  // (the heat of the raid) and what the screen shows of it. Pressed or dragged, the map goes there.
+  const mini = { el: null, base: null, basePrint: '', whole: false, heat: null, heatFor: null, at: 0, k: 1, ox: 0, oy: 0, v: null };
+  function miniPlace(x, y) {
+    const [a, b] = spin(x, y);
+    return [mini.ox + mini.k * (a - mini.v.min.x), mini.oy + mini.k * (mini.v.max.y - b)];
+  }
+  function drawMini() {
+    const on = !!replay && prefs.minimap !== false && !!map && !phone.matches;
+    if (!mini.el) {
+      if (!on) return;
+      mini.el = mk('canvas');
+      mini.el.id = 'miniMap';
+      mini.el.title = T('The whole map: press or drag to go there.');
+      document.body.appendChild(mini.el);
+      const go = e => {
+        if (!mini.v) return;
+        const box = mini.el.getBoundingClientRect(), a = (e.clientX - box.left - mini.ox) / mini.k + mini.v.min.x, b = mini.v.max.y - (e.clientY - box.top - mini.oy) / mini.k;
+        const [x, y] = unspin(a, b);
+        chase(null);
+        roam();
+        centreOn(x, y);
+      };
+      mini.el.onpointerdown = e => { mini.el.setPointerCapture(e.pointerId); mini.held = true; go(e); };
+      mini.el.onpointermove = e => { if (mini.held) go(e); };
+      mini.el.onpointerup = mini.el.onpointercancel = () => { mini.held = false; };
+    }
+    if (mini.el.hidden === on) mini.el.hidden = !on;
+    const now = performance.now();
+    if (!on || now - mini.at < 200) return;
+    mini.at = now;
+    const W = 210, H = 160, ratio = pixelRatio(), v = view();
+    if (mini.el.width !== Math.round(W * ratio)) { mini.el.width = Math.round(W * ratio); mini.el.height = Math.round(H * ratio); mini.el.style.width = W + 'px'; mini.el.style.height = H + 'px'; }
+    mini.v = v;
+    mini.k = Math.min((W - 8) / (v.max.x - v.min.x), (H - 8) / (v.max.y - v.min.y));
+    mini.ox = (W - mini.k * (v.max.x - v.min.x)) / 2;
+    mini.oy = (H - mini.k * (v.max.y - v.min.y)) / 2;
+    // the map's picture, kept once every tile of it has come
+    const print = map.loc + '|' + map.v + '|' + turn + '|' + ratio;
+    if (mini.basePrint !== print || !mini.whole) {
+      if (mini.basePrint !== print) { mini.base = mk('canvas'); mini.base.width = Math.round(W * ratio); mini.base.height = Math.round(H * ratio); mini.heatFor = null; }
+      mini.basePrint = print;
+      const g = mini.base.getContext('2d'), e1 = spin(1, 0), e2 = spin(0, 1), k = mini.k * ratio;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, mini.base.width, mini.base.height);
+      g.setTransform(k * e1[0], -k * e1[1], k * e2[0], -k * e2[1], (mini.ox - mini.k * v.min.x) * ratio, (mini.oy + mini.k * v.max.y) * ratio);
+      let whole = true;
+      for (const t of tiles) {
+        if (!t.img.complete || !t.img.naturalWidth) { whole = false; continue; }
+        const x0 = map.min.x + t.col * map.tile, y0 = map.min.y + t.row * map.tile;
+        try { g.drawImage(t.img, x0, y0 + map.tile, map.tile, -map.tile); } catch (e) { whole = false; }
+      }
+      mini.whole = whole;
+    }
+    // where everybody has been, as squares of red: the more, the stronger
+    const s = replay.scan;
+    if (s && s.done && mini.heatFor !== s) {
+      mini.heatFor = s;
+      mini.heat = mk('canvas');
+      mini.heat.width = Math.round(W * ratio);
+      mini.heat.height = Math.round(H * ratio);
+      const g = mini.heat.getContext('2d'), cell = Math.max(2, Math.round(2.5 * ratio)), counts = new Map();
+      let most = 1;
+      for (const spots of s.heat.values()) {
+        for (let i = 0; i < spots.length; i += 3) {
+          const p = miniPlace(spots[i], spots[i + 1]), key = Math.floor(p[0] * ratio / cell) + Math.floor(p[1] * ratio / cell) * 4096, n = (counts.get(key) || 0) + 1;
+          counts.set(key, n);
+          if (n > most) most = n;
+        }
+      }
+      const cap = Math.max(4, most * 0.35);
+      for (const [key, n] of counts) {
+        g.fillStyle = 'rgba(255, 72, 40, ' + Math.min(0.85, 0.18 + 0.67 * n / cap).toFixed(2) + ')';
+        g.fillRect((key % 4096) * cell, Math.floor(key / 4096) * cell, cell, cell);
+      }
+    }
+    const g = mini.el.getContext('2d');
+    g.setTransform(ratio, 0, 0, ratio, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#0c0c12';
+    g.fillRect(0, 0, W, H);
+    g.globalAlpha = 0.75;
+    g.drawImage(mini.base, 0, 0, W, H);
+    g.globalAlpha = 1;
+    if (mini.heat && mini.heatFor === s) g.drawImage(mini.heat, 0, 0, W, H);
+    for (const m of live) {
+      if (!m.dyn || m.c === 'Corpse' || isHidden(m.c) || inArea(m) || !Number.isFinite(m.cx)) continue;
+      const p = miniPlace(m.cx, m.cy), big = PEOPLE.includes(m.c);
+      g.beginPath();
+      g.arc(p[0], p[1], big ? 3.4 : 2.3, 0, Math.PI * 2);
+      g.fillStyle = (KINDS[m.c] || OTHER).col;
+      g.fill();
+      g.lineWidth = 1;
+      g.strokeStyle = '#000';
+      g.stroke();
+    }
+    // what the screen shows
+    const corners = [toMap(0, 0), toMap(vw, 0), toMap(vw, vh), toMap(0, vh)].map(c => miniPlace(c[0], c[1]));
+    g.beginPath();
+    corners.forEach((c, i) => { if (i) g.lineTo(c[0], c[1]); else g.moveTo(c[0], c[1]); });
+    g.closePath();
+    g.lineWidth = 1.5;
+    g.strokeStyle = '#fff';
+    g.stroke();
+  }
+
+  // ---- the Raid window ----
+  const raidWin = mk('div', 'ui win');
+  raidWin.id = 'raidWin';
+  raidWin.hidden = true;
+  raidWin.innerHTML = '<div id="rvWhen"><span id="rvClock"></span><input type="range" id="rvSeek" min="0" max="1000" step="1" value="0"><small id="rvWhenNote"></small></div><div id="rvBody" class="winBody"></div>';
+  document.body.appendChild(raidWin);
+  const histWin = mk('div', 'ui win');
+  histWin.id = 'histWin';
+  histWin.hidden = true;
+  histWin.innerHTML = '<div class="winHead"><b id="hwTitle"></b><span class="grow"></span><button id="hwImport" type="button"></button><button id="hwRefresh" type="button"></button><button id="hwClose" type="button" class="winX" aria-label="Close">×</button></div><div id="hwBody" class="winBody"></div>';
+  document.body.appendChild(histWin);
+  $('rvWhenNote').textContent = T('The moment of the raid shown under Objectives and Loot.');
+  $('hwTitle').textContent = T('Raid history');
+  $('hwImport').textContent = T('Import raid');
+  $('hwImport').title = T('Add a raid exported from another Satellite, or from Raid Review (a zip).');
+  $('hwRefresh').textContent = T('Refresh');
+  const RV_TABS = [['overview', T('Overview')], ['stats', T('Stats')], ['timeline', T('Timeline')], ['behaviour', T('Behaviour')], ['objectives', T('Objectives')], ['loot', T('Loot')], ['settings', T('Settings')]];
+  let rvTab = 'overview', rvSort = { key: 'kills', dir: -1 }, rvOpenRow = '', rvView = null, rvPrint = '';
+  const rvFilter = { text: '', act: '' }, rvLoot = { min: 0, where: '', text: '', who: '' };
+  // While a raid is open, a bar under the top one: back to the raids, which raid it is, and its tabs. Map is the
+  // raid played on the map; each of the others fills the page under the bar.
+  const raidNav = mk('div', 'ui');
+  raidNav.id = 'raidNav';
+  raidNav.hidden = true;
+  raidNav.innerHTML = '<button id="rnBack" type="button"></button><b id="rnTitle"></b><nav id="rnTabs"></nav><button id="rnLeave" type="button"></button>';
+  document.body.appendChild(raidNav);
+  $('rnBack').textContent = '‹ ' + T('Raids');
+  $('rnBack').title = T('Every raid recorded');
+  $('rnLeave').textContent = T('Leave');
+  $('rnLeave').title = T('Leave the replay: back to the live map');
+  for (const [key, name] of [['map', T('Map')]].concat(RV_TABS)) {
+    const b = mk('button', '', name);
+    b.type = 'button';
+    b.dataset.tab = key;
+    b.onclick = () => { if (key === 'map') rvShut(false); else rvOpen(key); };
+    $('rnTabs').appendChild(b);
+  }
+  let rnPrint = '', rvWas = false;
+  function rnShow() {
+    const r = replay, at = raidWin.hidden ? 'map' : rvTab, print = r ? r.about.id + '|' + at : '';
+    if (print === rnPrint) return;
+    rnPrint = print;
+    raidNav.hidden = !r;
+    if (!r) return;
+    const a = r.about, out = a.exit ? spaced(EXITS[a.exit] || a.exit) : '';
+    $('rnTitle').textContent = placeName(a.loc) + ' · ' + new Date(a.began).toLocaleString(document.documentElement.lang || undefined, { dateStyle: 'medium', timeStyle: 'short' }) + (out ? ' · ' + out : '');
+    for (const b of $('rnTabs').children) b.classList.toggle('on', b.dataset.tab === at);
+  }
+  $('rnBack').onclick = () => openHistWin(true);
+  $('rnLeave').onclick = () => leaveReplay();
+  function rvOpen(tab) {
+    if (!replay) return;
+    if (tab) rvTab = tab;
+    histWin.hidden = true;
+    if (raidWin.hidden) rvWas = replay.playing;
+    replay.playing = false;
+    raidWin.hidden = false;
+    rvShow();
+    replayShown = '';
+    showReplay();
+  }
+  function rvShut(play) {
+    if (raidWin.hidden) return;
+    raidWin.hidden = true;
+    if (replay && (play || rvWas)) replay.playing = true;
+    rnShow();
+    replayShown = '';
+    showReplay();
+    dirty = true;
+  }
+  // to a moment of the raid on the map: a little before it, at the place or following the one it's about
+  function rvGo(t, at, id) {
+    if (!replay) return;
+    seekReplay(Math.max(0, t - 2500));
+    rvShut(true);
+    const m = id !== null && id !== undefined ? liveById.get(id) : null;
+    if (m) watch(m); else if (Array.isArray(at)) goTo(at[0], at[1]);
+  }
+  $('rvSeek').oninput = e => { if (!replay) return; seekReplay(replay.total * (+e.target.value) / 1000); $('rvClock').textContent = clockText(replay.at) + ' / ' + clockText(replay.total); if (rvTab === 'objectives' || rvTab === 'loot') rvShow(); };
+  function rvShow() {
+    const r = replay;
+    rnShow();
+    if (!r || raidWin.hidden) return;
+    const a = r.about, box = $('rvBody');
+    $('rvWhen').hidden = !(rvTab === 'objectives' || rvTab === 'loot');
+    $('rvClock').textContent = clockText(r.at) + ' / ' + clockText(r.total);
+    $('rvSeek').value = String(Math.round(1000 * r.at / r.total));
+    const keep = box.scrollTop, same = rvPrint === a.id + '|' + rvTab;
+    rvPrint = a.id + '|' + rvTab;
+    box.textContent = '';
+    const s = scanReplay(r);
+    if (!s.done && rvTab !== 'settings') { box.appendChild(mk('p', 'winNote', T('Working it out…'))); return; }
+    ({ overview: rvOverview, stats: rvStats, timeline: rvTimeline, behaviour: rvBehaviour, objectives: rvObjectives, loot: rvLootTab, settings: rvSettings })[rvTab](box, r, s);
+    for (const lay of chartsToLay.splice(0)) lay();
+    box.scrollTop = same ? keep : 0;
+  }
+  const sideName = p => p.sd === 'Usec' ? 'USEC' : p.sd === 'Bear' ? 'BEAR' : p.sd === 'Savage' ? T('Scav') : ONE[p.kind] || p.kind || '';
+  const statusOf = p => p.died ? T('KIA') : p.left ? (p.left.x === 0 ? T('Left') : T('Extracted')) : p.end ? spaced(EXITS[p.end.st] || p.end.st) : T('Alive');
+  const killSaid = d => [d.w || '', Number.isFinite(d.m) ? d.m + ' m' : '', PARTS[d.bp] || ''].filter(Boolean).join(', ');
+  function rvSection(box, title) { const h = mk('h3', 'winSub', title); box.appendChild(h); return h; }
+
+  function rvOverview(box, r, s) {
+    const a = r.about, people = raidPeople(r), end = r.events.find(e => e.k === 'end');
+    const persons = people.filter(p => PEOPLE.includes(p.kind)).length, bots = people.filter(p => p.id !== null && !PEOPLE.includes(p.kind)).length;
+    const outcome = a.exit ? spaced(EXITS[a.exit] || a.exit) : a.died ? spaced(T('died')) : '—';
+    const table = mk('table', 'facts');
+    for (const [label, value] of [[T('Map'), placeName(a.loc)], [T('Outcome'), outcome], [T('Time in raid'), clockText(r.total)],
+      [T('Extract'), a.exitName || (end && end.d.ex) || '—'], [T('Players'), persons], [T('Bots'), bots], [T('Most bots at once'), s.peak || 0],
+      [T('Kills'), r.events.filter(e => e.k === 'kill').length], [T('Mods seen'), (s.mods || []).concat((s.has || []).filter(k => k !== 'RUAF Remnant' && k !== 'ISB WT')).join(', ') || '—'],
+      [T('Recorded by'), (a.name ? latin(a.name) : '—') + (a.hl ? ' (' + T('headless') + ')' : '')],
+      [T('Source'), a.rr ? T('Imported from Raid Review') : a.imported ? T('Imported from another Satellite') : T('Recorded by Satellite')]]) {
+      const row = table.insertRow();
+      row.insertCell().textContent = label;
+      row.insertCell().textContent = value;
+    }
+    box.appendChild(table);
+    // who came in together
+    const teams = new Map();
+    for (const p of people) if (p.team && (PEOPLE.includes(p.kind) || p.kind === 'Enemy Player')) { if (!teams.has(p.team)) teams.set(p.team, []); teams.get(p.team).push(p); }
+    if (teams.size) {
+      rvSection(box, T('Teams'));
+      const wrap = mk('div', 'teams');
+      for (const [n, members] of [...teams].sort((x, y) => x[0] - y[0])) {
+        const team = mk('div', 'team'), badge = mk('i', '', String(n));
+        badge.style.background = squadCol(n);
+        team.appendChild(badge);
+        for (const p of members) {
+          const b = mk('button', 'linkBtn', p.name || ONE[p.kind] || p.kind);
+          b.type = 'button';
+          b.style.color = (KINDS[p.kind] || OTHER).col;
+          b.title = T('Follow on the map');
+          b.onclick = () => rvGo(Math.max(p.spawn || 0, r.at), null, p.id);
+          team.appendChild(b);
+        }
+        wrap.appendChild(team);
+      }
+      box.appendChild(wrap);
+    }
+    rvSection(box, T('Leaderboard'));
+    const cols = [['name', T('Name'), 0], ['side', T('Side'), 0], ['team', T('Team'), 1], ['lv', T('Lvl'), 1], ['status', T('Status'), 0], ['sain', 'SAIN', 0],
+      ['kills', T('Kills'), 1], ['items', T('Looted'), 1], ['worth', T('Loot value'), 1], ['gear', T('Spawn value'), 1], ['acc', T('Accuracy'), 1], ['far', T('Longest kill'), 1], ['spawn', T('Spawned'), 1]];
+    const value = (p, key) => key === 'side' ? sideName(p) : key === 'status' ? statusOf(p) : key === 'acc' ? (s.hitsKnown && p.shots ? p.hits / p.shots : p.shots ? p.shots / 1e6 : -1) : key === 'spawn' ? (p.spawn === null ? 1e12 : p.spawn) : p[key];
+    const sorted = people.slice().sort((x, y) => {
+      const u = value(x, rvSort.key), w = value(y, rvSort.key);
+      return (typeof u === 'number' && typeof w === 'number' ? u - w : String(u || '').localeCompare(String(w || ''))) * rvSort.dir || y.kills - x.kills || y.worth - x.worth;
+    });
+    const board = mk('table', 'board sortable'), head = board.createTHead().insertRow();
+    for (const [key, label, numeric] of cols) {
+      const th = mk('th', rvSort.key === key ? 'sorted' : '', label + (rvSort.key === key ? (rvSort.dir < 0 ? ' ▾' : ' ▴') : ''));
+      th.onclick = () => { rvSort = { key, dir: rvSort.key === key ? -rvSort.dir : numeric ? -1 : 1 }; rvShow(); };
+      head.appendChild(th);
+    }
+    const body = board.createTBody();
+    for (const p of sorted) {
+      const key = p.key, row = body.insertRow();
+      row.className = 'pick' + (rvOpenRow === key ? ' open' : '');
+      const name = row.insertCell(), dot = mk('i');
+      dot.style.background = (KINDS[p.kind] || OTHER).col;
+      name.append(dot, p.name || ONE[p.kind] || p.kind);
+      if (p.died) name.appendChild(mk('small', '', p.died.by ? T('by {who}', { who: p.died.by }) + (killSaid(p.died) ? ' (' + killSaid(p.died) + ')' : '') : T('died')));
+      row.insertCell().textContent = sideName(p);
+      const team = row.insertCell();
+      if (p.team) { const b = mk('i', 'squadDot', String(p.team)); b.style.background = squadCol(p.team); team.appendChild(b); }
+      row.insertCell().textContent = p.lv || '';
+      const status = row.insertCell();
+      status.textContent = statusOf(p) + (p.downs ? ' · ' + TP(p.downs, 'downed {n} time', 'downed {n} times') : '');
+      status.className = p.died ? 'bad' : p.left || (p.end && p.end.st === 'Survived') ? 'good' : '';
+      row.insertCell().textContent = [DIFFICULTY[p.df] || p.df, p.ps].filter(Boolean).join(' · ');
+      row.insertCell().textContent = p.kills || '';
+      row.insertCell().textContent = p.items || '';
+      row.insertCell().textContent = p.worth ? shortWorth(p.worth) + ' ₽' : '';
+      row.insertCell().textContent = p.gear ? shortWorth(p.gear) + ' ₽' : '';
+      const acc = row.insertCell();
+      if (s.hitsKnown && p.shots) {
+        const bar = mk('div', 'accBar'), fill = mk('i');
+        fill.style.width = Math.round(100 * p.hits / p.shots) + '%';
+        bar.appendChild(fill);
+        acc.append(bar, Math.round(100 * p.hits / p.shots) + '% (' + p.hits + '/' + p.shots + ')');
+      } else acc.textContent = p.shots ? TP(p.shots, '{n} shot', '{n} shots') : '';
+      row.insertCell().textContent = p.far ? p.far + ' m' : '';
+      row.insertCell().textContent = p.spawn === null ? '' : clockText(p.spawn);
+      row.onclick = () => { rvOpenRow = rvOpenRow === key ? '' : key; rvShow(); };
+      if (rvOpenRow !== key) continue;
+      // pressed: their kills, how they went, and a way to them on the map
+      const more = body.insertRow(), cell = more.insertCell();
+      more.className = 'detail';
+      cell.colSpan = cols.length;
+      const follow = mk('button', 'linkBtn', T('Follow on the map'));
+      follow.type = 'button';
+      follow.onclick = e => { e.stopPropagation(); rvGo(Math.max(p.spawn || 0, 0) + 2500, null, p.id); };
+      if (p.id !== null) cell.appendChild(follow);
+      if (!p.killList.length && !p.died) cell.appendChild(mk('span', 'dim', T('No kills.')));
+      for (const e of p.killList) {
+        const b = mk('button', 'linkBtn killLine', clockText(e.rt) + '  ' + T('killed') + ' ' + (e.nm ? latin(e.nm) : ONE[e.d.vk] || e.d.vk || '') + (killSaid(e.d) ? ' · ' + killSaid(e.d) : ''));
+        b.type = 'button';
+        b.onclick = ev => { ev.stopPropagation(); rvGo(e.rt, e.d.at, null); };
+        cell.appendChild(b);
+      }
+      if (p.died) {
+        const b = mk('button', 'linkBtn killLine bad', clockText(p.died.t) + '  ' + (p.died.by ? T('killed by {who}', { who: p.died.by }) : T('died')) + (killSaid(p.died) ? ' · ' + killSaid(p.died) : ''));
+        b.type = 'button';
+        b.onclick = ev => { ev.stopPropagation(); rvGo(p.died.t, p.died.at, null); };
+        cell.appendChild(b);
+      }
+    }
+    box.appendChild(board);
+    box.appendChild(mk('p', 'winNote', T('Press a column to sort by it, a row for that one\'s kills.')));
+  }
+
+  // a ring of shares: [[name, n, colour]], the biggest first, with what each is beside it
+  function donut(box, title, parts) {
+    const wrap = mk('div', 'chart donut');
+    wrap.appendChild(mk('h4', '', title));
+    const total = parts.reduce((n, p) => n + p[1], 0);
+    if (!total) { wrap.appendChild(mk('p', 'winNote', T('Nothing to show.'))); box.appendChild(wrap); return; }
+    const row = mk('div', 'donutRow'), c = mk('canvas'), ratio = window.devicePixelRatio || 1, size = 132, legend = mk('div', 'donutLegend');
+    c.width = c.height = Math.round(size * ratio);
+    c.style.width = c.style.height = size + 'px';
+    const g = c.getContext('2d');
+    g.setTransform(ratio, 0, 0, ratio, 0, 0);
+    let from = -Math.PI / 2;
+    const gap = parts.length > 1 ? 0.035 : 0;
+    for (const [name, n, col] of parts) {
+      const sweep = Math.PI * 2 * n / total;
+      g.beginPath();
+      g.arc(size / 2, size / 2, size / 2 - 12, from + gap / 2, from + Math.max(gap / 2 + 0.01, sweep - gap / 2));
+      g.lineWidth = 20;
+      g.strokeStyle = col;
+      g.stroke();
+      from += sweep;
+      const item = mk('div'), dot = mk('i');
+      dot.style.background = col;
+      item.append(dot, mk('span', '', name), mk('b', '', n + ' · ' + Math.round(100 * n / total) + '%'));
+      legend.appendChild(item);
+    }
+    g.font = '700 22px ' + FONT;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#f2f2f5';
+    g.fillText(String(total), size / 2, size / 2 + 1);
+    row.append(c, legend);
+    wrap.appendChild(row);
+    box.appendChild(wrap);
+  }
+  const SHARE_COLS = ['#4f8ff7', '#f5a623', '#43c463', '#ec5fa8', '#26c6da', '#b06cf0', '#f7d046', '#ff8a65'];
+  // the most of them by name, the rest as one
+  function shares(counts, colOf) {
+    const sorted = [...counts].sort((x, y) => y[1] - x[1]), top = sorted.slice(0, 7), rest = sorted.slice(7).reduce((n, p) => n + p[1], 0);
+    const parts = top.map(([name, n], i) => [name, n, colOf ? colOf(name, i) : SHARE_COLS[i % SHARE_COLS.length]]);
+    if (rest) parts.push([T('Other'), rest, '#858b9c']);
+    return parts;
+  }
+  function barsOf(box, title, rows, say) {
+    const most = Math.max(1, ...rows.map(x => x[1])), bars = mk('div', 'bars');
+    bars.appendChild(mk('h4', '', title));
+    for (const [name, n, col] of rows) {
+      const row = mk('div'), track = mk('div'), bar = mk('i');
+      bar.style.width = (100 * n / most) + '%';
+      bar.style.background = col;
+      track.appendChild(bar);
+      row.append(mk('span', '', name), track, mk('b', '', say ? say(n) : String(n)));
+      bars.appendChild(row);
+    }
+    box.appendChild(bars);
+  }
+  function rvStats(box, r, s) {
+    const people = raidPeople(r), kills = r.events.filter(e => e.k === 'kill'), loot = r.events.filter(e => e.k === 'loot');
+    const tiles = mk('div', 'statTiles');
+    for (const [label, value] of [[T('Length'), clockText(r.total)], [T('Kills'), kills.length], [T('People seen'), s.tracks.size], [T('Most bots at once'), s.peak || 0],
+      [T('Items picked up'), loot.reduce((n, e) => n + (e.d.q || 1), 0)], [T('Shots fired'), [...s.tracks.values()].reduce((n, t) => n + t.shots, 0)]]) {
+      const tile = mk('div');
+      tile.append(mk('b', '', value), mk('span', '', label));
+      tiles.appendChild(tile);
+    }
+    box.appendChild(tiles);
+    const bots = [...s.tracks.values()].filter(t => !PEOPLE.includes(t.c));
+    const count = (list, of) => { const m = new Map(); for (const x of list) { const k = of(x); if (k) m.set(k, (m.get(k) || 0) + 1); } return m; };
+    const rings = mk('div', 'charts');
+    box.appendChild(rings);
+    donut(rings, T('Bots by faction'), shares(count(bots, t => (KINDS[t.c] || {}).name || t.c), null).map(p => { const kind = Object.keys(KINDS).find(k => KINDS[k].name === p[0]); return [p[0], p[1], kind ? KINDS[kind].col : p[2]]; }));
+    donut(rings, T('PMC personalities'), shares(count(bots.filter(t => t.c === 'Enemy Player'), t => t.ps), null));
+    const DIFF_COL = { easy: '#43c463', normal: '#4f8ff7', hard: '#f5a623', impossible: '#ef5350' };
+    donut(rings, T('Bots by difficulty'), ['easy', 'normal', 'hard', 'impossible'].map(d => [DIFFICULTY[d], bots.filter(t => t.df === d).length, DIFF_COL[d]]).filter(p => p[1]));
+    const looters = people.filter(p => p.items).sort((x, y) => y.worth - x.worth || y.items - x.items).slice(0, 12);
+    const priced = looters.some(p => p.worth);
+    if (looters.length) barsOf(box, T('Looting by player'), looters.map(p => [p.name || ONE[p.kind] || p.kind, priced ? p.worth : p.items, (KINDS[p.kind] || OTHER).col]), priced ? v => shortWorth(v) + ' ₽' : null);
+    const killers = people.filter(p => p.kills).sort((x, y) => y.kills - x.kills).slice(0, 12);
+    if (killers.length) barsOf(box, T('Kills by player'), killers.map(p => [p.name || ONE[p.kind] || p.kind, p.kills, (KINDS[p.kind] || OTHER).col]));
+    const seen = count([...s.tracks.values()], t => t.c);
+    barsOf(box, T('Who was in the raid'), [...seen].sort((x, y) => y[1] - x[1]).map(([kind, n]) => [(KINDS[kind] || {}).name || kind, n, (KINDS[kind] || OTHER).col]));
+    const charts = mk('div', 'charts');
+    box.appendChild(charts);
+    const stride = Math.max(1, Math.ceil(s.ts.length / 600)), pick = list => list.filter((v, i) => i % stride === 0), ts = pick(s.ts);
+    lineChart(charts, T('Active bots over time'), ts, [{ name: T('Bots'), col: '#4f8ff7', v: pick(s.botsAlive) }]);
+    const sides = GROUPS.map((g, i) => ({ name: KINDS[g[0]].name, col: KINDS[g[0]].col, v: pick(s.alive[i]) })).filter(side => side.v.some(v => v > 0));
+    lineChart(charts, T('Alive over time'), ts, sides);
+    const sum = (events, worth) => { let i = 0, n = 0; return ts.map(t => { while (i < events.length && events[i].rt <= t) n += worth(events[i++]); return n; }); };
+    lineChart(charts, T('Kills over time'), ts, [{ name: T('Kills'), col: '#ff5148', v: sum(kills, () => 1) }]);
+    const worthy = loot.some(e => Number.isFinite(lootWorth(e.d)));
+    lineChart(charts, T('Loot picked up over time'), ts, [{ name: T('Picked up'), col: '#7fd36b', v: sum(loot, e => worthy ? lootWorth(e.d) || 0 : e.d.q || 1) }], worthy ? shortWorth : null);
+    box.appendChild(mk('p', 'winNote', T('Press a chart to go to that moment.')));
+  }
+
+  // every event of the raid as a row: [{ t, who, kind, act, text, at, id }]
+  function raidRows(r) {
+    const s = r.scan, rows = [], idOf = pid => { for (const [id, t] of s.tracks) if (t.pid === pid) return id; return null; };
+    const seenSwitch = new Set();
+    for (const e of r.events) {
+      const d = e.d, name = e.nm ? latin(e.nm) : '';
+      if (e.k === 'kill') {
+        rows.push({ t: e.rt, who: d.kn ? latin(d.kn) : name || ONE[d.vk] || '', kind: d.kn ? d.kk : d.vk, act: 'killed',
+          text: d.kn ? (name || ONE[d.vk] || d.vk || '') + (killSaid(d) ? ' · ' + killSaid(d) : '') : T('died'), at: d.at, id: null });
+      } else if (e.k === 'loot' || e.k === 'drop') {
+        const worth = lootWorth(d);
+        rows.push({ t: e.rt, who: name || ONE[d.wk] || '', kind: d.wk, act: e.k === 'loot' ? 'looted' : d.g ? 'threw' : 'dropped',
+          text: (d.i || '') + (d.q > 1 ? ' ×' + d.q : '') + (Number.isFinite(worth) && worth ? ' · ' + roubles(worth) : ''), at: d.at, id: e.p ? idOf(e.p) : null });
+      } else if (e.k === 'left') {
+        rows.push({ t: e.rt, who: name || ONE[d.wk] || '', kind: d.wk, act: 'left', text: d.x === 0 ? T('Left the raid') : T('Extracted'), at: d.at, id: null });
+      } else if (e.k === 'end') {
+        rows.push({ t: e.rt, who: r.about.name ? latin(r.about.name) : T('Player'), kind: 'Main Player', act: 'left', text: spaced(EXITS[d.st] || d.st || '') + (d.ex ? ' · ' + d.ex : ''), at: d.at, id: null });
+      } else if (e.k === 'switch') {
+        // (the first told of each is only how it stood as the raid began)
+        if (seenSwitch.has(d.id)) rows.push({ t: e.rt, who: '', kind: '', act: 'switch', text: String(d.nm || T('Switch')).replace(/_+/g, ' ') + ' · ' + (d.st === 'Open' ? T('Switched on') : words(String(d.st || ''))), at: d.at, id: null });
+        seenSwitch.add(d.id);
+      } else if (e.k === 'orbit.wake') {
+        rows.push({ t: e.rt, who: name, kind: 'Other AI', act: 'ghost', text: T('Woke') + ' · ' + [d.c, d.by ? T('by {who}', { who: latin(d.by) }) : '', d.m ? d.m + ' m' : ''].filter(Boolean).join(' · '), at: null, id: e.p ? idOf(e.p) : null });
+      } else if (e.k === 'orbit.fight') {
+        rows.push({ t: e.rt, who: 'ORBIT', kind: 'Other AI', act: 'ghost', text: T('Ghost fight') + (d.n ? ' · ' + TP(d.n, '{n} dead', '{n} dead') : ''), at: d.a, id: null });
+      }
+    }
+    for (const b of s.blasts) {
+      const track = s.tracks.get(b.who);
+      rows.push({ t: b.t, who: track ? track.name || ONE[track.c] || track.c : '', kind: track ? track.c : '', act: 'grenade', text: T('Grenade went off'), at: [b.x, b.y], id: null });
+    }
+    return rows.sort((x, y) => x.t - y.t);
+  }
+  const ACTS = { killed: T('killed'), looted: T('looted'), dropped: T('dropped'), threw: T('threw'), grenade: T('grenade'), left: T('left'), switch: T('switch'), ghost: T('ghost') };
+  function rvTimeline(box, r) {
+    const all = raidRows(r), tools = mk('div', 'winTools'), text = mk('input'), pick = mk('select'), count = mk('small');
+    text.type = 'search';
+    text.placeholder = T('Filter by name or detail…');
+    text.value = rvFilter.text;
+    pick.appendChild(new Option(T('Every action'), ''));
+    for (const act of Object.keys(ACTS)) if (all.some(x => x.act === act)) pick.appendChild(new Option(ACTS[act], act));
+    pick.value = rvFilter.act;
+    tools.append(text, pick, count);
+    box.appendChild(tools);
+    const table = mk('table', 'board timeline'), head = table.createTHead().insertRow();
+    for (const label of [T('Time'), T('Name'), T('Action'), T('Detail')]) head.appendChild(mk('th', '', label));
+    const body = table.createTBody();
+    box.appendChild(table);
+    const fill = () => {
+      body.textContent = '';
+      const want = rvFilter.text.trim().toLowerCase();
+      const rows = all.filter(x => (!rvFilter.act || x.act === rvFilter.act) && (!want || (x.who + ' ' + x.text).toLowerCase().includes(want)));
+      count.textContent = TP(rows.length, '{n} event', '{n} events') + (rows.length > 1500 ? ' · ' + T('the first {n} shown', { n: 1500 }) : '');
+      for (const x of rows.slice(0, 1500)) {
+        const row = body.insertRow(), who = row.insertCell(-1);
+        row.className = 'pick act-' + x.act;
+        who.before(mk('td', '', clockText(x.t)));
+        const dot = mk('i');
+        dot.style.background = (KINDS[x.kind] || OTHER).col;
+        if (x.who) who.append(dot, x.who);
+        row.insertCell().appendChild(mk('span', 'actTag', ACTS[x.act] || x.act));
+        row.insertCell().textContent = x.text;
+        row.title = T('Go to this moment on the map');
+        row.onclick = () => rvGo(x.t, x.at, x.id);
+      }
+    };
+    text.oninput = () => { rvFilter.text = text.value; fill(); };
+    pick.onchange = () => { rvFilter.act = pick.value; fill(); };
+    fill();
+  }
+
+  // What every bot was doing, side by side: a bar each over the raid, coloured by the sort of thing. The wheel
+  // zooms in on a stretch of time, a drag moves along it, a press goes there on the map with that bot followed.
+  function rvBehaviour(box, r, s) {
+    const fate = new Map();
+    for (const e of r.events) if (e.p && (e.k === 'kill' || e.k === 'left')) fate.set(e.p, { k: e.k === 'kill' ? 'dead' : 'gone', t: e.rt });
+    const bots = [...s.tracks.entries()].filter(([, t]) => !PEOPLE.includes(t.c) && t.beh.length)
+      .sort((x, y) => (KINDS[y[1].c] || OTHER).order - (KINDS[x[1].c] || OTHER).order || x[1].first - y[1].first);
+    if (!bots.length) { box.appendChild(mk('p', 'winNote', T('No bots were recorded in this raid.'))); return; }
+    const used = new Set(['pre']);
+    for (const [, t] of bots) { for (const b of t.beh) used.add(b.k); const end = fate.get(t.pid); if (end) used.add(end.k); }
+    const legend = mk('div', 'chartLegend behLegend');
+    for (const key of Object.keys(BEH)) {
+      if (!used.has(key)) continue;
+      const item = mk('span'), dot = mk('i');
+      dot.style.background = BEH[key][1];
+      item.append(dot, BEH[key][0]);
+      legend.appendChild(item);
+    }
+    box.appendChild(legend);
+    const ROW = 20, AXIS = 22, wrap = mk('div', 'behWrap'), names = mk('div', 'behNames'), plot = mk('div', 'behPlot'), c = mk('canvas'), tip = mk('div', 'chartTip');
+    tip.hidden = true;
+    names.style.paddingTop = AXIS + 'px';
+    for (const [id, t] of bots) {
+      const b = mk('button', '', t.name || ONE[t.c] || t.c);
+      b.type = 'button';
+      b.style.color = (KINDS[t.c] || OTHER).col;
+      b.style.height = ROW + 'px';
+      b.title = (ONE[t.c] || t.c) + ' · ' + T('Follow on the map');
+      b.onclick = () => rvGo(Math.max(t.first + 2500, Math.min(r.at, t.last)), null, id);
+      names.appendChild(b);
+    }
+    plot.append(c, tip);
+    wrap.append(names, plot);
+    box.appendChild(wrap);
+    box.appendChild(mk('p', 'winNote', T('Scroll over the bars to zoom in on a stretch of time, drag to move along it, press to go there on the map.')));
+    if (!rvView || rvView.id !== r.about.id) rvView = { id: r.about.id, a: 0, b: r.total };
+    let w = 600, over = null;
+    const h = AXIS + bots.length * ROW, ratio = window.devicePixelRatio || 1;
+    const X = t => (t - rvView.a) / (rvView.b - rvView.a) * w, at = x => rvView.a + (rvView.b - rvView.a) * x / w;
+    const parts = t => {
+      const end = fate.get(t.pid), until = end ? Math.min(end.t, t.last + 4000) : t.last, list = [{ a: 0, b: t.first, k: 'pre', text: '' }];
+      t.beh.forEach((b, i) => list.push({ a: b.t, b: i + 1 < t.beh.length ? t.beh[i + 1].t : until, k: b.k, text: b.text, gh: b.gh }));
+      if (end) list.push({ a: until, b: r.total, k: end.k, text: '' });
+      return list;
+    };
+    const paint = () => {
+      w = Math.max(200, plot.clientWidth);
+      c.width = Math.round(w * ratio);
+      c.height = Math.round(h * ratio);
+      c.style.width = w + 'px';
+      c.style.height = h + 'px';
+      const g = c.getContext('2d');
+      g.setTransform(ratio, 0, 0, ratio, 0, 0);
+      g.clearRect(0, 0, w, h);
+      g.font = '11px ' + FONT;
+      g.textBaseline = 'middle';
+      const span = rvView.b - rvView.a, step = [5000, 10000, 30000, 60000, 120000, 300000, 600000].find(v => span / v <= 10) || 1200000;
+      for (let t = Math.ceil(rvView.a / step) * step; t <= rvView.b; t += step) {
+        const x = Math.round(X(t)) + 0.5;
+        g.strokeStyle = 'rgba(200, 205, 255, 0.1)';
+        g.beginPath(); g.moveTo(x, AXIS - 4); g.lineTo(x, h); g.stroke();
+        g.fillStyle = '#8a8c9a';
+        g.textAlign = x < 20 ? 'left' : x > w - 20 ? 'right' : 'center';
+        g.fillText(clockText(t), x, 9);
+      }
+      bots.forEach(([, t], i) => {
+        const y = AXIS + i * ROW;
+        for (const p of parts(t)) {
+          if (p.b <= rvView.a || p.a >= rvView.b) continue;
+          const x0 = Math.max(0, X(p.a)), x1 = Math.min(w, X(p.b));
+          g.fillStyle = BEH[p.k][1];
+          g.fillRect(x0, y + 2, Math.max(1, x1 - x0), ROW - 4);
+          // (parked by ORBIT as a ghost for this stretch: paler)
+          if (p.gh) { g.fillStyle = 'rgba(12, 12, 18, 0.45)'; g.fillRect(x0, y + 2, Math.max(1, x1 - x0), ROW - 4); }
+        }
+      });
+      // where the replay is, and the bar under the pointer
+      const now = X(r.at);
+      if (now >= 0 && now <= w) { g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(now, AXIS - 6); g.lineTo(now, h); g.stroke(); g.lineWidth = 1; }
+      if (over) { g.strokeStyle = 'rgba(255,255,255,0.7)'; g.strokeRect(0.5, AXIS + over.i * ROW + 1.5, w - 1, ROW - 3); }
+    };
+    const under = e => {
+      const box2 = c.getBoundingClientRect(), x = e.clientX - box2.left, y = e.clientY - box2.top, i = Math.floor((y - AXIS) / ROW);
+      if (i < 0 || i >= bots.length) return null;
+      const t = at(x), part = parts(bots[i][1]).find(p => t >= p.a && t < p.b);
+      return { i, t, x, y, part, id: bots[i][0], track: bots[i][1] };
+    };
+    let drag = null;
+    c.onwheel = e => {
+      e.preventDefault();
+      const box2 = c.getBoundingClientRect(), mid = at(e.clientX - box2.left), k = e.deltaY > 0 ? 1.3 : 1 / 1.3, span = Math.min(r.total, Math.max(8000, (rvView.b - rvView.a) * k));
+      let a = mid - (mid - rvView.a) * span / (rvView.b - rvView.a);
+      a = Math.min(r.total - span, Math.max(0, a));
+      rvView.a = a;
+      rvView.b = a + span;
+      paint();
+    };
+    c.onpointerdown = e => { c.setPointerCapture(e.pointerId); drag = { x: e.clientX, a: rvView.a, moved: false }; };
+    c.onpointermove = e => {
+      if (drag) {
+        const span = rvView.b - rvView.a, a = Math.min(r.total - span, Math.max(0, drag.a - (e.clientX - drag.x) * span / w));
+        if (Math.abs(e.clientX - drag.x) > 4) drag.moved = true;
+        rvView.a = a;
+        rvView.b = a + span;
+        tip.hidden = true;
+        paint();
+        return;
+      }
+      over = under(e);
+      paint();
+      if (!over || !over.part) { tip.hidden = true; return; }
+      tip.textContent = '';
+      tip.append(mk('b', '', (over.track.name || ONE[over.track.c] || over.track.c) + ' · ' + clockText(over.t)), mk('span', '', BEH[over.part.k][0] + (over.part.gh ? ' · ' + T('Ghost') : '')),
+        mk('span', '', over.part.text || ''), mk('span', 'dim', clockText(over.part.a) + ' – ' + clockText(over.part.b)));
+      tip.hidden = false;
+      tip.style.width = '220px';
+      tip.style.left = Math.min(w - 230, Math.max(0, over.x + (over.x > w / 2 ? -232 : 14))) + 'px';
+      tip.style.top = Math.max(0, over.y - 30) + 'px';
+    };
+    c.onpointerup = e => {
+      const was = drag;
+      drag = null;
+      if (was && was.moved) return;
+      const hit = under(e);
+      if (hit) rvGo(hit.t + 2500, null, hit.id);
+    };
+    c.onpointerleave = () => { over = null; tip.hidden = true; if (!drag) paint(); };
+    chartsToLay.push(paint);
+    // ORBIT's ghosts that were woken, and why
+    const wakes = r.events.filter(e => e.k === 'orbit.wake');
+    if (wakes.length) {
+      const fold = mk('details', 'winFold'), find = mk('input'), list = mk('div', 'wakeList');
+      fold.appendChild(mk('summary', '', T('Ghost wake diagnostics') + ' (' + wakes.length + ')'));
+      find.type = 'search';
+      find.placeholder = T('Filter by name or detail…');
+      fold.append(find, list);
+      const fill = () => {
+        list.textContent = '';
+        const want = find.value.trim().toLowerCase();
+        for (const e of wakes) {
+          const d = e.d, said = [clockText(e.rt), e.nm ? latin(e.nm) : T('A ghost'), d.c || '', d.dt || '', d.by ? T('by {who}', { who: latin(d.by) }) : '', d.m ? d.m + ' m' : ''].filter(Boolean).join(' · ');
+          if (want && !said.toLowerCase().includes(want)) continue;
+          const b = mk('button', 'linkBtn', said);
+          b.type = 'button';
+          b.onclick = () => rvGo(e.rt, null, (() => { for (const [id, t] of s.tracks) if (t.pid === e.p) return id; return null; })());
+          list.appendChild(b);
+        }
+      };
+      find.oninput = fill;
+      fill();
+      box.appendChild(fold);
+    }
+  }
+
+  // What the bots were out to do at the moment shown: ORBIT's squads, each with the things it means to do in order,
+  // and every bot a mod has sent somewhere.
+  function rvObjectives(box, r, s) {
+    const squads = orbitMain && Array.isArray(orbitMain.d.s) ? orbitMain.d.s : [];
+    rvSection(box, T('ORBIT squad objectives'));
+    if (!squads.length) box.appendChild(mk('p', 'winNote', T('ORBIT had no squad objectives at this moment (or wasn\'t in this raid).')));
+    const nameOf = pid => { for (const t of s.tracks.values()) if (t.pid === pid) return t.name || ONE[t.c] || t.c; return ''; };
+    for (const squad of squads) {
+      const row = mk('div', 'squadRow'), members = list(squad.MemberProfileIds).map(nameOf).filter(Boolean);
+      row.appendChild(mk('b', '', T('Squad {n}', { n: squad.SquadId !== undefined ? squad.SquadId : '?' }) + (members.length ? ' · ' + members.slice(0, 6).join(', ') : '')));
+      const chain = mk('div', 'goalChain');
+      const goals = list(squad.MainObjectives);
+      const first = goals.findIndex(o => o && !o.Completed);
+      goals.forEach((o, i) => {
+        if (!o) return;
+        const chip = mk('button', 'goal' + (o.Completed ? ' done' : i === first ? ' now' : ''));
+        chip.type = 'button';
+        chip.append(mk('i', '', orbitLetter(o)), mk('span', '', spaced(String(o.OperationName || o.QuestTitle || o.Type || '')) + (o.OperationStepCount ? ' ' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount : '')
+          + (o.AirdropStage ? ' · ' + words(String(o.AirdropStage)) : '') + (o.CampState ? ' · ' + words(String(o.CampState)) : '')));
+        chip.title = o.Completed ? T('Done') : i === first ? T('What the squad is on now') : T('To do after that');
+        if (Number.isFinite(o.X) && Number.isFinite(o.Z)) chip.onclick = () => { rvShut(false); goTo(o.X, o.Z); };
+        chain.appendChild(chip);
+      });
+      if (!goals.length) chain.appendChild(mk('span', 'dim', T('Nothing planned')));
+      row.appendChild(chain);
+      box.appendChild(row);
+    }
+    box.appendChild(mk('p', 'winNote', 'K ' + T('Kills') + ' · L ' + T('Loot') + ' · Q ' + T('Quest') + ' · E ' + T('Extract camp') + ' · A ' + T('Airdrop')
+      + ' · S ' + T('Spawn rush') + ' · B ' + T('Boss rush') + ' · R ' + T('Marked room rush') + ' · N ' + T('Sniper overwatch') + ' · C ' + T('Custom rush')));
+    rvSection(box, T('Where each bot is sent'));
+    const sent = live.filter(m => m.dyn && m.ob && m.c !== 'Corpse');
+    if (!sent.length) { box.appendChild(mk('p', 'winNote', T('No bot was being sent anywhere at this moment.'))); return; }
+    const table = mk('table', 'board'), head = table.createTHead().insertRow();
+    for (const label of [T('Name'), T('Kind'), T('Sent by'), T('Objective')]) head.appendChild(mk('th', '', label));
+    const body = table.createTBody();
+    for (const m of sent) {
+      const row = body.insertRow(), name = row.insertCell(), dot = mk('i');
+      row.className = 'pick';
+      dot.style.background = (KINDS[m.c] || OTHER).col;
+      name.append(dot, m.t || ONE[m.c] || m.c);
+      row.insertCell().textContent = ONE[m.c] || m.c;
+      row.insertCell().textContent = m.os || 'ORBIT';
+      row.insertCell().textContent = m.ob + (m.gh ? ' · ' + T('Ghost') : '');
+      row.onclick = () => rvGo(r.at + 2500, null, m.id);
+    }
+    box.appendChild(table);
+  }
+
+  // The loot of the moment shown: what lies about and in containers, and what somebody carries.
+  function rvLootTab(box, r, s) {
+    const loot = things;
+    if (!loot) { box.appendChild(mk('p', 'winNote', T('This recording has no loot (it was made before loot was kept, or loot is switched off on the server).'))); return; }
+    const nameOf = tpl => (loot.names[tpl] || {}).s || (loot.names[tpl] || {}).n || tpl, priceOf = tpl => (loot.names[tpl] || {}).p || 0;
+    const rows = loot.loose.map(i => ({ name: nameOf(i.tpl), n: i.n, worth: i.worth, where: 'ground', at: [i.x, i.y] }));
+    for (const key of Object.keys(loot.inside)) for (const i of loot.inside[key] || []) rows.push({ name: nameOf(i[0]), n: i[1] || 1, worth: priceOf(i[0]) * (i[1] || 1), where: 'box', at: null });
+    rvSection(box, T('Loose loot'));
+    const tools = mk('div', 'winTools'), text = mk('input'), min = mk('input'), pick = mk('select'), count = mk('small');
+    text.type = 'search';
+    text.placeholder = T('Filter by name…');
+    text.value = rvLoot.text;
+    min.type = 'number';
+    min.min = '0';
+    min.step = '5000';
+    min.placeholder = T('Least worth (₽)');
+    min.value = rvLoot.min ? String(rvLoot.min) : '';
+    min.title = T('Only loot worth at least this much.');
+    for (const [value, label] of [['', T('Ground and containers')], ['ground', T('On the ground')], ['box', T('In containers')]]) pick.appendChild(new Option(label, value));
+    pick.value = rvLoot.where;
+    tools.append(text, min, pick, count);
+    box.appendChild(tools);
+    const table = mk('table', 'board'), head = table.createTHead().insertRow();
+    for (const label of [T('Item'), T('Worth'), T('Where')]) head.appendChild(mk('th', '', label));
+    const body = table.createTBody();
+    box.appendChild(table);
+    const fill = () => {
+      body.textContent = '';
+      const want = rvLoot.text.trim().toLowerCase();
+      const shown = rows.filter(x => x.worth >= rvLoot.min && (!rvLoot.where || x.where === rvLoot.where) && (!want || x.name.toLowerCase().includes(want))).sort((x, y) => y.worth - x.worth);
+      count.textContent = TP(shown.length, '{n} item', '{n} items') + ' · ' + roubles(shown.reduce((n, x) => n + x.worth, 0));
+      for (const x of shown.slice(0, 400)) {
+        const row = body.insertRow(), name = row.insertCell(), dot = mk('i');
+        dot.style.background = worthCol(x.worth);
+        name.append(dot, x.name + (x.n > 1 ? ' ×' + x.n : ''));
+        row.insertCell().textContent = roubles(x.worth);
+        row.insertCell().textContent = x.where === 'ground' ? T('On the ground') : T('In a container');
+        if (x.at) { row.className = 'pick'; row.title = T('Show it on the map'); row.onclick = () => { rvShut(false); goTo(x.at[0], x.at[1]); }; }
+      }
+    };
+    text.oninput = () => { rvLoot.text = text.value; fill(); };
+    min.oninput = () => { rvLoot.min = Math.max(0, +min.value || 0); fill(); };
+    pick.onchange = () => { rvLoot.where = pick.value; fill(); };
+    fill();
+    // what one of them carries
+    rvSection(box, T('Bot inventory'));
+    const holders = Object.keys(loot.carried).map(pid => { let t = null; for (const x of s.tracks.values()) if (x.pid === pid) t = x; return { pid, t, total: (loot.carried[pid] || []).reduce((n, i) => n + priceOf(i[0]) * (i[1] || 1), 0) }; })
+      .filter(x => x.t).sort((x, y) => y.total - x.total);
+    if (!holders.length) { box.appendChild(mk('p', 'winNote', T('Nobody\'s inventory was recorded at this moment.'))); return; }
+    const who = mk('select');
+    for (const x of holders) who.appendChild(new Option((x.t.name || ONE[x.t.c] || x.t.c) + ' · ' + (ONE[x.t.c] || x.t.c) + ' · ' + shortWorth(x.total) + ' ₽', x.pid));
+    if (holders.some(x => x.pid === rvLoot.who)) who.value = rvLoot.who;
+    const inv = mk('table', 'board'), tools2 = mk('div', 'winTools');
+    tools2.appendChild(who);
+    box.append(tools2, inv);
+    const show = () => {
+      rvLoot.who = who.value;
+      inv.textContent = '';
+      const items = (loot.carried[who.value] || []).slice().sort((x, y) => (y[2] ? 1 : 0) - (x[2] ? 1 : 0) || priceOf(y[0]) * (y[1] || 1) - priceOf(x[0]) * (x[1] || 1));
+      for (const i of items) {
+        const row = inv.insertRow(), slot = WORN.find(w => w[0] === i[2]);
+        row.insertCell().textContent = nameOf(i[0]) + (i[1] > 1 ? ' ×' + i[1] : '');
+        row.insertCell().textContent = slot ? slot[1] : i[2] ? spaced(i[2]) : T('Carried');
+        row.insertCell().textContent = roubles(priceOf(i[0]) * (i[1] || 1));
+      }
+    };
+    who.onchange = show;
+    show();
+  }
+
+  // ---- the recordings' upkeep: this raid, all of them, and the raids Raid Review left behind ----
+  let historyInfo = { bytes: 0, keep: 30, rr: false }, rrRaids = null, rrBusy = false;
+  const bytesSaid = n => n >= 1 << 30 ? (n / (1 << 30)).toFixed(1) + ' GB' : n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' kB';
+  const twice = (b, act) => { b.type = 'button'; b.onclick = () => { if (!b.classList.contains('sure')) { b.classList.add('sure'); b.dataset.was = b.textContent; b.textContent = T('Press again to be sure'); setTimeout(() => { b.classList.remove('sure'); b.textContent = b.dataset.was; }, 3500); return; } b.classList.remove('sure'); b.textContent = b.dataset.was; act(); }; return b; };
+  async function loadRr() {
+    try { const j = await (await fetch('api/history/rr')).json(); rrRaids = j && j.found ? list(j.raids) : []; } catch (e) { rrRaids = []; }
+    showWins();
+  }
+  async function importRr(id) {
+    if (rrBusy) return;
+    rrBusy = true;
+    showWins();
+    try { await fetch('api/history/rr/import?id=' + encodeURIComponent(id), { method: 'POST' }); } catch (e) { /* listed again all the same */ }
+    rrBusy = false;
+    await loadHistory();
+    loadRr();
+  }
+  function upkeep(box, r) {
+    if (r) {
+      rvSection(box, T('This raid'));
+      const row = mk('div', 'winTools'), give = mk('a', 'btn', T('Export raid'));
+      give.href = 'api/history/export?id=' + encodeURIComponent(r.about.id);
+      give.download = '';
+      give.title = T('Export this raid as a zip, to share.');
+      row.appendChild(give);
+      if (!r.about.live) row.appendChild(twice(mk('button', 'danger', T('Delete this raid')), async () => {
+        try { await fetch('api/history/delete?id=' + encodeURIComponent(r.about.id), { method: 'POST' }); } catch (e) { /* listed again all the same */ }
+        leaveReplay();
+        loadHistory();
+      }));
+      box.appendChild(row);
+    }
+    rvSection(box, T('All recordings'));
+    const n = (historyRaids || []).length;
+    box.appendChild(mk('p', 'winNote', TP(n, '{n} raid kept', '{n} raids kept') + ' · ' + bytesSaid(historyInfo.bytes) + ' · '
+      + T('The newest {n} are kept (history.keep in the server\'s config.jsonc); imported raids are never deleted to make room.', { n: historyInfo.keep })));
+    const row = mk('div', 'winTools');
+    row.appendChild(twice(mk('button', 'danger', T('Delete all recordings')), async () => {
+      try { await fetch('api/history/deleteAll', { method: 'POST' }); } catch (e) { /* listed again all the same */ }
+      leaveReplay();
+      loadHistory();
+    }));
+    const tidy = mk('button', '', T('Delete temporary files'));
+    tidy.type = 'button';
+    tidy.title = T('Files a stopped import, export or recording left behind.');
+    tidy.onclick = async () => {
+      let done = null;
+      try { done = await (await fetch('api/history/tidy', { method: 'POST' })).json(); } catch (e) { /* said below */ }
+      tidy.textContent = done && done.ok ? TP(done.n, '{n} file deleted', '{n} files deleted') : T('Couldn\'t do that');
+      loadHistory();
+    };
+    row.appendChild(tidy);
+    box.appendChild(row);
+    if (!historyInfo.rr) return;
+    rvSection(box, T('Raids from Raid Review'));
+    if (rrRaids === null) { box.appendChild(mk('p', 'winNote', T('Loading…'))); loadRr(); return; }
+    const todo = rrRaids.filter(x => !x.have);
+    box.appendChild(mk('p', 'winNote', T('Raid Review is installed beside Satellite and has raids of its own. Imported, they play here like any other; Raid Review\'s own files are left as they are.')));
+    const tools = mk('div', 'winTools'), all = mk('button', '', rrBusy ? T('Importing…') : TP(todo.length, 'Import {n} raid', 'Import all {n} raids'));
+    all.type = 'button';
+    all.disabled = rrBusy;
+    all.hidden = !todo.length && !rrBusy;
+    all.onclick = () => importRr('all');
+    tools.appendChild(all);
+    box.appendChild(tools);
+    const table = mk('table', 'board');
+    for (const x of rrRaids) {
+      const row2 = table.insertRow();
+      row2.insertCell().textContent = placeName(x.loc);
+      row2.insertCell().textContent = x.began ? new Date(x.began).toLocaleString(document.documentElement.lang || undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      row2.insertCell().textContent = clockText(x.ms || 0);
+      const cell = row2.insertCell();
+      if (x.have) cell.textContent = T('imported');
+      else {
+        const b = mk('button', 'linkBtn', T('Import'));
+        b.type = 'button';
+        b.disabled = rrBusy;
+        b.onclick = () => importRr(x.rid);
+        cell.appendChild(b);
+        if (!x.pos) cell.appendChild(mk('small', 'dim', ' ' + T('(no positions: events only)')));
+      }
+    }
+    box.appendChild(table);
+  }
+  function rvSettings(box, r) { upkeep(box, r); }
+
+  // ---- the History window: every raid kept, as a table ----
+  function showHistWin() {
+    if (histWin.hidden) return;
+    const box = $('hwBody');
+    const keep = box.scrollTop;
+    box.textContent = '';
+    if (!historyRaids) { box.appendChild(mk('p', 'winNote', T('Loading…'))); return; }
+    if (!historyRaids.length) box.appendChild(mk('p', 'winNote', historyOn ? T('No raids recorded yet. Play one: it shows here once it has begun.') : T('Raids aren\'t recorded: history.record is off in the server\'s config.jsonc.')));
+    else {
+      const table = mk('table', 'board raids'), head = table.createTHead().insertRow();
+      for (const label of [T('Map'), T('Played'), T('Length'), T('Player'), T('Kills'), T('Outcome'), '']) head.appendChild(mk('th', '', label));
+      const body = table.createTBody();
+      for (const r of historyRaids) {
+        const row = body.insertRow();
+        row.className = 'pick' + (replay && replay.about.id === r.id ? ' open' : '');
+        row.title = T('Look into this raid');
+        row.insertCell().textContent = placeName(r.loc);
+        row.insertCell().textContent = new Date(r.began).toLocaleString(document.documentElement.lang || undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        row.insertCell().textContent = clockText(r.ms - (r.lead || 0));
+        row.insertCell().textContent = (r.name ? latin(r.name) : '') + (r.hl ? ' (' + T('headless') + ')' : '');
+        row.insertCell().textContent = (r.kills || 0) + (r.mine ? ' (' + T('{n} yours', { n: r.mine }) + ')' : '');
+        const out = row.insertCell();
+        out.textContent = [r.exit ? spaced(EXITS[r.exit] || r.exit) + (r.exitName && r.exit === 'Survived' ? ' · ' + r.exitName : '') : r.died ? spaced(T('died')) : '', r.live ? T('recording now') : '',
+          r.rr ? 'Raid Review' : r.imported ? T('imported') : ''].filter(Boolean).join(' · ');
+        out.className = r.exit === 'Survived' ? 'good' : r.died || r.exit === 'Killed' ? 'bad' : '';
+        const acts = row.insertCell();
+        acts.className = 'acts';
+        const play = mk('button', '', '▶ ' + T('Play'));
+        play.type = 'button';
+        play.title = T('Play this raid back on the map');
+        play.onclick = e => { e.stopPropagation(); histWin.hidden = true; startReplay(r); };
+        acts.appendChild(play);
+        if (!r.live) {
+          const give = mk('a', 'btn', '⭳');
+          give.href = 'api/history/export?id=' + encodeURIComponent(r.id);
+          give.download = '';
+          give.title = T('Export this raid as a zip, to share.');
+          give.onclick = e => e.stopPropagation();
+          acts.appendChild(give);
+          const drop = mk('button', 'danger', '×');
+          drop.type = 'button';
+          drop.title = T('Delete this recording. Press twice.');
+          drop.onclick = async e => {
+            e.stopPropagation();
+            if (!drop.classList.contains('sure')) { drop.classList.add('sure'); setTimeout(() => drop.classList.remove('sure'), 3000); return; }
+            try { await fetch('api/history/delete?id=' + encodeURIComponent(r.id), { method: 'POST' }); } catch (err) { /* listed again all the same */ }
+            if (replay && replay.about.id === r.id) leaveReplay();
+            loadHistory();
+          };
+          acts.appendChild(drop);
+        }
+        row.onclick = () => startReplay(r, true);
+      }
+      box.appendChild(table);
+      box.appendChild(mk('p', 'winNote', T('Press a raid to look into it: its summary, leaderboard, charts, timeline and what every bot was doing. Play shows it on the map.')));
+    }
+    upkeep(box, null);
+    box.scrollTop = keep;
+  }
+  function showWins() { showHistWin(); if (!raidWin.hidden && rvTab === 'settings') rvShow(); }
+  function openHistWin(on) {
+    histWin.hidden = on === undefined ? !histWin.hidden : !on;
+    if (histWin.hidden) return;
+    raidWin.hidden = true;
+    rnShow();
+    showHistWin();
+    loadHistory();
+  }
+  $('hwClose').onclick = () => openHistWin(false);
+  $('hwRefresh').onclick = () => { rrRaids = null; loadHistory(); };
+  $('hwImport').onclick = () => $('historyFile').click();
+
+  // ---- the map's key, in a replay: who is on it now by kind and by squad, and what the marks mean ----
+  let keyOpen = false, keyPrint = '';
+  function showKey() {
+    let box = $('mapKey');
+    if (!replay || !keyOpen) { if (box) box.hidden = true; keyPrint = ''; return; }
+    if (!box) { box = mk('div', 'ui'); box.id = 'mapKey'; document.body.appendChild(box); }
+    const here = live.filter(m => m.dyn && m.c !== 'Corpse' && m.c !== 'BTR' && m.c !== 'Airdrop');
+    const print = here.map(m => m.id + (m.g || '')).join(',');
+    box.hidden = false;
+    if (print === keyPrint) return;
+    keyPrint = print;
+    box.textContent = '';
+    const kinds = new Map();
+    for (const m of here) kinds.set(m.c, (kinds.get(m.c) || 0) + 1);
+    box.appendChild(mk('h4', '', T('On the map now')));
+    for (const [kind, n] of [...kinds].sort((x, y) => (KINDS[y[0]] || OTHER).order - (KINDS[x[0]] || OTHER).order)) {
+      const row = mk('div', 'keyRow'), dot = mk('i');
+      dot.style.background = (KINDS[kind] || OTHER).col;
+      row.append(dot, mk('span', '', (KINDS[kind] || {}).name || kind), mk('b', '', String(n)));
+      box.appendChild(row);
+    }
+    const squads = new Map();
+    for (const m of here) if (m.g && squadOf(m)) { const n = squadNo(m.g); if (!squads.has(n)) squads.set(n, []); squads.get(n).push(m); }
+    if (squads.size) box.appendChild(mk('h4', '', T('Teams')));
+    for (const [n, members] of [...squads].sort((x, y) => x[0] - y[0])) {
+      const row = mk('div', 'keyRow team'), badge = mk('i', 'squadDot', String(n));
+      badge.style.background = squadCol(n);
+      row.appendChild(badge);
+      for (const m of members) {
+        const b = mk('button', 'linkBtn', m.t || ONE[m.c] || m.c);
+        b.type = 'button';
+        b.style.color = (KINDS[m.c] || OTHER).col;
+        b.onclick = () => watch(m);
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+    }
+    box.appendChild(mk('h4', '', T('Marks')));
+    for (const [cls, label] of [['kKill', T('Somebody died here')], ['kHit', T('Hit by a bullet')], ['kBlast', T('A grenade went off')], ['kDown', T('Down, can be got up')],
+      ['kSwitch', T('Switch (green: on)')], ['kGoal', T('ORBIT squad objective')], ['kGhost', T('Parked by ORBIT as a ghost')]]) {
+      const row = mk('div', 'keyRow');
+      row.append(mk('i', 'mark ' + cls), mk('span', '', label));
+      box.appendChild(row);
+    }
+  }
+
+  $('replayKey').onclick = () => { keyOpen = !keyOpen; $('replayKey').classList.toggle('on', keyOpen); dirty = true; };
+  $('historyWinBtn').onclick = () => openHistWin(true);
+  $('replayMini').onclick = () => { prefs.minimap = prefs.minimap === false; $('optMinimap').checked = prefs.minimap; save(); replayShown = ''; showReplay(); dirty = true; };
+  winsReady = true;
+
+  // ---- what a raid has beyond its markers: switches, hits, what ORBIT's squads are out to do ----
+  // Each comes as an event (see Recorded in the game's plugin), live and in a replay.
+  //   switchNow: every switch as it stands, by its id (the latest "switch" event of each)
+  //   orbitMain, orbitField: ORBIT's latest snapshot of each ("s": as ORBIT gives it, places as the game's x, y, z)
+  let switchNow = new Map(), orbitMain = null, orbitField = null, phobosField = null, hitFlashes = [];
+  const HIT_MS = 450;
+  function drawHits(scale) {
+    if (!hitFlashes.length) return;
+    const now = performance.now();
+    hitFlashes = hitFlashes.filter(h => now - h.at < HIT_MS);
+    if (prefs.hitFlash === false) { hitFlashes = []; return; }
+    ctx.save();
+    for (const h of hitFlashes) {
+      const m = liveById.get(h.id);
+      if (!m || !Number.isFinite(m.cx) || isHidden(m.c) || inArea(m) || offFloor(m.cx, m.cy, m.cz)) continue;
+      const k = (now - h.at) / HIT_MS, s = toScreen(m.cx, m.cy);
+      ctx.globalAlpha = 1 - k;
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], (9 + 13 * k) * scale, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 60, 48, 0.35)';
+      ctx.fill();
+      ctx.lineWidth = 2.5 * scale;
+      ctx.strokeStyle = '#ff3b30';
+      ctx.stroke();
+    }
+    ctx.restore();
+    if (hitFlashes.length) dirty = true;
+  }
+  function drawSwitches(scale) {
+    if (prefs.switches === false || !switchNow.size || isHidden('Layer switches')) return;
+    // the ones the map's places have are drawn with them (see drawThings); these are the rest, from a map whose
+    // places were sent before switches were
+    const listed = places && map && sameMap(places.loc, map.loc) && places.switches.length ? new Set(places.switches.map(w => w.id)) : null;
+    const r = 5.5 * scale;
+    for (const e of switchNow.values()) {
+      if ((listed && listed.has(e.d.id)) || NOT_A_SWITCH.test(e.d.nm || '')) continue;
+      if (!prefs.lightSwitches && LIGHT_SWITCH.test((e.d.id || '') + ' ' + (e.d.nm || ''))) continue;
+      const at = e.d.at;
+      if (!Array.isArray(at) || offFloor(at[0], at[1], at[2])) continue;
+      const s = toScreen(at[0], at[1]);
+      if (s[0] < -20 || s[1] < -20 || s[0] > vw + 20 || s[1] > vh + 20) continue;
+      const on = e.d.st === 'Open';
+      ctx.save();
+      ctx.globalAlpha = otherFloor(at[0], at[1], at[2]) !== 0 ? 0.45 : 1;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(s[0] - r, s[1] - r, r * 2, r * 2, r * 0.45); else ctx.rect(s[0] - r, s[1] - r, r * 2, r * 2);
+      ctx.fillStyle = on ? '#3ddc5a' : '#59606e';
+      ctx.fill();
+      ctx.lineWidth = 1.6 * scale;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      // its lever: up once switched
+      ctx.beginPath();
+      ctx.moveTo(s[0], s[1] + (on ? r * 0.5 : -r * 0.5));
+      ctx.lineTo(s[0], s[1] + (on ? -r * 0.55 : r * 0.55));
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 2 * scale;
+      ctx.strokeStyle = on ? '#0c0c12' : '#e5e6ec';
+      ctx.stroke();
+      ctx.restore();
+      thingsDrawn.push({ x: s[0], y: s[1], r: r + 3, tip: { title: T('Switch') + (e.d.nm ? ' · ' + String(e.d.nm).replace(/[_]+/g, ' ').slice(0, 40) : ''),
+        lines: [on ? T('Switched on') : T('Not switched'), e.t ? raidClock(e.t) : ''] } });
+    }
+  }
+  // Where each ORBIT squad is headed, and what for: a blue diamond at each thing it's out to do (the one it's on
+  // now strong, the ones after it faint), a line to it from the squad, and the points of a rush as small rings.
+  const ORBIT_LETTER = { Kills: 'K', LootValue: 'L', Quest: 'Q' };
+  function drawOrbitMain(scale) {
+    const plans = !!prefs.orbitMain, rush = !!prefs.orbitRush;
+    if (!orbitMain || !(plans || rush) || !modOn('ORBIT')) return;
+    const squads = Array.isArray(orbitMain.d.s) ? orbitMain.d.s : [];
+    ctx.save();
+    for (const squad of squads) {
+      const members = list(squad.MemberProfileIds), goals = list(squad.MainObjectives).filter(o => o && !o.Completed && Number.isFinite(o.X) && Number.isFinite(o.Z));
+      if (!goals.length) continue;
+      const here = live.filter(m => m.pid && members.includes(m.pid) && m.c !== 'Corpse');
+      // (a squad nobody of which is shown: its plans aren't either)
+      if (!here.length || here.every(m => isHidden(m.c) || inArea(m))) continue;
+      goals.forEach((o, i) => {
+        if (offFloor(o.X, o.Z, o.Y)) return;
+        const s = toScreen(o.X, o.Z), r = 8 * scale;
+        const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : words(String(o.OperationName || o.Type || ''));
+        ctx.globalAlpha = i ? 0.45 : 1;
+        if (plans && !i && Number.isFinite(here[0].cx)) {
+          const from = toScreen(here[0].cx, here[0].cy);
+          ctx.beginPath();
+          ctx.moveTo(from[0], from[1]);
+          ctx.lineTo(s[0], s[1]);
+          ctx.setLineDash([3 * scale, 6 * scale]);
+          ctx.lineWidth = 1.5 * scale;
+          ctx.strokeStyle = 'rgba(111, 188, 255, 0.75)';
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        // the places the squad is to sweep (a rush), each a ring named over its top: what for, and by whom
+        for (const p of rush ? list(o.RushPoints) : []) {
+          if (!p || !Number.isFinite(p.X) || !Number.isFinite(p.Z)) continue;
+          const at = toScreen(p.X, p.Z), rr = Math.max(4 * scale, (p.Radius || 0) * zoom);
+          if (at[0] + rr < 0 || at[1] + rr < 0 || at[0] - rr > vw || at[1] - rr > vh) continue;
+          const done = /done|visited|complete/i.test(p.State || '');
+          ctx.beginPath();
+          ctx.arc(at[0], at[1], rr, 0, Math.PI * 2);
+          ctx.lineWidth = 1.3 * scale;
+          ctx.strokeStyle = done ? 'rgba(61, 220, 90, 0.8)' : 'rgba(111, 188, 255, 0.8)';
+          ctx.stroke();
+          const label = 'ORBIT · ' + (what || T('Rush point')) + (here.length ? ' · ' + (here[0].t || ONE[here[0].c] || here[0].c) + (here.length > 1 ? ' +' + (here.length - 1) : '') : '');
+          ctx.font = Math.round(10.5 * scale) + 'px ' + FONT;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.lineWidth = 3 * scale;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+          ctx.strokeText(label, at[0], at[1] - rr - 2 * scale);
+          ctx.fillStyle = done ? '#7ee89a' : '#bfe0ff';
+          ctx.fillText(label, at[0], at[1] - rr - 2 * scale);
+        }
+        if (!plans) return;
+        if (s[0] < -30 || s[1] < -30 || s[0] > vw + 30 || s[1] > vh + 30) return;
+        ctx.beginPath();
+        ctx.moveTo(s[0], s[1] - r * 1.25); ctx.lineTo(s[0] + r * 1.25, s[1]); ctx.lineTo(s[0], s[1] + r * 1.25); ctx.lineTo(s[0] - r * 1.25, s[1]);
+        ctx.closePath();
+        ctx.fillStyle = '#12314d';
+        ctx.fill();
+        ctx.lineWidth = 2 * scale;
+        ctx.strokeStyle = '#6fbcff';
+        ctx.stroke();
+        ctx.font = 'bold ' + Math.round(10 * scale) + 'px ' + FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#d7ecff';
+        ctx.fillText(orbitLetter(o), s[0], s[1] + 0.5);
+        thingsDrawn.push({ x: s[0], y: s[1], r: r * 1.4, tip: { title: 'ORBIT · ' + what,
+          lines: [o.OperationStep ? words(o.OperationStep) + (o.OperationStepCount ? ' (' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount + ')' : '') : '',
+            o.QuestTitle || '', o.CampState ? words(o.CampState) : '', o.KillAmbush ? 'Ambush' : '',
+            T('Squad:') + ' ' + here.map(m => m.t || ONE[m.c] || m.c).slice(0, 6).join(', '),
+            i ? '' : goals.length > 1 ? T('…and {n} more', { n: goals.length - 1 }) : ''] } });
+      });
+    }
+    ctx.restore();
+  }
+  // ORBIT's field: the arrows its bots are drawn along (one for each of its squares, thinned out from afar), and
+  // its zones as circles.
+  const drawOrbitField = scale => drawFieldOf(scale, orbitField && prefs.orbitField && modOn('ORBIT') ? orbitField.d.s : null, '111, 188, 255');
+  // (Phobos's field is the same sort of thing, with the arrows of where its bots are drawn together as well)
+  const drawPhobosField = scale => drawFieldOf(scale, phobosField && prefs.phobosField && modHere('Phobos') ? phobosField.d.s : null, '183, 227, 161');
+  function drawFieldOf(scale, f, rgb) {
+    if (!f || !Number.isFinite(f.CellSize) || !(f.CellSize > 0)) return;
+    const size = f.CellSize * zoom, every = Math.max(1, Math.ceil(18 * scale / size));
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(' + rgb + ', 0.7)';
+    ctx.lineWidth = 1.3 * scale;
+    ctx.beginPath();
+    for (const c of list(f.Advection).concat(list(f.Convergence))) {
+      if (!c || c.X % every || c.Y % every) continue;
+      const force = Math.hypot(c.Fx, c.Fz);
+      if (!(force > 0.001)) continue;
+      const x = f.WorldMinX + (c.X + 0.5) * f.CellSize, y = f.WorldMinZ + (c.Y + 0.5) * f.CellSize, len = f.CellSize * every * 0.4;
+      const a = toScreen(x, y);
+      if (a[0] < -20 || a[1] < -20 || a[0] > vw + 20 || a[1] > vh + 20) continue;
+      const b = toScreen(x + c.Fx / force * len, y + c.Fz / force * len), back = Math.atan2(a[1] - b[1], a[0] - b[0]), barb = 4 * scale;
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.moveTo(b[0] + Math.cos(back + 0.5) * barb, b[1] + Math.sin(back + 0.5) * barb);
+      ctx.lineTo(b[0], b[1]);
+      ctx.lineTo(b[0] + Math.cos(back - 0.5) * barb, b[1] + Math.sin(back - 0.5) * barb);
+    }
+    ctx.stroke();
+    for (const z of list(f.Zones)) {
+      if (!z || !Number.isFinite(z.X) || !Number.isFinite(z.Y)) continue;
+      // (a zone's place is a square of the field, or the game's own x and z: an ORBIT says which by how big they are)
+      const inCells = z.X < f.GridCols && z.Y < f.GridRows && z.X >= 0 && z.Y >= 0 && Number.isInteger(z.X) && Number.isInteger(z.Y);
+      const s = inCells ? toScreen(f.WorldMinX + (z.X + 0.5) * f.CellSize, f.WorldMinZ + (z.Y + 0.5) * f.CellSize) : toScreen(z.X, z.Y);
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], Math.max(4, (z.Radius || 0) * (inCells ? f.CellSize : 1) * zoom), 0, Math.PI * 2);
+      ctx.fillStyle = z.Force < 0 ? 'rgba(255, 110, 100, 0.07)' : 'rgba(' + rgb + ', 0.07)';
+      ctx.fill();
+      ctx.strokeStyle = z.Force < 0 ? 'rgba(255, 110, 100, 0.6)' : 'rgba(' + rgb + ', 0.6)';
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // how a raid ended for its player, as the list of raids and the leaderboard say it
+  const EXITS = { Survived: T('survived'), Killed: T('died'), Runner: T('run-through'), Left: T('left the raid'), MissingInAction: T('missing in action'), Transit: T('went through a transit') };
+
+  // ---- pick-ups on the map ----
+  // What somebody picks up ("loot" events, as they happen) is written where they stood: it rises and fades. An older
+  // plugin doesn't say where: then it's where their marker is.
+  let lootFloats = [];
+  const FLOAT_MS = 6000;
+  function floatLoot(e) {
+    if (prefs.lootFloats === false || replaySeeking || (e.k === 'loot' && !eventListed(e, 'loot')) || (e.k === 'drop' && (isHidden(e.d.wk || 'None') || prefs.areaKinds.includes(e.d.wk)))) return;
+    let at = Array.isArray(e.d.at) ? e.d.at : null;
+    if (!at) {
+      const m = e.p ? live.find(o => o.pid === e.p && o.c !== 'Corpse') : null;
+      if (m && Number.isFinite(m.cx)) at = [m.cx, m.cy, m.cz];
+    }
+    if (!at) return;
+    const worth = lootWorth(e.d), now = performance.now();
+    lootFloats = lootFloats.filter(f => now - f.at < FLOAT_MS);
+    const row = lootFloats.filter(f => Math.hypot(f.x - at[0], f.y - at[1]) < 5).length;
+    lootFloats.push({ x: at[0], y: at[1], z: at[2], at: now, row,
+      text: (e.k === 'drop' ? '− ' : '+ ') + e.d.i + (e.d.q > 1 ? ' ×' + e.d.q : ''), who: e.d.wk === 'Main Player' || !e.nm ? '' : latin(e.nm),
+      col: e.k === 'drop' ? '#b9bcc8' : e.d.qi ? LAYERS.quest.col : Number.isFinite(worth) ? worthCol(worth) : '#e8e9eb' });
+    if (lootFloats.length > 40) lootFloats.shift();
+    dirty = true;
+  }
+  function drawFloats(scale) {
+    if (!lootFloats.length) return;
+    const now = performance.now();
+    lootFloats = lootFloats.filter(f => now - f.at < FLOAT_MS);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.lineJoin = 'round';
+    for (const f of lootFloats) {
+      if (offFloor(f.x, f.y, f.z)) continue;
+      const age = now - f.at, s = toScreen(f.x, f.y);
+      if (s[0] < -80 || s[1] < -80 || s[0] > vw + 80 || s[1] > vh + 80) continue;
+      const y = s[1] - (16 + 26 * age / FLOAT_MS + 13 * f.row) * scale;
+      ctx.globalAlpha = Math.min(1, age / 250, (FLOAT_MS - age) / 1500);
+      ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
+      const text = f.who ? f.who + '  ' + f.text : f.text;
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+      ctx.strokeText(text, s[0], y);
+      ctx.fillStyle = f.col;
+      ctx.fillText(text, s[0], y);
+    }
+    ctx.restore();
+    if (lootFloats.length) dirty = true;
+  }
+
   function listen() {
     if (source) source.close();
     // One game's reports only: the player picked, or with nobody picked the game being shown. The other games on
@@ -7312,7 +10109,9 @@
     streamUp = false;
     source = new EventSource('api/stream' + (streamFor ? '?session=' + encodeURIComponent(streamFor) : ''));
     source.onopen = () => { serverLost = false; };
-    source.onerror = () => { serverLost = true; streamUp = false; };
+    // (a server without the map answers the stream "not found", and the browser gives it up: asked again later, see
+    // the timers at the end)
+    source.onerror = () => { serverLost = true; streamUp = false; if (source.readyState === 2) missed(); };
     source.onmessage = e => {
       serverLost = false;
       try { take(JSON.parse(e.data)); } catch (err) { console.warn(err); }
@@ -7356,9 +10155,14 @@
   // full screen can't be had on some phones (an iPhone's browser): no button for it there
   if (!document.documentElement.requestFullscreen) $('full').hidden = true;
   loadMaps();
-  setInterval(() => { if (!streamUp) loadMaps(); loadPlaces(false); loadSpawns(); }, 4000);
+  setInterval(() => { if (serverAway()) return; if (!streamUp) loadMaps(); loadPlaces(false); loadSpawns(); }, 4000);
   listen();
   askGames();
-  setInterval(() => { if (!streamUp) askGames(); }, 3000);
+  setInterval(() => {
+    if (serverAway()) return;
+    // the stream given up on (the server didn't have the map): opened again once it's time to ask again
+    if (source && source.readyState === 2) listen();
+    if (!streamUp) askGames();
+  }, 3000);
   requestAnimationFrame(frame);
 })();

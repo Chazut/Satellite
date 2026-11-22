@@ -33,6 +33,7 @@ namespace Satellite.Server;
 //   /satellite/api/places, api/things    where things stand on a location, and what lies about in a raid
 //   /satellite/api/spawns?loc=           where loot can spawn on a location, and what (the server's loot tables)
 //   /satellite/api/quests[?session=]     that player's started quests and where they send them
+//   /satellite/api/history               the raids recorded, to play back (see Recorder)
 //   POST /satellite/api/push             what the game plugin reports
 //   POST /satellite/api/tile, api/map    a location's picture, from the game plugin
 [Injectable(InjectionType.Singleton, TypePriority = OnLoadOrder.Preload)]
@@ -232,6 +233,39 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 case "api/events":
                     await SendEvents(context, query["session"].ToString(), query["after"].ToString(), cancellationToken);
                     return;
+#if RECORDING
+                case "api/history":
+                    await SendJson(context, HistoryList(), cancellationToken);
+                    return;
+                case "api/history/rec":
+                    await SendRecording(context, query["id"].ToString(), cancellationToken);
+                    return;
+                case "api/history/export":
+                    await ExportRecording(context, query["id"].ToString(), cancellationToken);
+                    return;
+                case "api/history/import" when post:
+                    await SendJson(context, await ImportRecording(context, cancellationToken), cancellationToken);
+                    return;
+                case "api/history/names" when post:
+                    await SendJson(context, await HistoryNames(context, cancellationToken), cancellationToken);
+                    return;
+                case "api/history/delete" when post:
+                    await SendJson(context, DeleteRecording(query["id"].ToString()), cancellationToken);
+                    return;
+                case "api/history/deleteAll" when post:
+                    await SendJson(context, DeleteAllRecordings(), cancellationToken);
+                    return;
+                case "api/history/tidy" when post:
+                    await SendJson(context, TidyRecordings(), cancellationToken);
+                    return;
+                case "api/history/rr":
+                    await SendJson(context, RrList(), cancellationToken);
+                    return;
+                case "api/history/rr/import" when post:
+                    var wanted = query["id"].ToString();
+                    await SendJson(context, await Task.Run(() => RrImport(wanted), cancellationToken), cancellationToken);
+                    return;
+#endif
                 case "api/state":
                     await State(context, query["session"].ToString(), cancellationToken);
                     return;
@@ -440,7 +474,14 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         // the kinds the plugin needn't send at all: the same every time, so written out once (this is answered ten
         // times a second for each game that's watched)
         _offAnswer ??= ",\"off\":" + OffList().ToJsonString() + ",\"layers\":" + LayersOffList().ToJsonString();
-        var answer = new StringBuilder(160).Append("{\"w\":").Append(session.Headless || session.IsHost ? HostWatchers(session) : Watchers(session)).Append(_offAnswer);
+        // nobody watching a raid that's recorded: the game reports all the same, slower ("slow")
+        var watchers = session.Headless || session.IsHost ? HostWatchers(session) : Watchers(session);
+#if RECORDING
+        var slow = watchers == 0 && Recorded(session);
+#else
+        const bool slow = false;
+#endif
+        var answer = new StringBuilder(160).Append("{\"w\":").Append(slow ? 1 : watchers).Append(slow ? ",\"slow\":1" : "").Append(_offAnswer);
         if (location != null)
         {
             answer.Append(",\"loc\":").Append(JsonSerializer.Serialize(location));
@@ -468,7 +509,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         ("friendlyPlayers", "Friendly Player"), ("enemyPmcs", "Enemy Player"), ("scavs", "Scav"), ("snipers", "Sniper"),
         ("guards", "Guard"), ("cultists", "Cultist"), ("goons", "Goon"), ("bosses", "Boss"), ("raiders", "Raider"), ("rogues", "Rogue"),
         ("smugglers", "Smuggler"), ("blackDivision", "Black Division"), ("ruaf", "RUAF"),
-        ("ruafRemnant", "RUAF Remnant"), ("untar", "UNTAR"), ("isb", "ISB"), ("civilians", "Civilian"), ("infected", "Infected"), ("otherAi", "Other AI"),
+        ("ruafRemnant", "RUAF Remnant"), ("untar", "UNTAR"), ("isb", "ISB"), ("isbWhiteTusks", "ISB WT"), ("bloodhounds", "Bloodhound"), ("mercenaries", "Mercenary"), ("combine", "Combine"), ("civilians", "Civilian"), ("infected", "Infected"), ("otherAi", "Other AI"),
         ("corpses", "Corpse"), ("extracts", "Extract"), ("transits", "Transit"), ("airdrops", "Airdrop")
     ];
 
@@ -511,7 +552,12 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 if (stream != null)
                 {
                     using var reader = new StreamReader(stream);
-                    File.WriteAllText(file, reader.ReadToEnd());
+                    var text = reader.ReadToEnd();
+#if !RECORDING
+                    // without raid recording in this build, its settings aren't offered
+                    text = Regex.Replace(text, @"\r?\n  // Raid history:[^\n]*\r?\n  ""history"": \{.*?\r?\n  \},", "", RegexOptions.Singleline);
+#endif
+                    File.WriteAllText(file, text);
                     info("[Satellite] Wrote config.jsonc with every kind of marker on. Edit it to keep some off the page.");
                 }
             }
@@ -522,6 +568,21 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
 
         return file;
+    }
+
+    // config.jsonc's server.quietLogs: on unless it says false
+    public static bool QuietLogs(string file)
+    {
+        try
+        {
+            var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+            return !(File.Exists(file) && JsonNode.Parse(File.ReadAllText(file), null, options)?["server"]?["quietLogs"] is JsonValue value
+                && value.TryGetValue<bool>(out var on) && !on);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        {
+            return true;
+        }
     }
 
     private string[] ReadOff()
@@ -595,7 +656,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 || one["k"] is not JsonValue k || !k.TryGetValue<string>(out var kind)
                 || (noBrains && kind.StartsWith("comet.", StringComparison.Ordinal))
                 || (noBrains && kind.StartsWith("orbit.", StringComparison.Ordinal))
-                || (kind == "loot" && off.Length > 0 && !Kept(one, "wk"))
+                || ((kind == "loot" || kind == "left" || kind == "drop") && off.Length > 0 && !Kept(one, "wk"))
                 || (kind == "kill" && off.Length > 0 && !(Kept(one, "vk") && Kept(one, "kk"))))
             {
                 events.RemoveAt(i);
@@ -675,6 +736,13 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             var node = JsonNode.Parse(report)!.AsObject();
             node["off"] = OffList();
             node["layersOff"] = LayersOffList();
+            // "rec": this raid is being recorded (the page shows a sign); not in a replay, where it's always so
+#if RECORDING
+            if (History().Record && node["raid"] is JsonValue inRaid && inRaid.TryGetValue<bool>(out var raiding) && raiding && node["rid"] is JsonValue)
+            {
+                node["rec"] = 1;
+            }
+#endif
             var blocked = new HashSet<long>();
             if (off.Length > 0 && node["markers"] is JsonArray markers)
             {
@@ -789,6 +857,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
 
     private void Publish(Session session, string report)
     {
+#if RECORDING
+        Record(session, report);
+#endif
         var message = Envelope(session, 0, report);
         foreach (var subscriber in _subscribers.Keys)
         {
@@ -1020,8 +1091,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
     private const int MaxTilesAcross = 64;
 
     // a map: the game's location id (a mod's own location too), and after a "~" the version a mod swapped in
-    // ("Interchange~backport"), each kept apart; "@snow" after it: the same map with snow on the ground (Snow below)
-    [GeneratedRegex("^[A-Za-z0-9_-]{1,40}(~[a-z0-9_-]{1,24})?(@snow)?$")]
+    // ("Interchange~backport"), each kept apart; "@snow", "@lateautumn" or "@earlyspring" after it: the same map in a
+    // season with snow on the ground (Seasons below)
+    [GeneratedRegex("^[A-Za-z0-9_-]{1,40}(~[a-z0-9_-]{1,24})?(@(snow|lateautumn|earlyspring))?$")]
     private static partial Regex LocationName();
 
     [GeneratedRegex("^[A-Za-z0-9_-]{1,40}$")]
@@ -1113,6 +1185,23 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
     }
 
+    // the version name the location's map has now, if it has one
+    private string? KeptVersionName(string location)
+    {
+        lock (_mapsLock)
+        {
+            try
+            {
+                return KnownMaps().TryGetValue(location, out var meta) && JsonNode.Parse(meta) is JsonObject about
+                    && about["vname"] is JsonValue name && name.TryGetValue<string>(out var text) && text.Length is > 0 and <= 40 ? text : null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+    }
+
     private bool HasMap(string location)
     {
         lock (_mapsLock)
@@ -1121,18 +1210,23 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
     }
 
-    // Snow: a map can come a second time, captured with snow on the ground, as "<map>@snow" (a folder of its own,
-    // from the snow add-on). The page shows it in place of the map in a raid whose season has snow, when it's
-    // installed; everything else (the places, the loot, which map a raid is on) goes by the map without snow.
-    public const string SnowSuffix = "@snow";
+    // Seasons: a map can come again for a season the game puts snow down in, captured then, as a folder of its own
+    // from a season add-on: "<map>@snow" (winter, all under snow), "<map>@lateautumn" and "<map>@earlyspring" (patches
+    // of it). The page shows one in place of the map in a raid of its season, when it's installed; everything else
+    // (the places, the loot, which map a raid is on) goes by the map itself.
+    public static readonly string[] SeasonSuffixes = ["@snow", "@lateautumn", "@earlyspring"];
 
-    public static bool IsSnow(string key) => key.EndsWith(SnowSuffix, StringComparison.Ordinal);
+    // the season map a key is ("@snow"), or null
+    public static string? SeasonOf(string key) => SeasonSuffixes.FirstOrDefault(s => key.EndsWith(s, StringComparison.Ordinal));
 
-    // the map a snow map is of ("bigmap@snow": "bigmap")
-    public static string WithoutSnow(string key) => IsSnow(key) ? key[..^SnowSuffix.Length] : key;
+    public static bool IsSnow(string key) => SeasonOf(key) != null;
 
-    // the seasons the game covers the ground in snow for
-    private static readonly HashSet<string> SnowySeasons = new(StringComparer.Ordinal) { "Winter", "AutumnLate", "SpringEarly", "Storm" };
+    // the map a season map is of ("bigmap@snow": "bigmap")
+    public static string WithoutSnow(string key) => SeasonOf(key) is { } season ? key[..^season.Length] : key;
+
+    // the seasons the game puts snow down in (all over in winter, patches late in autumn and early in spring): a map
+    // captured in one is taken again in a season without
+    private static readonly HashSet<string> SnowySeasons = new(StringComparer.Ordinal) { "Winter", "AutumnLate", "SpringEarly" };
 
     // whether a map was captured with snow on the ground (one captured before seasons were kept: not known, so no)
     private readonly Dictionary<string, bool> _snowy = new(StringComparer.Ordinal);
@@ -1201,7 +1295,8 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
     }
 
     // POST api/key with {"base","hint","scn"}, from the map scanner: {"key":the map this raid is on,"map":whether
-    // there's a picture of it yet,"snow":whether that picture has snow on the ground}
+    // there's a picture of it yet,"snow":whether that picture has snow on the ground,"seasons":the season maps of it
+    // there are, as "snow", "lateautumn", "earlyspring"}
     private async Task SendKey(MongoId sessionId, HttpContext context, CancellationToken cancellationToken)
     {
         if (GameSession(sessionId) == null)
@@ -1217,7 +1312,11 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             return;
         }
 
-        var answer = new JsonObject { ["key"] = key, ["map"] = HasMap(key), ["snow"] = SnowyMap(key) };
+        var answer = new JsonObject
+        {
+            ["key"] = key, ["map"] = HasMap(key), ["snow"] = SnowyMap(key),
+            ["seasons"] = new JsonArray(SeasonSuffixes.Where(s => HasMap(key + s)).Select(s => (JsonNode?)s[1..]).ToArray())
+        };
         await SendJson(context, answer.ToJsonString(), cancellationToken);
     }
 
@@ -1227,6 +1326,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
 
     [GeneratedRegex(@"\s*\(\d+\)$")]
     private static partial Regex SceneCount();
+
+    // the game's events, as their scenes and the versions made for them are named
+    [GeneratedRegex("halloween|christmas|xmas|newyear|new_year", RegexOptions.IgnoreCase)]
+    private static partial Regex EventScene();
 
     private string MapFor(string place, string hint, List<string> loaded, bool loose = true)
     {
@@ -1274,7 +1377,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 // the game's own map, when the raid is said to be the game's own version (MapVariants, or nothing
                 // swaps it): scenes another mod adds (props, ladders) don't make it another version, even for the scanner
                 var ownMap = key == place && hint == place;
-                if (Fit(then, now, loose, ownMap) is { } score && score < bestScore)
+                if (Fit(then, now, loose, ownMap, !EventScene().IsMatch(key)) is { } score && score < bestScore)
                 {
                     best = key;
                     bestScore = score;
@@ -1349,14 +1452,18 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
     // fit (one of its scenes isn't loaded and one it didn't have is: a swap; or more than half of its own are missing).
     // Not loose (the scanner): only the very same scenes fit. A version can be another with a scene added (Manimal's
     // Halloween 2026 Labs is his Labs Boiler with one layer more), and scanning it as that one would scan over it.
-    private static int? Fit(List<string> then, HashSet<string> now, bool loose = true, bool addedOk = false)
+    // eventOk: a version captured while an event was on (Customs Classic in Halloween) has the event's props as scenes,
+    // gone once it's over; only those missing, it's still that version. Not for a version named for the event
+    // (Halloween 2026 Labs is Labs with its Halloween layer): without the layer, it's the other.
+    private static int? Fit(List<string> then, HashSet<string> now, bool loose = true, bool addedOk = false, bool eventOk = false)
     {
         var thenSet = new HashSet<string>(then, StringComparer.Ordinal);
         var missing = then.Count(s => !now.Contains(s));
         var added = now.Count(s => !thenSet.Contains(s));
         if (!loose)
         {
-            return missing == 0 && (added == 0 || addedOk) ? added : null;
+            var eventGone = eventOk && missing > 0 && then.Where(s => !now.Contains(s)).All(s => EventScene().IsMatch(s));
+            return (missing == 0 || eventGone) && (added == 0 || addedOk) ? added + missing : null;
         }
 
         var swapped = missing > 0 && added > 0;
@@ -1570,6 +1677,12 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         if (Said("vname", 40) is { } versionName)
         {
             about["vname"] = versionName;
+        }
+        else if (KeptVersionName(location) is { } keptName)
+        {
+            // taken again without one (a mod that swaps the version in without MapVariants naming it, as Manimal's
+            // Labs office does): the name it was captured with before is kept, or the picker would name it by its key
+            about["vname"] = keptName;
         }
 
         // the season the game showed (snow on the ground in some)

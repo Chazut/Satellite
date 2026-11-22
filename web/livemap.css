@@ -305,7 +305,7 @@ select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
 #findCount { color: #ffe14d; white-space: nowrap; }
 #findCount:empty { display: none; }
 /* the search cleared: back to the map as it was */
-#findClear {
+#findClear, #setFindClear {
   flex: none;
   width: 22px;
   height: 22px;
@@ -317,10 +317,10 @@ select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
   font-size: 11px;
   line-height: 22px;
 }
-#findClear:hover { background: var(--accent-soft); color: var(--bright); }
-#findClear[hidden] { display: none; }
+#findClear:hover, #setFindClear:hover { background: var(--accent-soft); color: var(--bright); }
+#findClear[hidden], #setFindClear[hidden] { display: none; }
 /* the browser's own little cross: there's one of ours */
-#find::-webkit-search-cancel-button { display: none; }
+#find::-webkit-search-cancel-button, #setFind::-webkit-search-cancel-button { display: none; }
 /* what the search finds, under the box: a row each, pressed to go there (again: the next one) */
 #findList {
   position: fixed;
@@ -355,6 +355,25 @@ select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
 #findList .hit small { flex: none; color: var(--dim); }
 #findList .hit em { flex: none; min-width: 2.2em; text-align: right; color: #ffe14d; font-style: normal; font-variant-numeric: tabular-nums; }
 #findList .none { padding: 8px 10px; color: var(--dim); }
+/* what was found, by what it is: a row of tabs over the list, kept in sight while the list scrolls */
+#findList .tabs { position: sticky; top: -4px; z-index: 1; display: flex; flex-wrap: wrap; gap: 4px; margin: -4px -4px 4px; padding: 6px; border-bottom: 1px solid var(--line); background: var(--panel-solid); }
+#findList .tab { height: auto; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--dim); font: inherit; font-size: 12px; cursor: url("cursors/hand.png") 7 6, pointer; }
+#findList .tab:hover { background: var(--hover); color: var(--text); }
+#findList .tab.on { border-color: var(--accent); background: var(--accent-soft); color: var(--bright); }
+
+/* the map picker on wide screens: a row for each location, and beside it, the versions and season maps of the one
+   pointed at (phones keep the plain picker, the versions in a group under each location) */
+#mapBtn { display: none; align-items: center; gap: 8px; max-width: 46vw; white-space: nowrap; }
+#mapBtnText { overflow: hidden; text-overflow: ellipsis; }
+#mapBtn .caret { color: var(--dim); font-size: 10px; }
+@media (min-width: 701px) and (min-height: 521px) { #bar > #map { display: none; } #mapBtn:not([hidden]) { display: flex; } }
+#mapMenu, #mapSub { position: fixed; z-index: 4; min-width: 190px; max-height: min(75vh, 600px); overflow-y: auto; padding: 4px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel-solid); box-shadow: var(--shadow); font-size: 13px; }
+#mapMenu[hidden], #mapSub[hidden] { display: none; }
+.mapRow { display: flex; align-items: center; gap: 12px; width: 100%; height: auto; padding: 6px 10px; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--text); text-align: left; font: inherit; white-space: nowrap; }
+.mapRow:hover, .mapRow.open { background: var(--hover); color: var(--bright); }
+.mapRow.on { color: var(--accent); }
+.mapRow b { flex: 1 1 auto; font-weight: normal; }
+.mapRow small { flex: none; color: var(--dim); }
 
 /* the options are on the right, where their panel opens */
 #options { margin-left: auto; }
@@ -453,6 +472,7 @@ select option { background: #1a1a24; }
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 #listBtn.on { border-color: var(--line-strong); color: var(--accent); }
+body.replaying #histBtn { border-color: var(--line-strong); color: var(--accent); background: var(--accent-soft); }
 /* swapped: the menu on the left, the Raid list on the right */
 @media (min-width: 701px) and (min-height: 521px) {
   body.swap #panel { right: auto; left: max(8px, env(safe-area-inset-left)); }
@@ -1051,6 +1071,21 @@ body.rightOn #hint { display: none; }
   user-select: text;
 }
 #notice[hidden] { display: none; }
+#notice { padding-right: 38px; }
+#noticeClose { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--dim); font-size: 13px; line-height: 1; }
+#noticeClose:hover { background: var(--hover); color: var(--bright); }
+/* finding a setting: the box under the tabs, and while it has words, every tab's matching options together */
+#setFindBox { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px 0; }
+#setFind { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.04); color: var(--text); font: inherit; font-size: 13px; }
+#setFind:focus { outline: none; border-color: var(--accent); }
+#setFindNone { flex: none; color: var(--dim); }
+#setFindNone[hidden] { display: none; }
+@media (hover: none), (pointer: coarse) { #setFind { height: 40px; font-size: 16px; } }
+#panel.finding #panelBody > section.findIn, #panel.finding #panelBody .view.findIn { display: block !important; }
+#panel.finding #panelBody > section:not(.findIn) { display: none !important; }
+#panel.finding #panelBody .findOut { display: none !important; }
+#panel.finding #panelBody > section.findIn::before { content: attr(data-find-name); display: block; margin: 10px 0 2px; color: var(--accent); font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; }
+#panel.finding #tabs button.on { border-bottom-color: transparent; color: var(--dim); }
 #notice.soft {
   top: auto;
   bottom: max(40px, calc(env(safe-area-inset-bottom) + 40px));
@@ -1142,7 +1177,7 @@ button, select, input, summary, .row { touch-action: manipulation; -webkit-tap-h
   /* no frosted glass on a phone (it's slow there): the panels are plain, and darker so what's behind doesn't show */
   :root { --panel: var(--panel-solid); }
   #bar > *, #panel, #side { -webkit-backdrop-filter: none; backdrop-filter: none; }
-  #side, #listBtn { display: none; }
+  #side, #listBtn, #histBtn { display: none; }
   /* the kill feed: bottom right, above the menu's sheet when it's open (or beside it, the phone on its side) */
   #killFeed { bottom: calc(var(--cover-b, 0px) + max(10px, env(safe-area-inset-bottom))); right: calc(var(--cover-r, 0px) + max(10px, env(safe-area-inset-right))); max-height: 45%; }
   #bar { flex-wrap: wrap; gap: 5px; }
@@ -1338,3 +1373,370 @@ html.swap body { opacity: 0; transition: none; }
 @media (max-height: 520px) and (min-width: 701px) {
   body.menu #mapTools { right: calc(min(340px, 46vw) + max(10px, env(safe-area-inset-right))); }
 }
+
+/* ---- raid history: the list of raids, and the bar a replay is played from ---- */
+.histRow { display: flex; align-items: stretch; gap: 6px; margin: 0 0 6px; }
+.histPlay {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  height: auto;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.histPlay:hover { background: var(--hover); border-color: var(--line-strong); }
+.histRow.on .histPlay { border-color: var(--accent); background: var(--accent-soft); }
+.histPlay b { color: var(--bright); }
+.histPlay small { color: var(--dim); white-space: nowrap; }
+.histPlay span { grid-column: 1 / -1; color: var(--dim); font-size: 12px; }
+.histDrop {
+  width: 30px;
+  height: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--dim);
+  font-size: 16px;
+  cursor: pointer;
+}
+.histDrop:hover { color: var(--off); border-color: var(--off); }
+.histDrop.sure { color: #fff; background: var(--off); border-color: var(--off); }
+#replayBar {
+  position: fixed;
+  left: calc((100vw - var(--menu-r, 0px)) / 2);
+  bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px));
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(940px, calc(100vw - var(--menu-r, 0px) - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+}
+#replayBar[hidden] { display: none; }
+#replayBar { flex-wrap: wrap; z-index: 4; }
+#replayBot { flex-basis: 100%; display: flex; align-items: center; gap: 10px; }
+#replayBot[hidden] { display: none; }
+#replayBotName { white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+#replayBotStrip { position: relative; flex: 1; height: 12px; border-radius: 3px; background: rgba(200, 205, 255, 0.07); overflow: hidden; cursor: pointer; }
+#replayBotStrip i { position: absolute; top: 0; bottom: 0; }
+#replayBar button, #replayBar select {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#replayBar button:hover, #replayBar select:hover { background: var(--hover); border-color: var(--line-strong); }
+#replayBar button.on { color: var(--ink); background: var(--accent); border-color: var(--accent); }
+#replayPlay { width: 38px; padding: 0; color: var(--accent); }
+#replayClock { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--bright); }
+#replayTrack { position: relative; flex: 1; min-width: 60px; height: 30px; display: flex; align-items: center; }
+#replaySeek { position: relative; width: 100%; margin: 0; accent-color: var(--accent); }
+#replayTicks { position: absolute; left: 8px; right: 8px; top: 2px; height: 6px; }
+#replayTicks i { position: absolute; top: 0; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: #d8504a; }
+#replayTicks i.mine { background: #ffc94d; height: 8px; top: -2px; }
+#replayTicks i.died { background: #fff; height: 8px; top: -2px; }
+@media (max-width: 700px) {
+  #replayBar { flex-wrap: wrap; gap: 6px 8px; }
+  #replayTrack { order: 5; flex-basis: 100%; }
+}
+/* the kill feed and the scale stand clear of the replay's bar */
+body.replaying #killFeed:not(.toTop) { margin-bottom: 58px; }
+
+#historyNote { color: var(--dim); }
+/* a narrower screen: the search box gives way, so the bar stays on one line with History in it */
+@media (min-width: 701px) and (max-width: 1600px) { #findBox { width: 170px; } }
+
+/* ---- a replay's numbers: the leaderboard and the charts ---- */
+a.histGive { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+a.histGive:hover { color: var(--accent); border-color: var(--line-strong); }
+/* ---- the Raid window and the History window: over the map, under the top bar ---- */
+.win {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: 56px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  max-width: 1500px;
+  margin: 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: #101016;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+.win[hidden] { display: none; }
+.winHead { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.winHead > b { color: var(--bright); white-space: nowrap; }
+.winHead .grow { flex: 1; }
+.winHead nav { display: flex; flex: 1; gap: 2px; flex-wrap: wrap; }
+.winHead button, .winTools button, .winTools a.btn, .winTools select, .winTools input, .acts button, .acts a.btn, .winFold input {
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  white-space: nowrap;
+}
+.winHead button, .winTools button, .acts button, .winTools a.btn, .acts a.btn { cursor: pointer; }
+.winHead button:hover, .winTools button:hover, .winTools a.btn:hover, .acts button:hover, .acts a.btn:hover { background: var(--hover); border-color: var(--line-strong); }
+.winHead nav button { border-color: transparent; color: var(--dim); }
+.winHead nav button.on { color: var(--accent); background: var(--accent-soft); border-color: var(--line-strong); }
+.winHead .winX { width: 30px; padding: 0; border: 0; color: var(--dim); font-size: 18px; }
+#rvWhen { display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-bottom: 1px solid var(--line); }
+#rvWhen[hidden] { display: none; }
+#rvWhen input { flex: 1; max-width: 520px; accent-color: var(--accent); }
+#rvWhen small { color: var(--dim); }
+#rvClock { color: var(--bright); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.winBody { flex: 1; overflow: auto; padding: 12px 14px 16px; }
+.winNote { color: var(--dim); font-size: 12px; margin: 8px 0; }
+.winSub { margin: 16px 0 8px; color: var(--bright); font-size: 13px; font-weight: 600; }
+.winSub:first-child { margin-top: 0; }
+.winTools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.winTools input[type=search] { width: 240px; }
+.winTools input[type=number] { width: 150px; }
+.winTools small { color: var(--dim); }
+.winTools a.btn, .acts a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+.winTools select option, .winFold select option { background: var(--panel-solid); color: var(--text); }
+button.danger { color: #ff8a80; }
+button.danger.sure { color: #fff; background: #c8322c; border-color: #c8322c; }
+table.facts { border-collapse: collapse; font-size: 12.5px; margin-bottom: 6px; }
+table.facts td { padding: 4px 18px 4px 0; border-bottom: 1px solid var(--line); }
+table.facts td:first-child { color: var(--dim); white-space: nowrap; }
+table.facts td:last-child { color: var(--bright); }
+.teams { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.team { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 4px 10px 4px 5px; border: 1px solid var(--line); border-radius: 999px; font-size: 12.5px; }
+.team > i, i.squadDot { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; color: #10121a; font-style: normal; font-size: 11px; font-weight: 700; }
+.linkBtn { height: auto; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.linkBtn:hover { text-decoration: underline; }
+table.board.sortable th { cursor: pointer; user-select: none; white-space: nowrap; }
+table.board.sortable th:hover, table.board th.sorted { color: var(--accent); }
+table.board td i.squadDot { width: 18px; height: 18px; margin: 0; }
+table.board tr.pick { cursor: pointer; }
+table.board tr.pick:hover td { background: var(--hover); }
+table.board tr.open td { background: var(--accent-soft); }
+table.board td small { display: block; color: var(--dim); font-size: 11px; font-weight: 400; white-space: normal; }
+table.board td.good { color: #7fd36b; }
+table.board td.bad, .linkBtn.bad { color: #ff8a80; }
+table.board tr.detail td { padding: 8px 12px 10px 26px; background: rgba(255, 255, 255, 0.025); white-space: normal; }
+table.board tr.detail .linkBtn { display: block; margin: 2px 0; text-decoration: none; }
+table.board tr.detail .linkBtn:hover { color: var(--accent); }
+table.board tr.detail > td > .linkBtn:first-child { color: var(--accent); margin-bottom: 6px; }
+table.board .dim, .dim { color: var(--dim); }
+table.board td.acts { text-align: right; white-space: nowrap; }
+td.acts button, td.acts a.btn { height: 26px; padding: 0 9px; margin-left: 4px; }
+td.acts button.sure { color: #fff; background: #c8322c; border-color: #c8322c; }
+.accBar { display: inline-block; vertical-align: middle; width: 54px; height: 6px; margin-right: 7px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.accBar i { display: block; width: 0; height: 100%; margin: 0; border-radius: 0; background: var(--accent); }
+.actTag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 11.5px; }
+tr.act-killed .actTag { background: rgba(239, 83, 80, 0.25); color: #ffb3ae; }
+tr.act-looted .actTag { background: rgba(127, 211, 107, 0.2); color: #b6ecaa; }
+tr.act-grenade .actTag, tr.act-threw .actTag { background: rgba(255, 167, 38, 0.22); color: #ffd699; }
+tr.act-left .actTag { background: rgba(45, 212, 191, 0.2); color: #a5f0e5; }
+.donutRow { display: flex; align-items: center; gap: 14px; }
+.donutLegend { flex: 1; min-width: 0; font-size: 12px; }
+.donutLegend div { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.donutLegend i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.donutLegend span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donutLegend b { color: var(--bright); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.charts { margin-bottom: 14px; }
+.behLegend { gap: 4px 14px; margin-bottom: 10px; }
+.behLegend i { border-radius: 2px !important; width: 11px !important; height: 11px !important; border: 1px solid rgba(255, 255, 255, 0.25); }
+.behWrap { display: grid; grid-template-columns: 180px 1fr; border: 1px solid var(--line); border-radius: var(--radius-small); overflow: hidden; }
+.behNames { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.behNames button { display: block; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 11.5px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.behNames button:hover { background: var(--hover); }
+.behPlot { position: relative; min-width: 0; cursor: crosshair; }
+.behPlot canvas { display: block; touch-action: none; }
+.winFold { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-small); padding: 6px 12px; }
+.winFold summary { cursor: pointer; color: var(--bright); font-size: 12.5px; }
+.winFold input { width: 260px; margin: 8px 0; }
+.wakeList .linkBtn { display: block; padding: 3px 0; font-size: 12px; }
+.squadRow { margin: 0 0 10px; }
+.squadRow > b { display: block; margin-bottom: 5px; color: var(--bright); font-size: 12.5px; font-weight: 600; }
+.goalChain { display: flex; flex-wrap: wrap; gap: 6px; }
+.goal { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 4px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.goal i { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #12314d; border: 1.5px solid #6fbcff; color: #d7ecff; font-style: normal; font-size: 11px; font-weight: 700; }
+.goal.now { border-color: #6fbcff; color: var(--bright); }
+.goal.done { opacity: 0.5; text-decoration: line-through; }
+/* the menu's own list of raids: the button that looks into one */
+.histLook { font-size: 13px; }
+/* the minimap and the map's key, in a replay */
+#miniMap { position: fixed; right: calc(var(--menu-r, 0px) + 12px); top: 100px; z-index: 1; border: 1px solid var(--line-strong); border-radius: var(--radius-small); box-shadow: var(--shadow); cursor: pointer; touch-action: none; }
+#miniMap[hidden] { display: none; }
+#mapKey { position: fixed; left: calc((100vw - var(--menu-r, 0px)) / 2); transform: translateX(-50%); bottom: 74px; z-index: 5; width: 270px; max-height: calc(100vh - 150px); overflow: auto; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel-solid); box-shadow: var(--shadow); color: var(--text); font-size: 12px; }
+#mapKey[hidden] { display: none; }
+#mapKey h4 { margin: 8px 0 5px; color: var(--bright); font-size: 12px; font-weight: 600; }
+#mapKey h4:first-child { margin-top: 0; }
+.keyRow { display: flex; align-items: center; gap: 7px; margin: 2px 0; }
+.keyRow > i { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.keyRow > i.squadDot { width: 18px; height: 18px; }
+.keyRow span { flex: 1; }
+.keyRow b { color: var(--bright); font-variant-numeric: tabular-nums; }
+.keyRow.team { flex-wrap: wrap; gap: 3px 9px; }
+.keyRow i.mark { width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box; }
+i.mark.kKill { background: #c8322c; border: 1.5px solid #000; }
+i.mark.kHit { background: rgba(255, 60, 48, 0.35); border: 2px solid #ff3b30; }
+i.mark.kBlast { background: rgba(255, 152, 0, 0.3); border: 2px solid #ffa726; }
+i.mark.kDown { border: 2px dashed #ff5252; }
+i.mark.kSwitch { background: #3ddc5a; border: 1.5px solid #000; border-radius: 3px; }
+i.mark.kGoal { background: #12314d; border: 2px solid #6fbcff; border-radius: 2px; transform: rotate(45deg) scale(0.85); }
+i.mark.kGhost { background: #9fd8ff; border: 1.5px solid #000; border-radius: 7px 7px 2px 2px; opacity: 0.8; }
+@media (max-width: 700px) {
+  .win { left: 4px; right: 4px; top: 50px; bottom: 4px; }
+  .behWrap { grid-template-columns: 110px 1fr; }
+  #mapKey { bottom: 120px; }
+}
+.statTiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.statTiles div { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-small); }
+.statTiles b { display: block; color: var(--bright); font-size: 22px; font-variant-numeric: tabular-nums; }
+.statTiles span { color: var(--dim); font-size: 11.5px; }
+table.board { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 14px; }
+table.board th { text-align: left; padding: 5px 8px; color: var(--dim); font-weight: 600; font-size: 11px; border-bottom: 1px solid var(--line); }
+table.board td { padding: 5px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+table.board td:first-child { color: var(--bright); white-space: nowrap; }
+table.board td i, .chartLegend i, .chartTip i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; }
+table.board .linkBtn { height: auto; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; text-decoration: underline dotted; }
+table.board .linkBtn:hover { color: var(--accent); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+.chart { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-small); min-width: 0; }
+.chart h4 { margin: 0 0 4px; color: var(--bright); font-size: 12.5px; font-weight: 600; }
+.chartLegend { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-bottom: 4px; color: var(--text); font-size: 11.5px; }
+.chartPlot { position: relative; cursor: crosshair; }
+.chartPlot canvas { display: block; }
+.chartTip { position: absolute; top: 4px; width: 150px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-small); background: var(--panel-solid); color: var(--text); font-size: 11.5px; pointer-events: none; }
+.chartTip[hidden] { display: none; }
+.chartTip b { display: block; color: var(--bright); }
+.chartTip span { display: block; }
+.bars { margin: 0 0 14px; }
+.bars h4 { margin: 0 0 6px; color: var(--bright); font-size: 12.5px; font-weight: 600; }
+.bars > div { display: grid; grid-template-columns: 150px 1fr 34px; align-items: center; gap: 8px; margin: 3px 0; font-size: 12px; }
+.bars > div > div { height: 10px; }
+.bars i { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; }
+.bars b { color: var(--bright); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---- a raid open: its bar of tabs under the top bar, and everything else a step lower ---- */
+#raidNav {
+  position: fixed;
+  top: max(50px, calc(env(safe-area-inset-top) + 50px));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: #101016;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#raidNav[hidden] { display: none; }
+#raidNav > b { color: var(--bright); font-size: 12.5px; white-space: nowrap; }
+#raidNav nav { display: flex; flex: 1; gap: 2px; }
+#raidNav button { flex: none; height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: var(--radius-small); background: transparent; color: var(--dim); font: inherit; white-space: nowrap; cursor: pointer; }
+#raidNav button:hover { color: var(--text); background: var(--hover); }
+#raidNav nav button.on { color: var(--ink); background: var(--accent); border-color: var(--accent); }
+#rnBack, #rnLeave { border-color: var(--line) !important; color: var(--text) !important; }
+body.replaying #panel, body.replaying #side { top: max(96px, calc(env(safe-area-inset-top) + 96px)); }
+body.replaying #floorBadge { top: max(102px, calc(env(safe-area-inset-top) + 102px)); }
+body.replaying #toasts { top: max(142px, calc(env(safe-area-inset-top) + 142px)); }
+#raidWin { top: max(96px, calc(env(safe-area-inset-top) + 96px)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: 8px; max-width: none; z-index: 5; }
+@media (max-width: 700px) { #raidNav > b { display: none; } #miniMap { display: none; } }
+body.replaying #squadPane { margin-top: 46px; }
+
+/* Who's shown, under Raid: a kind on each line, with Off / Area / On beside its name */
+.filterGrid.whoGrid { grid-template-columns: 1fr; }
+.whoGrid .row.who { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 13px; }
+.whoGrid .row.who > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whoGrid .seg.tri { flex: none; width: 150px; }
+.whoGrid .seg.tri button { flex: 1 1 0; height: 24px; padding: 0 4px; font-size: 11.5px; }
+.whoGrid .seg.tri button.none { color: var(--dim); background: transparent; cursor: default; }
+.whoGrid .seg.tri button:disabled:not(.none) { opacity: 0.45; }
+.whoGrid .row.who.blocked > span { color: var(--dim); }
+.whoGrid .row.sub { padding-left: 26px; }
+@media (hover: none), (pointer: coarse) {
+  .whoGrid .row.who { min-height: 40px; }
+  .whoGrid .seg.tri { width: 168px; }
+  .whoGrid .seg.tri button { height: 34px; font-size: 12.5px; }
+}
+
+/* the Loot tab's Explorer: where from, a name to filter by, kind, wishlist and order, then the items */
+#exFrom { margin-bottom: 8px; }
+#exFrom[hidden], #exWishRow[hidden], #exPeek[hidden] { display: none; }
+#exFindBox { display: flex; margin: 0 0 6px; }
+#exFind { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.04); color: var(--text); font: inherit; font-size: 13px; }
+#exFind:focus { outline: none; border-color: var(--accent); }
+#exSum { margin-top: 10px; }
+#exList .sideRow.exRow.on { box-shadow: inset 2px 0 0 var(--accent); background: var(--hover); }
+@media (hover: none), (pointer: coarse) { #exFind { height: 40px; font-size: 16px; } }
+
+/* the Loot tab's Explorer: where from, a name to filter by, kind, wishlist and order, then the items */
+#exFrom { margin-bottom: 8px; }
+#exFrom[hidden], #exWishRow[hidden], #exPeek[hidden] { display: none; }
+#exFindBox { display: flex; margin: 0 0 6px; }
+#exFind { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.04); color: var(--text); font: inherit; font-size: 13px; }
+#exFind:focus { outline: none; border-color: var(--accent); }
+#exSum { margin-top: 10px; }
+#exList .sideRow.exRow.on { box-shadow: inset 2px 0 0 var(--accent); background: var(--hover); }
+@media (hover: none), (pointer: coarse) { #exFind { height: 40px; font-size: 16px; } }
+
+/* the REC sign: the raid shown is being recorded, to the left of the floor badge */
+#recBadge {
+  position: fixed;
+  left: calc(50% - 96px);
+  top: max(56px, calc(env(safe-area-inset-top) + 56px));
+  transform: translateX(-100%);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px 0 8px;
+  border: 1px solid rgba(255, 90, 80, 0.75);
+  border-radius: 999px;
+  background: rgba(30, 8, 10, 0.88);
+  color: #ffb3ad;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  pointer-events: auto;
+  cursor: default;
+}
+#recBadge[hidden] { display: none; }
+#recBadge i { width: 8px; height: 8px; border-radius: 50%; background: #ff4b3e; box-shadow: 0 0 6px #ff4b3e; animation: recBlink 1.6s ease-in-out infinite; }
+@keyframes recBlink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { #recBadge i { animation: none; } }
+
+/* a release without raid recording: none of it is shown (see RECORDING in livemap.js) */
+.norec [data-rec] { display: none !important; }

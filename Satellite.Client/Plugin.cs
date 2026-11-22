@@ -21,7 +21,7 @@ namespace Satellite.Client
     {
         public const string Guid = "com.fums.satellite";
         public const string Name = "Fums-Satellite";
-        public const string Version = "1.0.2";
+        public const string Version = "1.0.3";
 
         private const string PushRoute = "/satellite/api/push";
 
@@ -30,6 +30,8 @@ namespace Satellite.Client
         private const float FailedGap = 5f;
         // everything is sent again this often; in between, only what moves
         private const float FullGap = 1f;
+        // between reports while the server only records the raid
+        private const float SlowGap = 0.25f;
 
         internal static ManualLogSource Log;
 
@@ -39,6 +41,8 @@ namespace Satellite.Client
 
         // set by the server's answers, which arrive on another thread
         private volatile int _watchers;
+        // nobody is looking and the server only records the raid: reports go out slower
+        private volatile bool _slow;
         private volatile bool _sending;
         private volatile bool _failed;
 
@@ -140,7 +144,7 @@ namespace Satellite.Client
                 }
 
                 var watched = _watchers > 0 && !_failed;
-                _wait = _failed ? FailedGap : watched ? (World.InRaid() ? 1f / _rate.Value : FullGap) : IdleGap;
+                _wait = _failed ? FailedGap : watched ? (World.InRaid() ? (_slow ? SlowGap : 1f / _rate.Value) : FullGap) : IdleGap;
                 _clock.Restart();
                 _lapScan = 0;
                 World.ModsMs = World.ThinkMs = 0;
@@ -281,7 +285,8 @@ namespace Satellite.Client
                 }
             }
 
-            if (!watched)
+            // (just out of a raid with how it ended still to tell: a full report, once, so the recording has it)
+            if (!watched && !(Events.Unsaid && !raid))
             {
                 to.Append("{\"t\":\"idle\"").Append(Headless ? ",\"hl\":1" : "").Append(raid && FikaHost() ? ",\"fh\":1" : "")
                     .Append(",\"raid\":").Append(raid ? "true" : "false").Append(",\"loc\":");
@@ -294,6 +299,7 @@ namespace Satellite.Client
             if (raid)
             {
                 var before = _clock.Elapsed.TotalMilliseconds;
+                Recorded.Tick();
                 World.Scan();
                 _lapScan = _clock.Elapsed.TotalMilliseconds - before;
             }
@@ -327,6 +333,12 @@ namespace Satellite.Client
             }
 
             to.Append(",\"raid\":").Append(raid ? "true" : "false");
+            // "go":0 while the raid is loaded but hasn't begun (the countdown): a recording leaves that wait out
+            if (raid && !World.Started())
+            {
+                to.Append(",\"go\":0");
+            }
+
             to.Append(",\"loc\":");
             World.Text(to, location);
             AskScenes(to, location);
@@ -381,6 +393,11 @@ namespace Satellite.Client
                 QuestsDone.Take(to);
                 KeysCarried.Take(to);
             }
+            else
+            {
+                // just out of a raid: what happened in its last moments (how it ended)
+                Events.Take(to);
+            }
 
             to.Append('}');
         }
@@ -423,6 +440,7 @@ namespace Satellite.Client
 
                     var read = JObject.Parse(answer);
                     _watchers = read.Value<int?>("w") ?? 0;
+                    _slow = (read.Value<int?>("slow") ?? 0) > 0;
                     // the kinds of marker the server's config keeps off the page
                     if (read["off"] is JArray off)
                     {

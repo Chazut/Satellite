@@ -41,12 +41,18 @@ namespace Satellite.Client
             // the group a person or a PMC came in with, if any, and their level (0: not told)
             public string Group;
             public int Level;
+            // any other bot's level ("bl"), a person's or a PMC's side ("Usec", "Bear", "Savage"), and whether this
+            // is somebody playing (not a bot)
+            public int BotLevel;
+            public string Side;
+            public bool Person;
             // a bot: how hard it is ("easy" to "impossible"), SAIN's personality for it, the brain layer deciding
             // for it now, whether ORBIT has it parked as a ghost, what ORBIT has it heading for, and the move COMET
             // has it making in a fight
             public string Difficulty;
             public string Personality;
             public string Layer;
+            public string Decision;
             public bool Ghost;
             public string Objective;
             public string Tactic;
@@ -85,7 +91,9 @@ namespace Satellite.Client
                     for (var i = 0; active != null && i < active.Count; i++)
                     {
                         var drop = active[i] as EFT.SynchronizableObjects.AirdropSynchronizableObject;
-                        if (drop != null && !Drops.ContainsKey(drop))
+                        // The plane takes its crate when it sets off, and the crate waits where it was kept until it's
+                        // dropped: only from then on (IsInited) is it where the airdrop is.
+                        if (drop != null && drop.IsInited && !Drops.ContainsKey(drop))
                         {
                             Drops[drop] = new Dot
                             {
@@ -271,6 +279,7 @@ namespace Satellite.Client
                 }
 
                 dot.Layer = Brains.Layer(bot);
+                dot.Decision = Brains.Decision(player, bot);
                 dot.Ghost = Brains.Ghost(player.ProfileId);
                 dot.Objective = Brains.Objective(player.ProfileId);
                 dot.Tactic = Brains.Tactic(player.ProfileId);
@@ -355,6 +364,8 @@ namespace Satellite.Client
                 Born.Clear();
                 Shots.Forget();
                 KeysCarried.Forget();
+                Recorded.Forget();
+                Brains.ForgetDecisions();
                 Pickups.Forget();
                 Planes.Forget();
                 KilledByPlayers.Clear();
@@ -446,6 +457,11 @@ namespace Satellite.Client
                 {
                     continue;
                 }
+                else if (main != null && Leaving[i].Value.Person && Leaving[i].Value.Kind != "Main Player")
+                {
+                    // somebody playing who is gone and didn't die: they left the raid (extracted, when Fika says so)
+                    Recorded.PersonLeft(player, Leaving[i].Value.Text, Leaving[i].Value.Kind, Leaving[i].Value.At);
+                }
 
                 LeftAt.Remove(player);
                 Leaving.RemoveAt(i);
@@ -476,7 +492,15 @@ namespace Satellite.Client
                 {
                     dot.Level = player.Profile?.Info != null ? player.Profile.Info.Level : 0;
                     dot.Group = player.GroupId;
+                    dot.Side = player.Side.ToString();
+                    dot.BotLevel = 0;
                 }
+                else if (IsBot(player))
+                {
+                    dot.BotLevel = player.Profile?.Info != null ? player.Profile.Info.Level : 0;
+                }
+
+                dot.Person = !IsBot(player);
 
                 if (IsBot(player) && player.Profile?.Info?.Settings != null)
                 {
@@ -533,6 +557,7 @@ namespace Satellite.Client
                 if (loaded.Contains("ISB-SpecialForces"))
                 {
                     has.Add("ISB");
+                    has.Add("ISB WT");
                 }
             }
             catch (Exception)
@@ -806,6 +831,22 @@ namespace Satellite.Client
                     return "Raider";
                 }
 
+                // the arena's fighters let loose in an event, a mod's mercenaries, and Manimal's Combine
+                if (role == "arenaFighterEvent" || role == "arenaFighter")
+                {
+                    return "Bloodhound";
+                }
+
+                if (role.Equals("mercenary", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Mercenary";
+                }
+
+                if (role.StartsWith("Combine", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Combine";
+                }
+
                 if (role == "exUsec")
                 {
                     return "Rogue";
@@ -834,6 +875,11 @@ namespace Satellite.Client
                 if (Untar.Contains(role))
                 {
                     return "UNTAR";
+                }
+
+                if (WhiteTusks.Contains(role))
+                {
+                    return "ISB WT";
                 }
 
                 if (IsbSpecialForces(role))
@@ -895,6 +941,13 @@ namespace Satellite.Client
         private static readonly HashSet<string> Untar = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "followeruntar", "bossuntarlead", "followeruntarmarksman", "bossuntarofficer", "1170", "1171", "1172", "1173"
+        };
+
+        // ISB's White Tusks (Firefly and those with her), a group of their own: by name and by number
+        private static readonly HashSet<string> WhiteTusks = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ISBBossFirefly", "ISBFollowerVipper", "ISBFollowerLoghan", "ISBFollowerSpearthrower", "ISBFollowerZofia",
+            "ISBFollowerEvernight", "ISBFollowerNemesis", "13702", "13703", "13704", "13705", "13706", "13715", "13716"
         };
 
         // ISB Special Forces: its sixteen types, their bosses among them, named "ISB..." or numbered 13701 to 13716
@@ -1412,6 +1465,22 @@ namespace Satellite.Client
             {
                 to.Append(",\"lv\":").Append(dot.Level);
             }
+            else if (dot.BotLevel > 0)
+            {
+                to.Append(",\"bl\":").Append(dot.BotLevel);
+            }
+
+            // "sd": a person's or a PMC's side; "dn": a person who is down and can be got up again (Fika)
+            if (!string.IsNullOrEmpty(dot.Side))
+            {
+                to.Append(",\"sd\":");
+                Text(to, dot.Side);
+            }
+
+            if (dot.Person && dot.Player != null && FikaSide.Downed(dot.Player))
+            {
+                to.Append(",\"dn\":1");
+            }
 
             // an airdrop. "box": its crate's id, which what's in it goes by; "fall": still coming down
             if (dot.Crate != null && !string.IsNullOrEmpty(dot.Crate.Id))
@@ -1451,6 +1520,13 @@ namespace Satellite.Client
                 {
                     to.Append(",\"ly\":");
                     Text(to, dot.Layer);
+                }
+
+                // "dc": what it has decided to do this moment (SAIN's decision, else the game's)
+                if (!string.IsNullOrEmpty(dot.Decision))
+                {
+                    to.Append(",\"dc\":");
+                    Text(to, dot.Decision);
                 }
 
                 if (dot.Ghost)

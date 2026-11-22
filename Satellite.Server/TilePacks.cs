@@ -13,7 +13,7 @@ namespace Satellite.Server;
 //   "SATTILE1"                                    8 bytes
 //   count                                         int32
 //   count times: name length (byte), name (ASCII, as "0_1_f1_s.jpg"), offset from the file's start (int64), length (int32)
-//   the tiles' bytes, one after another
+//   the tiles' bytes, one after another: JPEG as captured, WebP in the release zips (tools/webp_tiles.py)
 public partial class LiveMapRoute
 {
     private const string PackName = "tiles.pack";
@@ -56,11 +56,16 @@ public partial class LiveMapRoute
             return;
         }
 
-        context.Response.ContentType = "image/jpeg";
+        // a tile is named .jpg whatever it is: the release maps' are WebP (tools/webp_tiles.py), a capture's JPEG
+        context.Response.ContentType = IsWebP(bytes) ? "image/webp" : "image/jpeg";
         context.Response.Headers.XContentTypeOptions = "nosniff";
         context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
         await context.Response.Body.WriteAsync(bytes, cancellationToken);
     }
+
+    // "RIFF", its length, "WEBP"
+    private static bool IsWebP(byte[] bytes) =>
+        bytes.Length >= 12 && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8);
 
     // a tile's bytes from a pack; null: not in it (or the pack can't be read, and the loose file is tried)
     private async Task<byte[]?> FromPack(string pack, string name, CancellationToken cancellationToken)

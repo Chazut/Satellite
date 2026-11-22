@@ -31,8 +31,8 @@ public partial class LiveMapRoute
     // the config's switch for each layer, and the layer as the plugin names it
     private static readonly (string Key, string Layer)[] LayerSwitches =
     [
-        ("looseLoot", "loose"), ("containerContents", "contents"), ("locks", "locks"), ("spawnPoints", "spawns"),
-        ("botDetails", "brains"), ("botLoot", "carried")
+        ("looseLoot", "loose"), ("containerContents", "contents"), ("locks", "locks"), ("switches", "switches"),
+        ("spawnPoints", "spawns"), ("botDetails", "brains"), ("botLoot", "carried")
     ];
 
     private string[]? _layersOff;
@@ -134,11 +134,6 @@ public partial class LiveMapRoute
             }
         }
 
-        if (!same)
-        {
-            logger.Info($"[Satellite] Saved the places on {location}.");
-        }
-
         await SendJson(context, same ? "{\"saved\":false}" : "{\"saved\":true}", cancellationToken);
     }
 
@@ -159,7 +154,7 @@ public partial class LiveMapRoute
         _places[location] = text;
     }
 
-    private static readonly string[] PlaceLists = ["boxes", "locks", "spawns", "zones", "exits", "stops", "route"];
+    private static readonly string[] PlaceLists = ["boxes", "locks", "switches", "spawns", "zones", "exits", "stops", "route"];
 
     // Lines of points: [[[east,north],..],..] (the BTR's road). Anything else comes back empty.
     private static JsonArray Lines(JsonNode? lines)
@@ -286,6 +281,11 @@ public partial class LiveMapRoute
             places["locks"] = new JsonArray();
         }
 
+        if (off.Contains("switches"))
+        {
+            places["switches"] = new JsonArray();
+        }
+
         if (off.Contains("spawns"))
         {
             places["spawns"] = new JsonArray();
@@ -390,6 +390,9 @@ public partial class LiveMapRoute
         session.Things = sent.ToJsonString();
         var count = Interlocked.Increment(ref session.ThingsSent);
         Publish(session, "{\"t\":\"things\",\"v\":" + count + ",\"loc\":" + JsonSerializer.Serialize(location) + "}");
+#if RECORDING
+        RecordThings(session);
+#endif
         return true;
     }
 

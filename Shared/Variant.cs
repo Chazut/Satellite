@@ -337,9 +337,9 @@ namespace Satellite.Shared
             }
         }
 
-        // The season the game shows, which SPT picks by the date: in winter, late autumn, early spring and a storm the
-        // ground is under snow, and so is a picture taken then. A map captured in snow is taken again in the first raid
-        // that isn't.
+        // The season the game shows, which SPT picks by the date: in winter the ground is all under snow, late in autumn
+        // and early in spring there are patches of it, and so is a picture taken then. A map captured in one of those is
+        // taken again in the first raid that isn't (a map of the season of its own is captured apart: SeasonSuffix).
         internal static string Season()
         {
             try
@@ -355,7 +355,20 @@ namespace Satellite.Shared
 
         internal static bool Snowy(string season)
         {
-            return season == "Winter" || season == "AutumnLate" || season == "SpringEarly" || season == "Storm";
+            return SeasonSuffix(season) != null;
+        }
+
+        // the map a season with snow has of its own, after the map's key: "@snow" in winter (all under snow),
+        // "@lateautumn" and "@earlyspring" (patches of it); null for a season without
+        internal static string SeasonSuffix(string season)
+        {
+            switch (season)
+            {
+                case "Winter": return "@snow";
+                case "AutumnLate": return "@lateautumn";
+                case "SpringEarly": return "@earlyspring";
+                default: return null;
+            }
         }
     }
 }

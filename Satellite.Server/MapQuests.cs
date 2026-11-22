@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Eft.Common.Tables;
 using SPTarkov.Server.Core.Models.Enums;
 using SPTarkov.Server.Core.Utils.Json;
@@ -11,7 +12,12 @@ namespace Satellite.Server;
 //   {"sid","quests":[{"id","name","trader","loc"?,"goals":[{"id","text","zones":[zone ids],"items":[tpls],
 //     "locs":[locations]}]}],
 //    "zones":{"zone id":"name of a quest that sends you there",..},"wish":[tpls on the player's wishlist],
-//    "names":{tpl: as in api/things}}
+//    "wishG":{tpl: its wishlist group, as the game numbers them: 0 Tasks, 1 Hideout, 2 Barter, 3 Equipment, 4 Other},
+//    "names":{tpl: as in api/things},
+//    "friends":[{"sid","name","quests":[as above]}]}
+// A goal that wants items found in raid has "fir":1, and "n": how many it wants.
+// "friends" holds the quests of the other players in the same Fika raid (the raid's host reports, so who's in it is
+// known), so a page can show what they're after too.
 // "quests" holds the quests the player has started, each with the goals not done yet. "zones" holds every place any
 // quest sends you to, so the page can name them all. A zone id is the id of a place in places.json's "zones".
 public partial class LiveMapRoute
@@ -73,7 +79,12 @@ public partial class LiveMapRoute
     }
 
     // what a goal asks for: the items, the places and the locations in it
-    private sealed record Goal(List<string> Items, List<string> Zones, List<string> Locations);
+    private sealed record Goal(List<string> Items, List<string> Zones, List<string> Locations)
+    {
+        // the items must be found in raid; Count: how many it wants
+        public bool FoundInRaid { get; set; }
+        public int Count { get; set; }
+    }
 
     private static List<string> Values(ListOrT<string>? target) =>
         target?.List ?? (target?.Item is { } one ? [one] : []);
@@ -86,6 +97,8 @@ public partial class LiveMapRoute
             case "FindItem":
             case "HandoverItem":
                 goal.Items.AddRange(Values(condition.Target));
+                goal.FoundInRaid = condition.OnlyFoundInRaid == true;
+                goal.Count = (int)Math.Max(0, condition.Value ?? 0);
                 break;
             case "LeaveItemAtLocation":
             case "PlaceBeacon":
@@ -211,6 +224,125 @@ public partial class LiveMapRoute
         return mine;
     }
 
+    // the PMC profile a session plays, as the server has it
+    private PmcData? ProfileOf(string sessionId)
+    {
+        try
+        {
+            foreach (var (profileId, profile) in saveServer.GetProfiles())
+            {
+                if (profileId.ToString() == sessionId)
+                {
+                    return profile?.CharacterData?.PmcData;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Debug($"[Satellite] No profile for {sessionId}: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    // The other players in the same Fika raid as a session: the ones its host reports (the host too, when a player
+    // hosts). None when the raid's host doesn't report, as who's in it isn't known then.
+    private List<Session> RaidFriends(Session session)
+    {
+        var friends = new List<Session>();
+        if (!session.Raid || session.Headless)
+        {
+            return friends;
+        }
+
+        var host = session.IsHost ? session : HostOf(session);
+        if (host == null)
+        {
+            return friends;
+        }
+
+        foreach (var other in _sessions.Values)
+        {
+            if (other != session && !other.Headless && other.Raid && Fresh(other)
+                && (other == host || HostOf(other) == host))
+            {
+                friends.Add(other);
+            }
+        }
+
+        return friends;
+    }
+
+    // a session's started quests, each with the goals not done yet (see the top of this file)
+    private JsonArray StartedQuests(Session session, List<QuestStatus>? statuses, Dictionary<string, string> captured,
+        HashSet<string> named, Func<string, string> text)
+    {
+        var list = new JsonArray();
+        foreach (var status in statuses ?? [])
+        {
+            if (status.Status != QuestStatusEnum.Started || !templates.Quests.TryGetValue(status.QId, out var quest))
+            {
+                continue;
+            }
+
+            // done as the profile here has it, and in a raid as the player's game has it (a goal done in a raid
+            // is known here only once the raid is over; after it, the profile alone says, kept or not)
+            var done = new HashSet<string>(status.CompletedConditions ?? []);
+            if (session.Raid)
+            {
+                done.UnionWith(session.QuestsDone);
+            }
+
+            var goals = new JsonArray();
+            foreach (var condition in quest.Conditions?.AvailableForFinish ?? [])
+            {
+                var id = condition.Id.ToString();
+                if (done.Contains(id))
+                {
+                    continue;
+                }
+
+                var goal = GoalOf(condition);
+                named.UnionWith(goal.Items);
+                var entry = new JsonObject
+                {
+                    ["id"] = id,
+                    ["text"] = text(id),
+                    ["items"] = new JsonArray(goal.Items.Distinct().Select(i => (JsonNode?)i).ToArray()),
+                    ["zones"] = new JsonArray(goal.Zones.Distinct().Select(z => (JsonNode?)z).ToArray()),
+                    ["locs"] = new JsonArray(goal.Locations.Distinct().Select(l => (JsonNode?)l).ToArray())
+                };
+                if (goal.FoundInRaid)
+                {
+                    entry["fir"] = 1;
+                }
+
+                if (goal.Count > 0)
+                {
+                    entry["n"] = goal.Count;
+                }
+
+                goals.Add(entry);
+            }
+
+            var started = new JsonObject
+            {
+                ["id"] = quest.Id.ToString(),
+                ["name"] = text(quest.Id + " name") is { Length: > 0 } name ? name : quest.QuestName ?? quest.Id.ToString(),
+                ["trader"] = text(quest.TraderId + " Nickname"),
+                ["goals"] = goals
+            };
+            if (QuestLocation(quest.Location, captured) is { } loc)
+            {
+                started["loc"] = loc;
+            }
+
+            list.Add(started);
+        }
+
+        return list;
+    }
+
     private string QuestsFor(string? wanted)
     {
         var session = Pick(wanted);
@@ -219,88 +351,41 @@ public partial class LiveMapRoute
             return "{\"none\":true}";
         }
 
-        List<QuestStatus>? statuses = null;
+        var pmc = ProfileOf(session.Id);
         var wish = new List<string>();
-        BotBaseInventory? inventory = null;
-        try
+        var wishGroups = new JsonObject();
+        // the items on the player's wishlist (the game keeps a group for each; any group counts)
+        if (pmc?.WishList is { } wished)
         {
-            foreach (var (profileId, profile) in saveServer.GetProfiles())
+            wish.AddRange(wished.Keys.Select(tpl => tpl.ToString()));
+            foreach (var (tpl, group) in wished)
             {
-                if (profileId.ToString() == session.Id)
-                {
-                    statuses = profile?.CharacterData?.PmcData?.Quests;
-                    inventory = profile?.CharacterData?.PmcData?.Inventory;
-                    // the items on the player's wishlist (the game keeps a group for each; any group counts)
-                    if (profile?.CharacterData?.PmcData?.WishList is { } wished)
-                    {
-                        wish.AddRange(wished.Keys.Select(tpl => tpl.ToString()));
-                    }
-
-                    break;
-                }
+                wishGroups[tpl.ToString()] = (int)group;
             }
-        }
-        catch (Exception ex)
-        {
-            logger.Debug($"[Satellite] No quests for {session.Id}: {ex.Message}");
         }
 
         var captured = CapturedLocationIds();
-        var list = new JsonArray();
         var named = new HashSet<string>();
+        JsonArray list;
+        var friends = new JsonArray();
         lock (_namesLock)
         {
             var locale = Locale();
             string Text(string key) => locale.GetValueOrDefault(key) ?? "";
 
-            foreach (var status in statuses ?? [])
+            list = StartedQuests(session, pmc?.Quests, captured, named, Text);
+            foreach (var friend in RaidFriends(session))
             {
-                if (status.Status != QuestStatusEnum.Started || !templates.Quests.TryGetValue(status.QId, out var quest))
+                var quests = StartedQuests(friend, ProfileOf(friend.Id)?.Quests, captured, named, Text);
+                if (quests.Count > 0)
                 {
-                    continue;
-                }
-
-                // done as the profile here has it, and in a raid as the player's game has it (a goal done in a raid
-                // is known here only once the raid is over; after it, the profile alone says, kept or not)
-                var done = new HashSet<string>(status.CompletedConditions ?? []);
-                if (session.Raid)
-                {
-                    done.UnionWith(session.QuestsDone);
-                }
-                var goals = new JsonArray();
-                foreach (var condition in quest.Conditions?.AvailableForFinish ?? [])
-                {
-                    var id = condition.Id.ToString();
-                    if (done.Contains(id))
+                    friends.Add(new JsonObject
                     {
-                        continue;
-                    }
-
-                    var goal = GoalOf(condition);
-                    named.UnionWith(goal.Items);
-                    goals.Add(new JsonObject
-                    {
-                        ["id"] = id,
-                        ["text"] = Text(id),
-                        ["items"] = new JsonArray(goal.Items.Distinct().Select(i => (JsonNode?)i).ToArray()),
-                        ["zones"] = new JsonArray(goal.Zones.Distinct().Select(z => (JsonNode?)z).ToArray()),
-                        ["locs"] = new JsonArray(goal.Locations.Distinct().Select(l => (JsonNode?)l).ToArray())
+                        ["sid"] = friend.Id,
+                        ["name"] = friend.Name is { } name ? JsonNode.Parse(name) : "",
+                        ["quests"] = quests
                     });
                 }
-
-                var entry = new JsonObject
-                {
-                    ["id"] = quest.Id.ToString(),
-                    ["name"] = Text(quest.Id + " name") is { Length: > 0 } name ? name : quest.QuestName ?? quest.Id.ToString(),
-                    ["trader"] = Text(quest.TraderId + " Nickname"),
-                    ["goals"] = goals
-                };
-                if (QuestLocation(quest.Location, captured) is { } loc)
-                {
-                    entry["loc"] = loc;
-                }
-
-                list.Add(entry);
             }
 
             // every place any quest sends you to, by the first quest's name
@@ -329,7 +414,9 @@ public partial class LiveMapRoute
             ["quests"] = list,
             ["zones"] = _questZones.DeepClone(),
             ["wish"] = new JsonArray(wish.Distinct().Select(w => (JsonNode?)w).ToArray()),
-            ["keys"] = KeysOf(inventory, session.Raid ? session.KeysCarried : null),
+            ["keys"] = KeysOf(pmc?.Inventory, session.Raid ? session.KeysCarried : null),
+            ["wishG"] = wishGroups,
+            ["friends"] = friends,
             ["names"] = Names(named)
         }.ToJsonString();
     }

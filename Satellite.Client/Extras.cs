@@ -38,6 +38,8 @@ namespace Satellite.Client
                 After(harmony, plane, "ManualUpdate", typeof(Planes), nameof(Planes.Flew));
                 After(harmony, plane, "ReturnToPool", typeof(Planes), nameof(Planes.Left));
             }
+
+            Recorded.Hook(harmony);
         }
 
         private static void After(Harmony harmony, Type type, string method, Type mine, string with)
@@ -144,6 +146,8 @@ namespace Satellite.Client
             public string Shooter;
             public Vector3 From;
             public Vector3 To;
+            // whoever it hit, by profile id (nobody: null)
+            public string Hit;
         }
 
         private static readonly List<One> Waiting = new List<One>();
@@ -168,7 +172,19 @@ namespace Satellite.Client
                     Waiting.RemoveAt(0);
                 }
 
-                Waiting.Add(new One { Shooter = Hooks.Get(__0, "PlayerProfileID") as string, From = from, To = to });
+                string hit = null;
+                try
+                {
+                    var struck = Hooks.Get(__0, "HittedBallisticCollider") as Component;
+                    var body = struck != null ? struck.GetComponentInParent<Player>() : null;
+                    hit = body != null ? body.ProfileId : null;
+                }
+                catch (Exception)
+                {
+                    // a miss, as far as the map knows
+                }
+
+                Waiting.Add(new One { Shooter = Hooks.Get(__0, "PlayerProfileID") as string, From = from, To = to, Hit = hit });
             }
             catch (Exception)
             {
@@ -211,6 +227,14 @@ namespace Satellite.Client
                 World.Number(to, shot.To.x);
                 to.Append(',');
                 World.Number(to, shot.To.z);
+                // whoever it hit: their marker (0: it's not on the map), only when somebody was
+                if (!string.IsNullOrEmpty(shot.Hit))
+                {
+                    long struck = 0;
+                    World.Ids.TryGetValue(shot.Hit, out struck);
+                    to.Append(',').Append(struck);
+                }
+
                 to.Append(']');
             }
 
@@ -220,11 +244,27 @@ namespace Satellite.Client
     }
 
     // What somebody picks up: an event ("loot") each, {"tpl":template,"i":its short name,"q":how many,"qi":1 for a
-    // quest item,"wk":what kind the one picking it up is}. Not what a bot spawns with, not rounds pushed into a
+    // quest item,"wk":what kind the one picking it up is,"at":[east,north,height] where they stood}. Not what a bot spawns with, not rounds pushed into a
     // magazine, and not a thing moved from one pocket to another (taken out and put back in the same moment).
+    // What leaves somebody's hands for good is a "drop", told the same way ("g":1 when it's a grenade: a throw).
     internal static class Pickups
     {
-        private static readonly Dictionary<string, float> Out = new Dictionary<string, float>();
+        private struct Gone
+        {
+            public float At;
+            public string Who;
+            public string Template;
+            public string Said;
+            public int Count;
+            public bool Grenade;
+            public Vector3 Where;
+        }
+
+        private static readonly Dictionary<string, Gone> Out = new Dictionary<string, Gone>();
+        private static readonly List<string> Due = new List<string>();
+        // the last one told, so a thing the game tells twice (Fika's copy of a player does) is told once
+        private static string _lastKey;
+        private static float _lastAt;
 
         public static void Moved(Player __instance, Item item, object location, bool added)
         {
@@ -249,6 +289,14 @@ namespace Satellite.Client
                 }
 
                 var key = who + "|" + item.Id;
+                var told = key + (added ? "+" : "-");
+                if (told == _lastKey && now - _lastAt < 0.03f)
+                {
+                    return;
+                }
+
+                _lastKey = told;
+                _lastAt = now;
                 if (!added)
                 {
                     if (Out.Count > 400)
@@ -256,14 +304,20 @@ namespace Satellite.Client
                         Out.Clear();
                     }
 
-                    Out[key] = now;
+                    var type = item.GetType().Name;
+                    Out[key] = new Gone
+                    {
+                        At = now, Who = who, Template = item.TemplateId.ToString(), Said = item.LocalizedShortName(), Count = item.StackObjectsCount,
+                        Grenade = type.IndexOf("ThrowWeap", StringComparison.OrdinalIgnoreCase) >= 0 || type.IndexOf("Grenade", StringComparison.OrdinalIgnoreCase) >= 0,
+                        Where = __instance.Position
+                    };
                     return;
                 }
 
                 if (Out.TryGetValue(key, out var left))
                 {
                     Out.Remove(key);
-                    if (now - left <= 0.1f)
+                    if (now - left.At <= 0.1f)
                     {
                         return;
                     }
@@ -275,6 +329,7 @@ namespace Satellite.Client
                 var said = item.LocalizedShortName();
                 var count = item.StackObjectsCount;
                 var quest = item.QuestItem;
+                var where = __instance.Position;
                 Events.Add("loot", who, name, now, to =>
                 {
                     to.Append("{\"tpl\":");
@@ -297,12 +352,73 @@ namespace Satellite.Client
                         World.Text(to, kind);
                     }
 
+                    // where they stood
+                    World.Spot(to, "at", where);
                     to.Append('}');
                 });
             }
             catch (Exception)
             {
                 // not told
+            }
+        }
+
+        // with every report: what was taken out and hasn't come back is a drop
+        internal static void Flush()
+        {
+            if (Out.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var now = Time.realtimeSinceStartup;
+                Due.Clear();
+                foreach (var pair in Out)
+                {
+                    if (now - pair.Value.At > 0.25f)
+                    {
+                        Due.Add(pair.Key);
+                    }
+                }
+
+                foreach (var key in Due)
+                {
+                    var gone = Out[key];
+                    Out.Remove(key);
+                    World.Names.TryGetValue(gone.Who, out var name);
+                    World.Kinds.TryGetValue(gone.Who, out var kind);
+                    Events.Add("drop", gone.Who, name, gone.At, to =>
+                    {
+                        to.Append("{\"tpl\":");
+                        World.Text(to, gone.Template);
+                        to.Append(",\"i\":");
+                        World.Text(to, gone.Said);
+                        if (gone.Count > 1)
+                        {
+                            to.Append(",\"q\":").Append(gone.Count);
+                        }
+
+                        if (gone.Grenade)
+                        {
+                            to.Append(",\"g\":1");
+                        }
+
+                        if (!string.IsNullOrEmpty(kind))
+                        {
+                            to.Append(",\"wk\":");
+                            World.Text(to, kind);
+                        }
+
+                        World.Spot(to, "at", gone.Where);
+                        to.Append('}');
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                Out.Clear();
             }
         }
 
@@ -622,6 +738,20 @@ namespace Satellite.Client
             {
                 Look();
                 return _questName != null;
+            }
+        }
+
+        // Phobos's manager, while it has one
+        internal static object PhobosManager()
+        {
+            Look();
+            try
+            {
+                return _phobos != null ? _phobos.GetValue(null, null) : null;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 

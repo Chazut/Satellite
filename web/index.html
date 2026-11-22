@@ -21,20 +21,34 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
   <canvas id="markers"></canvas>
 </div>
 
-<div id="notice" hidden></div>
+<div id="notice" hidden><span id="noticeText"></span><button id="noticeClose" type="button" title="Hide this message" aria-label="Hide this message">&#10005;</button></div>
+<div id="recBadge" data-rec hidden title="This raid is being recorded on the server, to watch again under History. config.jsonc's history.record turns recording off; Settings > Markers and names hides this sign."><i></i>REC</div>
 <div id="floorBadge" hidden><button id="floorDown" type="button" title="Floor down ( [ )" aria-label="Floor down">&#9660;</button><span id="floorText" title="Gold: a floor picked by hand. Press to go back to the floor it would show by itself"></span><button id="floorUp" type="button" title="Floor up ( ] )" aria-label="Floor up">&#9650;</button></div>
 <div id="debugLine" hidden></div>
+<div id="replayBar" data-rec class="ui" hidden>
+  <div id="replayBot" hidden><b id="replayBotName"></b><div id="replayBotStrip" title="What this one was doing over the raid. Press to go to a moment."></div></div>
+  <button id="replayPlay" type="button"></button>
+  <span id="replayClock"></span>
+  <div id="replayTrack"><div id="replayTicks" title="Red: a kill. Gold: one of yours. White: where you died."></div><input type="range" id="replaySeek" min="0" max="1000" step="1" value="0" aria-label="Time in the raid"></div>
+  <select id="replaySpeed" title="How fast it plays"></select>
+  <button id="replayTrails" type="button" title="Where each one has been in the last minute, as a line behind them.">Trails</button>
+  <button id="replayHeat" type="button" title="Where everybody was over the whole raid: hotter the longer. For the kinds of people switched on under Raid.">Heat map</button>
+  <button id="replayMini" type="button" title="In a replay: the whole map small in a corner, with where everybody is and has been. Press it to go there.">Minimap</button>
+  <button id="replayKey" type="button" title="Who is on the map now, by kind and by team, and what the marks mean.">Key</button>
+</div>
 <div id="tip" hidden></div>
 <div id="toasts"></div>
 
 <header id="bar" class="ui">
-  <button id="brand" type="button" title="Satellite 1.0.2, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.2</span></button>
+  <button id="brand" type="button" title="Satellite 1.0.3, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.0.3</span></button>
   <div id="status" title=""><span id="dot"></span><span id="statusText">Connecting…</span></div>
   <button id="backRaid" type="button" title="Show the map of the raid again, following the player" hidden>Back to the raid</button>
   <select id="session" title="Whose game to show" hidden></select>
   <select id="map" title="Map"></select>
-  <label id="findBox" title="Find loot, containers holding it, locks by their key, and quests, by name (/ to type here, Escape clears). It finds what the Loot tab is set to show: what's in this raid, what can spawn, or both."><input id="find" type="search" placeholder="Find loot, key or quest…" autocomplete="off" spellcheck="false"><small id="findCount"></small><button id="findClear" type="button" title="Clear the search: back to the map as it was (Escape)" aria-label="Clear the search" hidden>&#10005;</button></label>
+  <button id="mapBtn" type="button" title="Map" aria-haspopup="true" aria-expanded="false" hidden><span id="mapBtnText"></span><span class="caret" aria-hidden="true">&#9662;</span></button>
+  <label id="findBox" title="Find loot, containers holding it, locks by their key, switches, spawn points, quests and extracts, by name (/ to type here, Escape clears). Loot is found as the Loot tab is set to show it: what's in this raid, what can spawn, or both."><input id="find" type="search" placeholder="Find loot, keys, switches, spawns…" autocomplete="off" spellcheck="false"><small id="findCount"></small><button id="findClear" type="button" title="Clear the search: back to the map as it was (Escape)" aria-label="Clear the search" hidden>&#10005;</button></label>
   <button id="listBtn" type="button" title="Who is in the raid: the list beside the map (P)">Raid list</button>
+  <button id="histBtn" data-rec type="button" title="The raids played: to watch again and look into">History</button>
   <button id="follow" type="button" title="Keep the player in the middle (;)">Follow</button>
   <button id="fit" type="button" title="Show the whole map (0)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6"/></svg><span class="lbl">Whole map</span></button>
   <button id="reveal" type="button" title="Outline every building that can be pressed to look inside. They stay outlined until you press a building, or this again (B). Held: only while held." hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V9l8-5.5L20 9v12z"/><path d="M9.5 21v-6h5v6"/></svg><span class="lbl">Buildings</span></button>
@@ -46,6 +60,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
      over the first button unseen, like the language picker -->
 <div id="mapTools" class="ui"><label id="mapPick" title="Map"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6z"/><path d="M9 4v14M15 6v14"/></svg></label></div>
 <div id="findList" class="ui" hidden></div>
+<div id="mapMenu" class="ui" hidden></div>
+<div id="mapSub" class="ui" hidden></div>
 
 <aside id="side" class="ui" hidden>
   <div id="sideHead"><b>Raid</b><button id="sideClose" type="button" aria-label="Close">×</button></div>
@@ -59,24 +75,21 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <button type="button" data-tab="loot" title="Loot: what's shown, and the best of it (L)">Loot</button>
       <button type="button" data-tab="quests" title="Quests (Q)">Quests</button>
       <button type="button" data-tab="map" title="The view, and what's drawn on the map">Map</button>
+      <button type="button" data-tab="history" data-rec title="The raids played, to watch again">History</button>
       <button type="button" data-tab="settings" title="Settings">Settings</button>
     </nav>
     <button id="panelClose" type="button" aria-label="Close">×</button>
   </div>
+  <label id="setFindBox" title="Find a setting in any tab by what it does: PMC finds everything to do with PMCs and players (Escape clears)."><input id="setFind" type="search" placeholder="Search the settings…" autocomplete="off" spellcheck="false"><small id="setFindNone" hidden>Nothing found.</small><button id="setFindClear" type="button" title="Clear the search" aria-label="Clear the search" hidden>&#10005;</button></label>
   <div id="panelBody">
     <section data-tab="raid" hidden>
       <div class="tabTools" id="rosterTools"><div id="rosterSum"></div><button id="sideSort" type="button" title="List who's here nearest first, instead of by kind (N)">Nearest</button></div>
       <div id="roster"></div>
       <details class="group" data-group="who" open>
         <summary>Who's shown</summary>
-        <p>On the map and in this list. Off: no marker and no row.</p>
-        <div id="filtersPeople" class="filterGrid"></div>
-        <details class="group sub" data-group="areas" open>
-          <summary>Rough area only</summary>
-          <p>For each kind switched on here: no marker, name or row saying where they are. Only a circle they are somewhere in, while they have been moving.</p>
-          <div id="areaKinds" class="filterGrid"></div>
-          <label class="row range" title="How big the circle is that one of them is somewhere in."><span>Area size <small id="areaRText"></small></span><input type="range" id="optAreaR" min="30" max="200" step="10"></label>
-        </details>
+        <p>On: on the map and in this list. Area: only a circle they are somewhere in, while they have been moving; no marker, name or row saying where. Off: no marker and no row.</p>
+        <div id="filtersPeople" class="filterGrid whoGrid"></div>
+        <label class="row range" title="How big the circle is that one of them is somewhere in, for the kinds set to Area."><span>Area size <small id="areaRText"></small></span><input type="range" id="optAreaR" min="30" max="200" step="10"></label>
       </details>
       <details class="group" data-group="rosterMore" open>
         <summary>List details</summary>
@@ -98,8 +111,15 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       </details>
     </section>
 
+    <section data-tab="history" data-rec hidden>
+      <div class="tabTools"><div id="historySum">Raids recorded</div><button id="historyImport" type="button" title="Add a raid exported from another Satellite (a zip).">Import raid</button><input type="file" id="historyFile" accept=".zip,application/zip" hidden><button id="historyWinBtn" type="button" title="Every raid as a table, with the upkeep of the recordings">Open window</button><button id="historyRefresh" type="button" title="Look for new raids">Refresh</button></div>
+      <p id="historyNote" hidden></p>
+      <div id="historyList"></div>
+      <p>The server records each raid as it's played, whether this page is open or not. Press one to play it back on the map: everything the live map shows, at any moment of the raid.</p>
+    </section>
+
     <section data-tab="loot" hidden>
-      <nav class="subTabs"><button type="button" data-view="filters">Filters</button><button type="button" data-view="best">Best loot</button><button type="button" data-view="legend">Legend</button></nav>
+      <nav class="subTabs"><button type="button" data-view="filters">Filters</button><button type="button" data-view="best">Best loot</button><button type="button" data-view="explore" title="Every item on this map, once each: filter, sort, and press one to find it">Explorer</button><button type="button" data-view="legend">Legend</button></nav>
       <div class="view" data-view="filters">
       <div class="segHead">Loot shown in a raid</div>
       <div class="seg" id="lootMode"></div>
@@ -123,6 +143,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <div id="filtersLoot" class="filterGrid"></div>
         <label class="row" title="What's in containers, bodies and airdrops, and what bots wear and carry, by the pointer, in the Raid list and in Best loot. Off: you only see what's lying about. Containers then show only up close, all alike."><input type="checkbox" id="optPeek"><span>Show what's inside things</span></label>
         <label class="row" title="The short name of each piece of loose loot, once zoomed in close enough"><input type="checkbox" id="optItemNames"><span>Item names</span></label>
+        <label class="row" title="What somebody picks up is written on the map where they stood, for a few seconds. For the kinds of people shown, and loot worth showing."><input type="checkbox" id="optLootFloats"><span>Pick-ups on the map</span></label>
         <label class="row range" title="Containers and bodies worth less than that only show once you've zoomed in this close (the screen's short side this many metres across or fewer). Item names show from there too. Further right: from further out."><span>Show all within <small id="closeText"></small></span><input type="range" id="optClose" step="5"></label>
         <label class="row range" title="Opacity of loot, containers and locks on another floor than the player. All the way left: hidden."><span>Other floors <small id="otherLootText"></small></span><input type="range" id="optOtherLoot" min="0" max="100" step="5"></label>
         <label class="row range" title="With Rough areas only on, under Loose loot: how big each area is. Its worth is rounded (394,000 is shown as ~400k)."><span>Rough area size <small id="lootCellText"></small></span><input type="range" id="optLootCell" min="20" max="150" step="10"></label>
@@ -144,6 +165,17 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <div class="filterHead">Best that can spawn here</div>
         <div id="bestCan"></div>
       </div>
+      </div>
+      <div class="view" data-view="explore" hidden>
+        <div class="seg" id="exFrom"></div>
+        <label id="exFindBox" title="Only the items whose name has these words (Escape clears)"><input id="exFind" type="search" placeholder="Filter by name…" autocomplete="off" spellcheck="false"></label>
+        <label class="row range" title="Only items of this kind"><span>Kind</span><select id="exKind"></select></label>
+        <label class="row range" id="exWishRow" title="Only items on your wishlist, or in one of its groups. Add to the wishlist in the game; this catches up within half a minute."><span>Wishlist</span><select id="exWish"></select></label>
+        <label class="row range" title="The order of the list"><span>Order</span><select id="exSort"></select></label>
+        <p id="exPeek" hidden>Only loose loot: what's in containers and on bodies is shown with Show what's inside things on, under Filters.</p>
+        <div class="filterHead" id="exSum"></div>
+        <div id="exList"></div>
+        <p>Press an item: the search box finds it on the map (whatever Kinds of loot says) and goes to the nearest; press again for the next. Clear the search to see the map as it was.</p>
       </div>
       <div class="view" data-view="legend" hidden>
         <div class="filterHead">What it is</div>
@@ -168,6 +200,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <label class="row sub" title="Off: every quest's items, started or not."><input type="checkbox" id="optMyQuestItems"><span>Only my quests' items</span></label>
       <label class="row"><input type="checkbox" id="optQuestPlaces"><span>Quest places</span></label>
       <label class="row sub" title="Off: the places of every quest, started or not."><input type="checkbox" id="optMyQuestPlaces"><span>Only my quests' places</span></label>
+      <label class="row" title="In a Fika raid: the quest items and places of the friends in it too, each saying whose quest it is."><input type="checkbox" id="optFriendQuests"><span>Friends' quests</span></label>
+      <label class="row" title="Loot a started quest wants found in raid, marked with an F in its own colour wherever it lies, whatever it's worth. In a raid only."><input type="checkbox" id="optFirItems"><span>Found-in-raid needs</span></label>
       </div>
       <div class="legend"><span><b class="star">★</b>Quest place</span><span><b class="quest">!</b>Quest item</span></div>
       <div class="segHead">My quests</div>
@@ -207,6 +241,19 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <summary>People and bots</summary>
         <label class="row" title="A thin line for every shot, from the gun to where the bullet went, for a moment."><input type="checkbox" id="optShots"><span>Shot lines</span></label>
         <label class="row" title="A line from the killer to the one killed, and a mark where they died, for a few seconds."><input type="checkbox" id="optKillLines"><span>Kill lines</span></label>
+        <label class="row" title="A red flash on whoever a bullet hits."><input type="checkbox" id="optHitFlash"><span>Hit flashes</span></label>
+        <label class="row" title="Power switches and levers on the map, green once switched."><input type="checkbox" id="optSwitches"><span>Switches</span></label>
+        <label class="row" title="A burst where a grenade goes off, and an arc to it from whoever threw it."><input type="checkbox" id="optGrenades"><span>Grenades</span></label>
+        <label class="row" title="By each player and PMC who came in with others: their team's number, in the team's colour."><input type="checkbox" id="optSquadMarks"><span>Team numbers</span></label>
+        <label class="row" title="Phobos's field over the map: the arrows its bots are drawn along, and its zones."><input type="checkbox" id="optPhobosField"><span>Phobos field</span></label>
+        <label data-rec class="row" title="In a replay: the whole map small in a corner, with where everybody is and has been. Press it to go there."><input type="checkbox" id="optMinimap"><span>Minimap in replays</span></label>
+        <label data-rec class="row" title="In a replay: every death so far stays marked, not only the last few seconds'."><input type="checkbox" id="optKillKeep"><span>Keep kill marks in replays</span></label>
+        <label data-rec class="row range" title="In a replay: how far back the line behind each one goes."><span>Trail length</span><select id="optTrailMs">
+          <option value="15000">15 seconds</option><option value="60000">1 minute</option><option value="300000">5 minutes</option><option value="0">The whole raid</option></select></label>
+        <label class="row" title="Where each ORBIT squad is headed and what for: a blue diamond, with a line to it from the squad. Off unless you turn it on."><input type="checkbox" id="optOrbitMain"><span>ORBIT squad objectives</span></label>
+        <label class="row" title="The places an ORBIT squad is sent to sweep (a boss rush, a spawn rush): a blue ring each, as big as the place, named over its top with what for and the squad. Green once swept. Off unless you turn it on."><input type="checkbox" id="optOrbitRush"><span>ORBIT rush points</span></label>
+        <label class="row" title="ORBIT's field over the map: the arrows its bots are drawn along, and its zones."><input type="checkbox" id="optOrbitField"><span>ORBIT field</span></label>
+        <label class="row" title="Only who is on the floor shown: people, kills and pick-ups on other floors are left out."><input type="checkbox" id="optFloorOnly"><span>Selected floor only</span></label>
         <label class="row" title="A small bar over anybody who is hurt: how much health they have left. Also by the pointer."><input type="checkbox" id="optHealth"><span>Health bars</span></label>
         <label class="row sub" title="The bar over everybody, hurt or not."><input type="checkbox" id="optHealthAll"><span>Also when not hurt</span></label>
         <label class="row" title="Under each bot's marker, always: what it is doing now, as SAIN, COMET, ORBIT, QuestingBots or Phobos has it (looting, heading for a quest, in a fight). Off: only by the pointer and in the Raid list."><input type="checkbox" id="optMapDoing"><span>What each bot is doing</span></label>
@@ -268,6 +315,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row range" title="Whose name is written under their marker. Bosses include their guards and the Goons. Pointing at a marker always names it."><span>Names under</span><select id="optNames">
         <option value="some">Bosses and friends</option><option value="players">PMCs, bosses and friends</option><option value="all">Everyone</option></select></label>
         <label class="row" title="Your name under your own marker. It shows by itself while friends are in the raid with you; this shows it always."><input type="checkbox" id="optMyName"><span>Always show my name</span></label>
+        <label data-rec class="row" title="A red REC sign at the top of the map while the raid shown is being recorded on the server."><input type="checkbox" id="optRecSign"><span>Recording sign</span></label>
         <label class="row" title="Names written in Cyrillic (scavs, bosses) are shown in Latin letters; the bosses by the names players know them by (Kollontay, Reshala)."><input type="checkbox" id="optLatin"><span>Names in English letters</span></label>
       </details>
       <details class="group" data-group="screen" open>
@@ -317,7 +365,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       </details>
       <div id="about">
         <img src="icon.svg" alt="" width="32" height="32">
-        <div><b>Satellite</b> <span class="ver">1.0.2</span><br><small>by <b>Fums</b></small></div>
+        <div><b>Satellite</b> <span class="ver">1.0.3</span><br><small>by <b>Fums</b></small></div>
       </div>
       <p class="credit">Map scans by Fums, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>.</p>
       <p class="credit">Use, share and change them with credit. Not for sale.</p>
@@ -331,7 +379,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
   <span id="scaleBar" hidden></span>
   <span id="cursorAt"></span>
   <span id="playerAt"></span>
-  <button id="credit" type="button" title="Satellite 1.0.2, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
+  <button id="credit" type="button" title="Satellite 1.0.3, made by Fums. Press for the credits and the map licence">Satellite · © Fums</button>
 </footer>
 
 <div id="hint" class="ui">H hide controls · M menu · P raid · L loot · Q quests · / find</div>

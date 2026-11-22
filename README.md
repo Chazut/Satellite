@@ -14,8 +14,10 @@ A live map of your raid in the browser, for SPT 4.1. Use it on a second monitor,
 - Shows transits and the map each one goes to
 - Shows loose loot and what's inside containers, coloured by value (uses Better Flea prices if you have it)
 - Can show only the loot on your wishlist
+- Writes what bots and players pick up on the map as it happens
 - Shows locked doors and which key opens them
-- Shows markers for your quests and their items
+- Shows markers for your quests and their items, your Fika friends' quests too, and the loot your quests need found in raid
+- Shows power switches and levers, and whether they've been switched
 - Shows the floor you're on when you walk into a building
 - Shows minefields, claymores and sniper zones
 - Lists everyone in the raid, with a kill feed and raid events
@@ -76,6 +78,8 @@ If port 6969 is forwarded for Fika, anyone with your address can open the map to
 - Page settings are in the menu, saved in each viewer's browser.
 - `SPT_Runtime/user/mods/Satellite/config.jsonc`: the server owner can turn off any kind of marker or loot for every
   page. Made on first start. Updates don't overwrite it. Restart the server after a change.
+  The map's own `[Client Request]` lines are left out of the server window (other requests are logged as SPT always
+  does); `"server": { "quietLogs": false }` in it brings them back.
 - F12 > Fums-Satellite: the key that opens the map, and how often it updates.
 
 ## Build

@@ -29,6 +29,12 @@
     "untar": true,
     // the ISB Special Forces mod's soldiers, their bosses among them
     "isb": true,
+    // ISB's White Tusks: Firefly and those with her
+    "isbWhiteTusks": true,
+    // the arena fighters of an event (Bloodhounds), a mod's mercenaries, and Manimal's Combine
+    "bloodhounds": true,
+    "mercenaries": true,
+    "combine": true,
     // the people living on Manimal's Terminal
     "civilians": true,
     // the infected (the zombie event)
@@ -50,6 +56,8 @@
     "containerContents": true,
     // doors, car trunks and safes a key opens, and the key each needs
     "locks": true,
+    // power switches, levers and the like, and whether each is switched yet
+    "switches": true,
     // where PMCs, scavs and bosses can spawn
     "spawnPoints": true,
     // what each bot is like and is up to: its difficulty, its SAIN personality, whether SAIN or ORBIT is deciding
@@ -57,5 +65,19 @@
     "botDetails": true,
     // what each living bot wears and carries (a page shows it only once its "Bot loot" switch is turned on)
     "botLoot": true
+  },
+  // Raid history: each raid is recorded as it's played, to play back on the page's History tab.
+  "history": {
+    // false: no raid is recorded
+    "record": true,
+    // how many raids are kept: the oldest are deleted beyond this
+    "keep": 30
+  },
+  // The SPT server itself. Restart the server after a change.
+  "server": {
+    // true: SPT's "[Client Request] <address>" line is left out for the map's own requests, so they never fill the
+    // server's window and log. Every other request (other mods', the game's own) is logged as SPT always does.
+    // false: the map's requests are logged too.
+    "quietLogs": true
   }
 }
