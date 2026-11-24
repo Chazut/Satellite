@@ -5668,6 +5668,18 @@
         shots: true, hitFlash: true, killLines: true, health: true, healthAll: true, names: 'all', rosterFog: false,
         botDetails: true, botDiff: true,
         feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true,
+        edge: true, edgeKinds: EDGE_ABLE.slice(), edgeQuests: true, edgeExits: true }) },
+    // Standard: the author's own page through the alphas: everybody and all that's in the raid, with what the mods say
+    // of the bots, but none of the extras (spawn points, where loot can spawn, bots' plans, the squads pane)
+    { id: 'std', name: T('Standard'), says: T('Everybody and everything in the raid, without the extras: every bot with its difficulty and what SAIN, COMET and ORBIT say of it, action icons and tactic words; all the loot and what is inside things; doors, switches, shots and grenades. No spawn points, no loot spawn chances, no bot plans.'),
+      patch: () => ({ hide: [], show: [], areaKinds: [], mapDoing: false, squadParts: true, actionIcons: true, tacticWords: true, squadPane: false,
+        orbitMain: false, orbitRush: false, orbitField: false, phobosField: false, orbitLines: false, orbitNames: false, orbitHear: false, orbitFights: false,
+        doorEvents: true, grenades: true, botLoot: true, botSAIN: true, botORBIT: true, botCOMET: true, botDetails: true, botDiff: true,
+        loot: 'real', peek: true, worth: 0, wishOnly: false, lootArea: false, itemNames: true, lootFloats: true,
+        allCorpses: true, myCorpses: false, botKills: false, seenDead: true, corpseKind: true,
+        myExits: true, goneExits: false, secretExits: false, switches: true, lightSwitches: false, keyStates: false,
+        shots: true, hitFlash: true, killLines: true, health: true, healthAll: true, names: 'all', rosterFog: false,
+        feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true,
         edge: true, edgeKinds: EDGE.slice(), edgeQuests: true, edgeExits: true }) },
     { id: 'min', name: T('Minimal'), says: T('Only what matters, without the clutter: everybody in the raid, without what each is up to; loot worth 50,000 ₽ or more; your quests; your extracts and the airdrop. No mod details, no bot plans, no shot lines.'),
       patch: () => Object.assign(shownOnly(Object.keys(KINDS).concat([
@@ -5677,7 +5689,7 @@
         myExits: true, goneExits: false, secretExits: false, switches: false, lightSwitches: false,
         shots: false, hitFlash: false, killLines: true, health: true, healthAll: false, names: 'players', rosterFog: false,
         feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: false,
-        edge: true, edgeKinds: ['Enemy Player', 'Friendly Player', 'Boss', 'Goon', 'Airdrop'], edgeQuests: true, edgeExits: true }) },
+        edge: true, edgeKinds: EDGE_ABLE.slice(), edgeQuests: true, edgeExits: true }) },
     { id: 'fair', name: T('Fair play'), says: T("Only what you'd know in the game: you, your friends, the kills you make, your extracts, quest places, power switches and the airdrop. No bots, no loot or what spawned, no quest items, no alerts, nothing that gives away where anybody else is."),
       patch: () => Object.assign(shownOnly(['Main Player', 'Friendly Player', 'Corpse', 'Extract', 'Transit', 'Airdrop',
         'Layer questZones', 'Layer btrRoad', 'Layer locks', 'Layer switches', 'Zone mine', 'Zone sniper']), botSwitches(false), {
