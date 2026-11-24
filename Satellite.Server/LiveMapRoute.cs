@@ -1438,7 +1438,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 // the game's own map, when the raid is said to be the game's own version (MapVariants, or nothing
                 // swaps it): scenes another mod adds (props, ladders) don't make it another version, even for the scanner
                 var ownMap = key == place && hint == place;
-                if (Fit(then, now, loose, ownMap, !EventScene().IsMatch(key)) is { } score && score < bestScore)
+                // (two versions that load the same scenes fit alike: the one MapVariants says it loaded is taken, by the
+                // name its mod gives that version, "bigmap~fums")
+                if (Fit(then, now, loose, ownMap, !EventScene().IsMatch(key)) is { } score && (score < bestScore || (score == bestScore && key == hint)))
                 {
                     best = key;
                     bestScore = score;
