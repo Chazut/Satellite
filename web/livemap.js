@@ -336,6 +336,7 @@
   // (once: a replay's Raid events list the whole raid to begin with, not only what had happened by the moment shown)
   if (!prefs.eventsAllOnce) { prefs.hpEventsAll = true; prefs.eventsAllOnce = true; }
   // (once: a preset of the day before put ORBIT's and Phobos's fields, hearing circles and the rest on; off again)
+  if (!prefs.modsOnOnce) { prefs.botSAIN = true; prefs.botORBIT = true; prefs.botCOMET = true; prefs.modsOnOnce = true; }
   if (!prefs.debugOffOnce) { Object.assign(prefs, { orbitField: false, phobosField: false, orbitLines: false, orbitNames: false, orbitHear: false, orbitFights: false }); prefs.debugOffOnce = true; }
   // the Loot tab's Explorer: where its items are from ('real': this raid, 'can': what can spawn), of which kind ('' any,
   // a kind of LOOT_KINDS, or 'quest'), of the wishlist ('' any, 'all' on it, or one of its groups '0'..'4'), in what
@@ -3699,7 +3700,8 @@
   const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitMain', 'ORBIT'], ['optOrbitRush', 'ORBIT'], ['optOrbitField', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
     ['optRosterGhosts', 'ORBIT'], ['optSquadParts', 'COMET'], ['optTacticWords', 'COMET'], ['optPhobosField', 'Phobos']];
   const modHere = n => (prefs.brains || []).includes(n);
-  const modOn = n => modHere(n) && prefs['bot' + n] !== false;
+  // (in a replay always: what SAIN, COMET and ORBIT had the bots doing is what a replay is watched for)
+  const modOn = n => modHere(n) && (HIST || prefs['bot' + n] !== false);
   function nameBotDetails() {
     for (const n of Object.keys(BOT_MODS)) {
       const box = $('optBot' + n), row = $('optBot' + n + 'Row'), here = modHere(n);
@@ -3733,7 +3735,8 @@
   function trimBrains(m) {
     if (prefs.botDiff === false) delete m.df;
     if (!modOn('SAIN')) delete m.ps;
-    if (!modOn('ORBIT') && !m.os) { delete m.gh; delete m.ob; delete m.og; }
+    // (a bot ORBIT parked is drawn as a ghost whenever ORBIT is in the game, its details switch or not)
+    if (!modOn('ORBIT') && !m.os) { if (!modHere('ORBIT')) delete m.gh; delete m.ob; delete m.og; }
     if (!modOn('COMET')) { delete m.cm; delete m.sq; }
   }
   // what a living bot wears and carries, when asked for (off unless switched on): its worth, and the dearest first
@@ -3825,7 +3828,7 @@
     ctx.strokeStyle = edgeOf(col);
     ctx.fillStyle = col;
     ctx.beginPath();
-    const brain = kind.shape === 'arrow' && hasDetails(m) ? brainOf(m) : null;
+    const brain = kind.shape === 'arrow' && (m.gh || hasDetails(m)) ? brainOf(m) : null;
     if (brain && brain.ghost) {
       // parked by ORBIT: a ghost, not an arrow (it has no body to face any way)
       ctx.globalAlpha *= 0.8;
@@ -5668,7 +5671,7 @@
   // what a mod is doing (its fields, hearing circles, ghost fights, lines to where every bot is heading) is never put
   // on by a preset: turned on by hand only.
   const botSwitches = v => ({ mapDoing: v, squadParts: v, actionIcons: v, tacticWords: v, squadPane: v, orbitMain: v, orbitRush: v,
-    doorEvents: v, grenades: v, botLoot: v, botSAIN: v, botORBIT: v, botCOMET: v,
+    doorEvents: v, grenades: v, botLoot: v,
     orbitField: false, phobosField: false, orbitLines: false, orbitNames: false, orbitHear: false, orbitFights: false });
   const PRESETS = [
     { id: 'all', name: T('All info'), says: T('Everything Satellite can show: every bot and what it is doing, all the loot and where it can spawn, what is inside containers and bodies, every kill, doors, switches and spawn points.'),
@@ -5685,14 +5688,14 @@
     { id: 'std', name: T('Standard'), says: T('Everybody and everything in the raid, without the extras: every bot with its difficulty and what SAIN, COMET and ORBIT say of it, action icons and tactic words; all the loot and what is inside things; doors, switches, shots and grenades. No spawn points, no loot spawn chances, no bot plans.'),
       patch: () => ({ hide: [], show: [], areaKinds: [], mapDoing: false, squadParts: true, actionIcons: true, tacticWords: true, squadPane: false,
         orbitMain: false, orbitRush: false, orbitField: false, phobosField: false, orbitLines: false, orbitNames: false, orbitHear: false, orbitFights: false,
-        doorEvents: true, grenades: true, botLoot: true, botSAIN: true, botORBIT: true, botCOMET: true, botDetails: true, botDiff: true,
+        doorEvents: true, grenades: true, botLoot: true, botDetails: true, botDiff: true,
         loot: 'real', peek: true, worth: 0, wishOnly: false, lootArea: false, itemNames: true, lootFloats: true,
         allCorpses: true, myCorpses: false, botKills: false, seenDead: true, corpseKind: true,
         myExits: true, goneExits: false, secretExits: false, switches: true, lightSwitches: false, keyStates: false,
         shots: true, hitFlash: true, killLines: true, health: true, healthAll: true, names: 'all', rosterFog: false,
         feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true,
         edge: true, edgeKinds: EDGE.slice(), edgeQuests: true, edgeExits: true }) },
-    { id: 'min', name: T('Minimal'), says: T('Only what matters, without the clutter: everybody in the raid, without what each is up to; loot worth 50,000 ₽ or more; your quests; your extracts and the airdrop. No mod details, no bot plans, no shot lines.'),
+    { id: 'min', name: T('Minimal'), says: T('Only what matters, without the clutter: everybody in the raid, without what each is up to; loot worth 50,000 ₽ or more; your quests; your extracts and the airdrop. No bot plans, no shot lines.'),
       patch: () => Object.assign(shownOnly(Object.keys(KINDS).concat([
         'Layer quest', 'Layer questZones', 'Layer firItems', 'Layer loose', 'Layer boxes', 'Layer locks', 'Zone mine', 'Zone sniper'])), botSwitches(false), {
         loot: 'real', peek: true, worth: 50000, wishOnly: false, lootArea: false, itemNames: false, lootFloats: false,
@@ -7815,7 +7818,9 @@
           if (insideShut && insideShut !== mine) insideShut = 0;
           // or walk on: a few steps from where they stood when it was pressed away, and the inside is back
           if (insideShut && here && insideShutAt && Math.hypot(here[0] - insideShutAt[0], here[1] - insideShutAt[1]) > WALK_BACK) insideShut = 0;
-          if (!wantPlace && mine && prefs.insideMine && insideShut !== mine) {
+          // (only while the map follows them, or a bot: looking about elsewhere, the player walking into a building
+          // across the map doesn't grey the map round it)
+          if (!wantPlace && mine && prefs.insideMine && insideShut !== mine && (following() || them)) {
             wantN = myFloor(mine);
             wantPlace = wantN ? mine : 0;
           }

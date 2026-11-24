@@ -42,6 +42,8 @@
 - The raid history's Most loot extracted counts what the raid gained you: what you got out with less what you went in with, item by item, so your kit and what's in your secure container aren't counted. Your kit's worth is said under it. Raids recorded before this count what was picked up.
 - Extracts are named in the raid history as the game names them (Courtyard, not E8_yard), raids recorded before this too.
 - Beside a replay, Raid events has Whole raid (to begin with) and So far: the whole raid's events of the kind picked, in order, each with its time in the raid (Tactic: every move COMET had a squad make). Pressing one goes to that moment.
+- A bot ORBIT has parked is drawn as a ghost whenever ORBIT is in the game, whatever Raid > List details > ORBIT details says, and a replay always shows what SAIN, COMET and ORBIT had the bots doing. The presets leave the SAIN, ORBIT and COMET details switches as they are.
+- Looking about the map while it doesn't follow the player (a replay watched from above, say), the player walking into a building doesn't open it or grey the map round it: that's only while the map follows them.
 - A replay of a Fika raid recorded from its host (a headless) plays as smoothly as one played alone: the player's own reports, which come between the host's, are left out of how long the bots take from one report to the next, as on the live map.
 - In a Fika raid run by a headless, the raid history has how it ended for the player (survived, extract, what they got out with).
 - Pressing a tab of the menu while searching the settings puts the search away and shows that tab.
