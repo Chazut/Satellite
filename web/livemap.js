@@ -4852,14 +4852,24 @@
     showRec();
     if (HIST && paused !== undefined) loadHistory();
   }
+  // REC: only while a raid is recorded (blinking), or, stopped, "REC off" (pressed, it starts again). Out of a raid
+  // with recording on: not there. A raid recorded that ends says so once, in a toast.
+  let recLiveSince = 0;
   function showRec() {
     const btn = $('recBtn');
-    const shown = RECORDING && !HIST && prefs.recSign !== false;
     const off = !recState.on || recState.paused;
     const live = !off && !replay && !!report && report.rec === 1 && inRaidHere();
+    const shown = RECORDING && !HIST && prefs.recSign !== false && (live || (off && recState.on));
     const print = [shown, off, live, recState.on].join();
     if (print === recPrint) return;
     recPrint = print;
+    if (live && !recLiveSince) recLiveSince = performance.now();
+    else if (!live && recLiveSince) {
+      // (over, as this game says, and long enough for the server to keep it: 45 s)
+      const kept = performance.now() - recLiveSince > 45000 && !off && !!report && report.raid === false;
+      recLiveSince = 0;
+      if (kept) toast(T('Raid recorded: in Raid history (Left Alt + H in the game)'), '#ff4b3e', () => window.open(ROOT + 'raids/', '_blank'));
+    }
     btn.hidden = !shown;
     btn.classList.toggle('off', off);
     btn.classList.toggle('live', live);
@@ -5219,15 +5229,16 @@
       seenRoster.set(m.id, { id: m.id, c: m.c, t: m.t, lv: m.lv, g: m.g, df: m.df, ps: m.ps, pid: m.pid });
     }
   }
-  function toast(text, col) {
+  // (go: what pressing it does, as well as putting it away)
+  function toast(text, col, go) {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'toast';
     item.style.borderColor = col;
     item.textContent = text;
-    item.title = T('Press to dismiss');
+    item.title = go ? T('Press to open it') : T('Press to dismiss');
     const gone = () => item.remove();
-    item.onclick = gone;
+    item.onclick = () => { gone(); if (go) go(); };
     setTimeout(gone, 12000);
     $('toasts').appendChild(item);
     while ($('toasts').children.length > 5) $('toasts').firstChild.remove();
@@ -9078,6 +9089,7 @@
       if (lootFloats.length > before) lootFloats[lootFloats.length - 1].at = now - (t - e.rt);
     }
     r.next = last + 1;
+    r.paced = -1;
     r.at = t;
     r.lootAt = '';
     replayLoot(r);
@@ -9141,10 +9153,16 @@
     const r = replay;
     if (!r || !r.playing) return;
     r.at += dt * 1000 * r.speed;
-    let fed = -1;
-    while (r.next < r.times.length && r.times[r.next] <= r.at) { fed = r.next; feedReplay(r.next++); }
-    // things glide from one report's place to the next's in the time between them, as fast as the replay goes
-    if (fed > 0) period = Math.min(1000, Math.max(16, (r.times[fed] - r.times[fed - 1]) / r.speed));
+    // things glide from one report's place to the next's in the time between them, as fast as the replay goes. In a
+    // Fika raid recorded from its host, the player's own reports ("own", their place from their own game) come between
+    // the host's: they're left out of the timing, as on the live map, or every bot would glide in half its time
+    for (; r.next < r.times.length && r.times[r.next] <= r.at; r.next++) {
+      const i = r.next;
+      feedReplay(i);
+      if (r.lines[i].indexOf('"own":') >= 0) continue;
+      if (r.paced >= 0 && r.paced < i) period = Math.min(1000, Math.max(16, (r.times[i] - r.times[r.paced]) / r.speed));
+      r.paced = i;
+    }
     if (r.at >= r.total) { r.at = r.total; r.playing = false; }
     replayLoot(r);
     showReplay();

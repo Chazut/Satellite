@@ -101,6 +101,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         public volatile string? OwnName;
         public volatile string? Me;
         public volatile string? OwnFull;
+        // the raid as this game's own plugin names it ("rid", a new one each raid): in a Fika raid whose host reports,
+        // the raid recorded is the host's, under the host's id, and how it ended for this player comes under this one
+        public volatile string OwnRid = "";
     }
 
     // From: the report the answer was made of
@@ -411,6 +414,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             }
 
             session.Headless = IsHeadless(session, root);
+            if (session.Raid && root.TryGetProperty("rid", out var ownRid) && ownRid.ValueKind == JsonValueKind.String && ownRid.GetString() is { Length: > 0 and <= 64 } rid)
+            {
+                session.OwnRid = rid;
+            }
             if (kind.ValueEquals("full") || kind.ValueEquals("idle"))
             {
                 session.IsHost = session.Raid && Flag(root, "fh");

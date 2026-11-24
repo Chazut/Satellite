@@ -432,10 +432,13 @@ public partial class LiveMapRoute
             var raid = root.TryGetProperty("raid", out var inRaid) && inRaid.ValueKind == JsonValueKind.True;
             var rid = root.TryGetProperty("rid", out var said) && said.ValueKind == JsonValueKind.String ? said.GetString() ?? "" : "";
             _recording.TryGetValue(session.Id, out var now);
+            // (a raid this game was in: the one recorded, or, in a Fika raid whose host reports, the one its own plugin
+            // named, which says how it ended for this player)
+            bool Ours(Recording of) => rid.Length > 0 && (rid == of.Rid || rid == session.OwnRid);
             if (now != null && (!raid || rid != now.Rid))
             {
                 // the first report after the raid brings what happened in its last moments (how it ended): kept
-                if (!raid && rid == now.Rid && root.TryGetProperty("ev", out var last) && last.ValueKind == JsonValueKind.Array)
+                if (!raid && Ours(now) && root.TryGetProperty("ev", out var last) && last.ValueKind == JsonValueKind.Array)
                 {
                     Counted(now, last);
                     Write(now, report);
@@ -449,7 +452,7 @@ public partial class LiveMapRoute
             if (!raid || rid.Length == 0)
             {
                 // how a raid that's over ended, told after its recording was closed: added to what's kept of it
-                if (!raid && now == null && rid.Length > 0 && _ended.TryGetValue(session.Id, out var was) && was.Rid == rid
+                if (!raid && now == null && rid.Length > 0 && _ended.TryGetValue(session.Id, out var was) && Ours(was)
                     && root.TryGetProperty("ev", out var late) && late.ValueKind == JsonValueKind.Array)
                 {
                     var exit = was.Exit;
@@ -473,6 +476,12 @@ public partial class LiveMapRoute
                     }
                 }
 
+                return;
+            }
+
+            // (a raid just ended for this player that its host goes on reporting, the player gone from it: not begun again)
+            if (now == null && _ended.TryGetValue(session.Id, out var done) && done.Rid == rid)
+            {
                 return;
             }
 
