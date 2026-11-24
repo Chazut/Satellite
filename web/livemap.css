@@ -21,6 +21,14 @@
   --font: "Bender", "Jura", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
   /* dark already: see the color-scheme meta in index.html */
   color-scheme: dark;
+  /* the cursors (Kenney's Cursor Pack): the arrow, the hand over what can be pressed, the hand dragging the map, and
+     the arrow over text. Settings > Screen > Cursor puts other ones in their place (see CURSORS in livemap.js). In the
+     stylesheet itself, so they're there from the first moment (the server has every file asked again each time: with a
+     picture still on its way, the browser shows its own pointer, an hourglass while the page loads) */
+  --cur: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADtElEQVR42u2Wz0srVxTHv/dHZjLREANZtP6YWPwDunNRFz4QuyiUItT+FS1udF3QXXduuiml8kRCwFVB8CkNFSwF243oQiNPKagQMI5OkslkZu6cLpx5TK2890JSuvELd3Uv537me849c4AHMTwt+Za9vkhEFxCAQSHEDBF9nM/nhzqdziWAMHGOR+f6Lg4gA+C36IJ4Hei6/nWxWPyAMfbfumIYxpcAaHl5uX14eOgtLCyokZGRGKQO4MehoaHpRyAiWr0rm81+BoBWV1d9IlJEFNq2HWxsbHgzMzPEOY9h/tB1/RvTND/spytsfn5eA/B6YmKCOp1O4HmeIqKQHqSOjo68xcXFYGxsLAa5BfBTLpd7wTl/qqa6kgQAKeW3AGhnZ6dDROQ4jvJ9PwzDmIOo0WgEpVLJm52dJSFEDPOnpmkLo6OjI70UIUzT/AiAOzc3FxJR2Gw2yXVdRUShUop836eE1PHxsbe0tBSYphmDWAC+B2BELnTlhIhy+rNhGHR+fu75vk/39/fUbDaT6Xi4Xal/uFIul73p6ekQADHGvks621U/yGaznwOglZUVn4jo5uaG6vU62batLi4u1OnpaWhZ1hugR654xWIxAPB7VBf8ve2PG87U1NQOgIv19XVp27binEMpBcYYMwwDt7e3qFar/OTkhO7u7kIpJQGAUgoA+ODgoAAQRDGpGwACILa3tztCiPVqtYpKpRJmMhl4nocgCFAoFLhpmsQ5p0ajwWMQ13VJiId2EIYhus190qYQAIaHh18C8NbW1mT0AuA4DtrtNmWzWV4oFIgxRlJKWJbFa7Vaz204CcAvLy9fA9jd3d1l1Wo10DQNnuexVqsFIkImk+G5XI6IiIQQUEqxfgEAACciZhjGD47jYHNzk6XTaQRBgFarhajooOs6NwwjLj70E0ABwOTk5CsAf5XLZWlZVsgYg+/7rNVqEWOMAEDTNC6lpIGBgbCfAARA7O3tuUKI9bOzM+zv7ytd1+H7PhqNBrcsixzHgeu6AMCazSaUUgQAkRvUC8CbYszn8y8BeKVSSaTTaUqlUkilUiAiHlU7dF1ntm3zq6srAoDoNfCu/wNPAPB6vX7GGPu1Uql8urW11R4fH0+1223EX5rMfa1Ww8HBgXd9fW0A6ER7PE5pL5PSi6ixkKZplEqlnly6ricHma8SMd79K37HHkkpP1FKfUFE2lsDMeZzzl8ppX5JjHk9ASAZ6NEA8i8lUsK6KUTWRTreR9RL3p/1rGc963/R38uHRbHf8dt2AAAAAElFTkSuQmCC") 2 2, default;
+  --cur-hand: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEeElEQVR42uVXTWhcVRg998eXmUl4CdMSojhx2mRgYBaC2KgUGdpNg5VAi3HT0E3porgQXKiUmpIEunBnspEQXLnoysBAQQhNsS6C0kqRQpBWK4SIsRkYS9OZ+96797jom/JMM+nEpi70wOUtZh7fd7/vnPN9D/i/Q7X5PwFAxudfhQCgnyLxXamAGx0d9dbX10upVKq/UCj8uba2ZuJq8FneHAA8rfVHAH6KgxHAr1LKd+Pf5W4F2gwJQAoh5km+feDAAYyMjDjnHGdnZ9Xq6iqUUoettVfiKtpdJ6bneccB8OzZsw2SEWOsrKyY3t5eCiF+LJfLOkFOFfOledQ2F9wWWggBAJ+l02lbq9UCkjTGsF6vkySnpqZCAOzp6XnzKaq8fQJSyk+01lxeXg6cc7TW0lpL5xzv3LkTeJ7nPM/7YmxsrDOXyw1ks9nXPc97R0r5vud5H/i+P0xS/JMkFABks9nXAPDChQuWJMMwJElaa0nSHTp0yAEIAPwGoJEgafJ8A+CFhI+0XR5BUgghfiiVSi/fvHnTklRCCFhroZTC/Pw8Z2ZmxP79+5HL5ZDP520+n2dXVxfX1tZw/fp1Nzk52eGc+9ZaWxYP++rabgMAaK0/BMClpaWAJKPoERebcCRt/HwM4+PjBgAzmcxbOzUwCQD9/f37AJgzZ844kq7ZBpJs8iIMw0cniiJGUcQgCBhFEWu1WtDd3e0AXIqJvSMHfS5+6VJfXx83NjbCZuB2EFfLnThxwgGo5/P5l3ZiXhIAhBDo7u4+JaVkpVIJkmRsJwHnHC9fvhwAYOyoaDFbHg+utX4DwNcAfgfgDh48aJ1zW/FgSzjn6JxjGIZRoVAggO9jWYrHyLYpuNNaD0VRtOj7furYsWPo6+tjR0cH6vU6M5mMIIm4Pa3dRwhEUQSttTxy5Ahu3bpVKhaLz8eyla0UIc+fPy+FEN/t2bOHy8vLjVYMbwfNdk1PT1sA3Lt37yubeaA3335ubq5A8tXTp0+7YrHYYYyBUg/Jq7Xesa+ThDFGxFWxW/Y7CWNMFwCZy+VgrYUQAkopKKVA7mz8CyEghOC1a9cEgNrAwMBKM6+Wrjg0NOQDqJbL5Sg5BZPkCsPwiXJszo579+4FPT09DsBX7XiBAgCl1AQAnjx50ty+fTtYX18PqtVqcP/+/SB2vr9JbaskjTEkyXPnzhkATKfTI+24YXNoKCHE57F+6fs+fd9nb28vy+UyZ2dnQ2NMlCRb0g2bqFQqDaUUpZRXRkdH1Y43qM7OzsMAPgUwA2AawJcAfgHAUqnEixcvBnEiyTLYarUaTkxMGCklhRA/p9PpF1tNRPEEQ3Kb9X706NHMwsLCmDHmYwD7CoUChoeHMTg46B48eCBu3LghFhcXcffuXQBYSKVSpxqNxsp22n8SJzavWQCAwcFBX2v9HoAlAPXEDvAHgEo6nT6eSF7u2rqUKKUFACklcrlcfmNjI6uUMsVicfXq1au1WLJiO9nt1keLaNE+hWexMG43wBK3fWYfLP89/AUHdZn+qjdW/wAAAABJRU5ErkJggg==") 7 6, pointer;
+  --cur-grab: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEeElEQVR42uVXTWhcVRg998eXmUl4CdMSojhx2mRgYBaC2KgUGdpNg5VAi3HT0E3porgQXKiUmpIEunBnspEQXLnoysBAQQhNsS6C0kqRQpBWK4SIsRkYS9OZ+96797jom/JMM+nEpi70wOUtZh7fd7/vnPN9D/i/Q7X5PwFAxudfhQCgnyLxXamAGx0d9dbX10upVKq/UCj8uba2ZuJq8FneHAA8rfVHAH6KgxHAr1LKd+Pf5W4F2gwJQAoh5km+feDAAYyMjDjnHGdnZ9Xq6iqUUoettVfiKtpdJ6bneccB8OzZsw2SEWOsrKyY3t5eCiF+LJfLOkFOFfOledQ2F9wWWggBAJ+l02lbq9UCkjTGsF6vkySnpqZCAOzp6XnzKaq8fQJSyk+01lxeXg6cc7TW0lpL5xzv3LkTeJ7nPM/7YmxsrDOXyw1ks9nXPc97R0r5vud5H/i+P0xS/JMkFABks9nXAPDChQuWJMMwJElaa0nSHTp0yAEIAPwGoJEgafJ8A+CFhI+0XR5BUgghfiiVSi/fvHnTklRCCFhroZTC/Pw8Z2ZmxP79+5HL5ZDP520+n2dXVxfX1tZw/fp1Nzk52eGc+9ZaWxYP++rabgMAaK0/BMClpaWAJKPoERebcCRt/HwM4+PjBgAzmcxbOzUwCQD9/f37AJgzZ844kq7ZBpJs8iIMw0cniiJGUcQgCBhFEWu1WtDd3e0AXIqJvSMHfS5+6VJfXx83NjbCZuB2EFfLnThxwgGo5/P5l3ZiXhIAhBDo7u4+JaVkpVIJkmRsJwHnHC9fvhwAYOyoaDFbHg+utX4DwNcAfgfgDh48aJ1zW/FgSzjn6JxjGIZRoVAggO9jWYrHyLYpuNNaD0VRtOj7furYsWPo6+tjR0cH6vU6M5mMIIm4Pa3dRwhEUQSttTxy5Ahu3bpVKhaLz8eyla0UIc+fPy+FEN/t2bOHy8vLjVYMbwfNdk1PT1sA3Lt37yubeaA3335ubq5A8tXTp0+7YrHYYYyBUg/Jq7Xesa+ThDFGxFWxW/Y7CWNMFwCZy+VgrYUQAkopKKVA7mz8CyEghOC1a9cEgNrAwMBKM6+Wrjg0NOQDqJbL5Sg5BZPkCsPwiXJszo579+4FPT09DsBX7XiBAgCl1AQAnjx50ty+fTtYX18PqtVqcP/+/SB2vr9JbaskjTEkyXPnzhkATKfTI+24YXNoKCHE57F+6fs+fd9nb28vy+UyZ2dnQ2NMlCRb0g2bqFQqDaUUpZRXRkdH1Y43qM7OzsMAPgUwA2AawJcAfgHAUqnEixcvBnEiyTLYarUaTkxMGCklhRA/p9PpF1tNRPEEQ3Kb9X706NHMwsLCmDHmYwD7CoUChoeHMTg46B48eCBu3LghFhcXcffuXQBYSKVSpxqNxsp22n8SJzavWQCAwcFBX2v9HoAlAPXEDvAHgEo6nT6eSF7u2rqUKKUFACklcrlcfmNjI6uUMsVicfXq1au1WLJiO9nt1keLaNE+hWexMG43wBK3fWYfLP89/AUHdZn+qjdW/wAAAABJRU5ErkJggg==") 7 6, grabbing;
+  --cur-text: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADtElEQVR42u2Wz0srVxTHv/dHZjLREANZtP6YWPwDunNRFz4QuyiUItT+FS1udF3QXXduuiml8kRCwFVB8CkNFSwF243oQiNPKagQMI5OkslkZu6cLpx5TK2890JSuvELd3Uv537me849c4AHMTwt+Za9vkhEFxCAQSHEDBF9nM/nhzqdziWAMHGOR+f6Lg4gA+C36IJ4Hei6/nWxWPyAMfbfumIYxpcAaHl5uX14eOgtLCyokZGRGKQO4MehoaHpRyAiWr0rm81+BoBWV1d9IlJEFNq2HWxsbHgzMzPEOY9h/tB1/RvTND/spytsfn5eA/B6YmKCOp1O4HmeIqKQHqSOjo68xcXFYGxsLAa5BfBTLpd7wTl/qqa6kgQAKeW3AGhnZ6dDROQ4jvJ9PwzDmIOo0WgEpVLJm52dJSFEDPOnpmkLo6OjI70UIUzT/AiAOzc3FxJR2Gw2yXVdRUShUop836eE1PHxsbe0tBSYphmDWAC+B2BELnTlhIhy+rNhGHR+fu75vk/39/fUbDaT6Xi4Xal/uFIul73p6ekQADHGvks621U/yGaznwOglZUVn4jo5uaG6vU62batLi4u1OnpaWhZ1hugR654xWIxAPB7VBf8ve2PG87U1NQOgIv19XVp27binEMpBcYYMwwDt7e3qFar/OTkhO7u7kIpJQGAUgoA+ODgoAAQRDGpGwACILa3tztCiPVqtYpKpRJmMhl4nocgCFAoFLhpmsQ5p0ajwWMQ13VJiId2EIYhus190qYQAIaHh18C8NbW1mT0AuA4DtrtNmWzWV4oFIgxRlJKWJbFa7Vaz204CcAvLy9fA9jd3d1l1Wo10DQNnuexVqsFIkImk+G5XI6IiIQQUEqxfgEAACciZhjGD47jYHNzk6XTaQRBgFarhajooOs6NwwjLj70E0ABwOTk5CsAf5XLZWlZVsgYg+/7rNVqEWOMAEDTNC6lpIGBgbCfAARA7O3tuUKI9bOzM+zv7ytd1+H7PhqNBrcsixzHgeu6AMCazSaUUgQAkRvUC8CbYszn8y8BeKVSSaTTaUqlUkilUiAiHlU7dF1ntm3zq6srAoDoNfCu/wNPAPB6vX7GGPu1Uql8urW11R4fH0+1223EX5rMfa1Ww8HBgXd9fW0A6ER7PE5pL5PSi6ixkKZplEqlnly6ricHma8SMd79K37HHkkpP1FKfUFE2lsDMeZzzl8ppX5JjHk9ASAZ6NEA8i8lUsK6KUTWRTreR9RL3p/1rGc963/R38uHRbHf8dt2AAAAAElFTkSuQmCC") 2 2, text;
 }
 
 * { box-sizing: border-box; }
@@ -39,15 +47,15 @@ html, body {
 
 /* Cursors: Kenney's Cursor Pack (www.kenney.nl, CC0), see cursors/License.txt. The arrow everywhere, the hand
    while the map is dragged and over what can be clicked. */
-html, body, #stage { cursor: url("cursors/idle.png") 2 2, default; }
+html, body, #stage { cursor: var(--cur); }
 #stage {
   position: fixed;
   inset: 0;
   overflow: hidden;
   touch-action: none;
 }
-#stage.canOpen { cursor: url("cursors/hand.png") 7 6, pointer; }
-#stage.dragging { cursor: url("cursors/hand.png") 7 6, grabbing; }
+#stage.canOpen { cursor: var(--cur-hand); }
+#stage.dragging { cursor: var(--cur-grab); }
 
 /* the map's tiles: moved and zoomed as one, each placed in metres */
 #layers {
@@ -99,8 +107,12 @@ html, body, #stage { cursor: url("cursors/idle.png") 2 2, default; }
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
 }
-#floorLayer .floorPart.other { filter: brightness(0.7) saturate(0.85); }
-#layers.dim > img { filter: brightness(0.42) saturate(0.55); }
+/* (as dark as the rest of the map round the floor, Settings > View > "Map round a floor", so the floor shown stands out) */
+#floorLayer .floorPart.other { filter: brightness(calc(1 - 0.85 * var(--floor-dim, 0.7))) saturate(0.6); }
+/* the rest of the map while a floor is shown: one dark layer over it, under the floor (Settings > View > "Map round a
+   floor", --floor-dim) */
+#floorShade { position: absolute; pointer-events: none; background: #05060a; opacity: var(--floor-dim, 0.7); }
+#floorShade[hidden] { display: none; }
 
 #floorBadge {
   position: fixed;
@@ -139,6 +151,20 @@ html, body, #stage { cursor: url("cursors/idle.png") 2 2, default; }
 }
 #floorBadge button:hover { background: rgba(123, 156, 255, 0.34); }
 #floorBadge button:disabled { opacity: 0.3; cursor: default; background: transparent; }
+/* a few floors: a button each by name (Auto first), not arrows */
+#floorPick { display: none; }
+#floorBadge.named { padding: 3px; gap: 2px; border-radius: var(--radius-small); border-color: var(--line-strong); background: rgba(14, 16, 26, 0.92); }
+#floorBadge.named > button, #floorBadge.named #floorText { display: none; }
+#floorBadge.named #floorPick { display: inline-flex; gap: 2px; max-width: calc(100vw - 48px); overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+#floorBadge.named #floorPick button { flex: none; white-space: nowrap; }
+#floorBadge #floorPick button { width: auto; height: 26px; padding: 0 11px; border-radius: 5px; background: transparent; color: var(--dim); font-size: 12.5px; font-weight: 600; line-height: 26px; }
+#floorBadge #floorPick button:hover { color: var(--bright); background: var(--hover); }
+#floorBadge #floorPick button.on { color: var(--ink); background: var(--accent); }
+#floorBadge #floorPick button.on.picked { background: #ffc94d; }
+/* a place's one floor: its name, nothing to press */
+#floorBadge #floorPick button.only, #floorBadge #floorPick button.only:hover { color: var(--ink); background: var(--accent); cursor: var(--cur); }
+#floorBadge #floorPick button.auto { color: var(--dim); font-weight: 500; }
+#floorBadge #floorPick button.auto.on { color: var(--accent); background: var(--accent-soft); }
 
 /* /map/?debug: what the floor display goes by, for finding why a building's inside isn't shown */
 #debugLine {
@@ -190,6 +216,7 @@ html, body, #stage { cursor: url("cursors/idle.png") 2 2, default; }
 .tipRow .worth { min-width: 5.6em; }
 .tipRow .chance { min-width: 3.2em; color: var(--dim); }
 .tipRow .more { flex: none; color: var(--dim); }
+#tip .tag.fir { background: #f5a3ff; }
 #tip .tag { flex: none; padding: 0 5px; border-radius: 999px; background: #ffe14d; color: var(--ink); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 15px; }
 /* a heading inside it ("Can hold"), and plain lines (its key, "Empty", "and 4 more") */
 .tipSub { padding: 6px 10px 2px; border-top: 1px solid var(--line); color: var(--accent); font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
@@ -273,11 +300,11 @@ body.bare #unbare { display: block; }
 #backRaid { flex: none; border-color: var(--line-strong); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 #backRaid[hidden] { display: none; }
 
-button { cursor: url("cursors/hand.png") 7 6, pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
-button:disabled { color: var(--dim); cursor: url("cursors/idle.png") 2 2, default; opacity: 0.6; }
+button { cursor: var(--cur-hand); transition: background 0.12s, border-color 0.12s, color 0.12s; }
+button:disabled { color: var(--dim); cursor: var(--cur); opacity: 0.6; }
 button:hover:not(:disabled), select:hover { border-color: var(--line-strong); color: var(--bright); }
 button.on { background: var(--accent-soft); border-color: var(--line-strong); color: var(--accent); }
-select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
+select { max-width: 46vw; cursor: var(--cur-hand); }
 /* the search box: what it finds is counted beside it. Its width is fixed, so the count and the cross appearing take
    room from the text and never push the rest of the bar along */
 #findBox {
@@ -348,7 +375,7 @@ select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
   color: var(--text);
   text-align: left;
   font: inherit;
-  cursor: url("cursors/hand.png") 7 6, pointer;
+  cursor: var(--cur-hand);
 }
 #findList .hit:hover { background: var(--hover); color: var(--bright); }
 #findList .hit b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; }
@@ -357,7 +384,7 @@ select { max-width: 46vw; cursor: url("cursors/hand.png") 7 6, pointer; }
 #findList .none { padding: 8px 10px; color: var(--dim); }
 /* what was found, by what it is: a row of tabs over the list, kept in sight while the list scrolls */
 #findList .tabs { position: sticky; top: -4px; z-index: 1; display: flex; flex-wrap: wrap; gap: 4px; margin: -4px -4px 4px; padding: 6px; border-bottom: 1px solid var(--line); background: var(--panel-solid); }
-#findList .tab { height: auto; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--dim); font: inherit; font-size: 12px; cursor: url("cursors/hand.png") 7 6, pointer; }
+#findList .tab { height: auto; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--dim); font: inherit; font-size: 12px; cursor: var(--cur-hand); }
 #findList .tab:hover { background: var(--hover); color: var(--text); }
 #findList .tab.on { border-color: var(--accent); background: var(--accent-soft); color: var(--bright); }
 
@@ -472,7 +499,6 @@ select option { background: #1a1a24; }
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 #listBtn.on { border-color: var(--line-strong); color: var(--accent); }
-body.replaying #histBtn { border-color: var(--line-strong); color: var(--accent); background: var(--accent-soft); }
 /* swapped: the menu on the left, the Raid list on the right */
 @media (min-width: 701px) and (min-height: 521px) {
   body.swap #panel { right: auto; left: max(8px, env(safe-area-inset-left)); }
@@ -524,7 +550,7 @@ body.replaying #histBtn { border-color: var(--line-strong); color: var(--accent)
 #panelBody::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(255, 255, 255, 0.16); }
 #panel p { margin: 6px 0; color: var(--dim); font-size: 12px; line-height: 1.45; }
 #panel p.credit { font-size: 11px; }
-#panel p.credit a { color: inherit; cursor: url("cursors/hand.png") 7 6, pointer; }
+#panel p.credit a { color: inherit; cursor: var(--cur-hand); }
 #about { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; padding-top: 10px; border-top: 1px solid var(--line); }
 #about img { border-radius: 7px; flex: none; }
 #about div { line-height: 1.3; }
@@ -583,7 +609,7 @@ details.group > summary {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent);
-  cursor: url("cursors/hand.png") 7 6, pointer;
+  cursor: var(--cur-hand);
 }
 details.group > summary:hover { color: var(--bright); }
 details.group > summary::-webkit-details-marker { display: none; }
@@ -609,7 +635,7 @@ details.group[open] > summary::after { transform: rotate(45deg); }
   margin: 0 -6px;
   padding: 0 6px;
   border-radius: 6px;
-  cursor: url("cursors/hand.png") 7 6, pointer;
+  cursor: var(--cur-hand);
 }
 .row:hover { background: var(--hover); }
 .row > span { flex: 1; min-width: 0; }
@@ -648,9 +674,9 @@ details.group[open] > summary::after { transform: rotate(45deg); }
 .row > .swatch + span { flex: 1; }
 .row.blocked .swatch { opacity: 0.4; }
 /* a row with a slider or a list: only those are pressed, so the arrow over its words, the hand over them */
-.row.range { justify-content: space-between; cursor: url("cursors/idle.png") 2 2, default; }
-.row.range input, .row.range select, input[type="range"] { cursor: url("cursors/hand.png") 7 6, pointer; }
-#find { cursor: url("cursors/idle.png") 2 2, text; }
+.row.range { justify-content: space-between; cursor: var(--cur); }
+.row.range input, .row.range select, input[type="range"] { cursor: var(--cur-hand); }
+#find { cursor: var(--cur-text); }
 .row.range:hover { background: transparent; }
 .row.range > span { flex: none; }
 .row.range input, .row.range select { flex: 1; min-width: 60px; max-width: 170px; accent-color: var(--accent); }
@@ -667,7 +693,7 @@ details.group[open] > summary::after { transform: rotate(45deg); }
 .filterGrid .filterHead.sect { grid-column: 1 / -1; margin: 8px 0 2px; padding: 7px 2px 0; border-top: 1px solid var(--line); color: var(--text); }
 .filterGrid .filterHead.sect:first-child { margin-top: 2px; padding-top: 2px; border-top: 0; }
 /* small words to press in a heading (All, None) */
-.linkBtn { margin-left: 6px; padding: 0 4px; height: auto; border: 0; background: none; color: var(--accent); font: inherit; letter-spacing: 0.04em; cursor: url("cursors/hand.png") 7 6, pointer; }
+.linkBtn { margin-left: 6px; padding: 0 4px; height: auto; border: 0; background: none; color: var(--accent); font: inherit; letter-spacing: 0.04em; cursor: var(--cur-hand); }
 .linkBtn:hover { text-decoration: underline; background: none; }
 /* the Raid list without who's alive: ? or Dead */
 .sideRow small.far.fog { color: var(--dim); text-align: center; }
@@ -714,7 +740,7 @@ details.group[open] > summary::after { transform: rotate(45deg); }
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  cursor: url("cursors/hand.png") 7 6, pointer;
+  cursor: var(--cur-hand);
 }
 #panel details.quest.here > summary { color: #ffe14d; }
 .goal {
@@ -762,8 +788,11 @@ details.group[open] > summary::after { transform: rotate(45deg); }
 .sideRow { position: relative; }
 .sideRow.two { height: auto; flex-wrap: wrap; row-gap: 2px; padding: 3px 7px 5px; }
 /* how much health is left: a thin bar along the bottom of the row */
-.hpBar { position: absolute; left: 25px; right: 7px; bottom: 1px; height: 2px; border-radius: 1px; background: rgba(200, 205, 255, 0.09); overflow: hidden; text-decoration: none; }
-.hpBar b { display: block; height: 100%; border-radius: 1px; }
+.hpBar { position: absolute; left: 25px; right: 7px; bottom: 1px; height: 3px; border-radius: 2px; background: rgba(200, 205, 255, 0.12); overflow: hidden; text-decoration: none; }
+.hpBar b { display: block; height: 100%; border-radius: 2px; }
+/* its number, by the name (faint while whole) */
+#roster .sideRow small.hpNum, .sideRow small.hpNum { min-width: 0; padding: 0 2px; font-weight: 700; font-size: 11px; cursor: var(--cur); }
+.sideRow small.hpNum.whole { color: var(--dim); font-weight: 600; opacity: 0.75; }
 /* one line each: the name, then what it's doing */
 .sideRow.slim > span:not(.chips) { flex: 1 1 42%; }
 .sideRow.slim > .chip { flex: 0 1 auto; max-width: 40%; display: block; }
@@ -773,7 +802,7 @@ button.filterHead.fold { display: flex; align-items: center; gap: 5px; width: 10
 button.filterHead.fold::before { content: ''; flex: none; width: 5px; height: 5px; margin: 0 3px 2px 1px; border: solid var(--dim); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 button.filterHead.fold.shut::before { transform: rotate(-45deg); margin-bottom: 0; }
 button.filterHead.fold:hover { color: var(--bright); background: var(--hover); }
-#rosterSum .chip.count { cursor: url("cursors/hand.png") 7 6, pointer; }
+#rosterSum .chip.count { cursor: var(--cur-hand); }
 #rosterSum .chip.count.shut { opacity: 0.45; }
 /* a panel within a panel: a box of its own, with a smaller title */
 details.group.sub { margin: 8px 0 2px; padding: 0 10px 6px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.025); }
@@ -783,10 +812,13 @@ details.group.sub[hidden] { display: none; }
 details.group.sub > summary { padding: 8px 2px 7px; font-size: 10.5px; color: var(--dim); }
 details.group.sub > p { margin: 0 0 6px; font-size: 11.5px; color: var(--dim); }
 /* the one the map follows, and the one whose gear is set out */
-.sideRow.chased { border-left-color: #5fd4ff; background: rgba(95, 212, 255, 0.08); }
+.sideRow.chased { background: rgba(95, 212, 255, 0.08); }
+/* followed or in a fight: a short bar of that colour down the row's left, inside its rounded box */
+.sideRow.chased::before, .sideRow.fight::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: #5fd4ff; }
+.sideRow.fight::before { background: #ff5148; }
 .sideRow.open { background: rgba(255, 255, 255, 0.05); }
 /* in a fight: a red edge */
-.sideRow.fight { border-left-color: #ff5148; background: rgba(255, 81, 72, 0.07); }
+.sideRow.fight { background: rgba(255, 81, 72, 0.07); }
 /* its tags: what it's up to is written out in full, on a line of its own when there's no room beside the others; its worth is always at the right */
 /* always in the same places, at the same sizes: difficulty | personality | worth, then a line of what it's doing
    (and its squad's part beside it), cut short with an ellipsis; the full text is in each tag's hint */
@@ -1177,7 +1209,10 @@ button, select, input, summary, .row { touch-action: manipulation; -webkit-tap-h
   /* no frosted glass on a phone (it's slow there): the panels are plain, and darker so what's behind doesn't show */
   :root { --panel: var(--panel-solid); }
   #bar > *, #panel, #side { -webkit-backdrop-filter: none; backdrop-filter: none; }
-  #side, #listBtn, #histBtn { display: none; }
+  #side, #listBtn { display: none; }
+  /* (the live map's bar is full on a phone: its raid history is in the menu's History tab) */
+  html:not(.hist) #modeNav { display: none; }
+  #modeNav a { padding: 0 10px; }
   /* the kill feed: bottom right, above the menu's sheet when it's open (or beside it, the phone on its side) */
   #killFeed { bottom: calc(var(--cover-b, 0px) + max(10px, env(safe-area-inset-bottom))); right: calc(var(--cover-r, 0px) + max(10px, env(safe-area-inset-right))); max-height: 45%; }
   #bar { flex-wrap: wrap; gap: 5px; }
@@ -1533,6 +1568,7 @@ table.facts td:last-child { color: var(--bright); }
 .teams { display: flex; flex-wrap: wrap; gap: 6px 10px; }
 .team { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 4px 10px 4px 5px; border: 1px solid var(--line); border-radius: 999px; font-size: 12.5px; }
 .team > i, i.squadDot { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; color: #10121a; font-style: normal; font-size: 11px; font-weight: 700; }
+.team > .teamKind { color: var(--dim); font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; }
 .linkBtn { height: auto; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .linkBtn:hover { text-decoration: underline; }
 table.board.sortable th { cursor: pointer; user-select: none; white-space: nowrap; }
@@ -1554,7 +1590,25 @@ td.acts button, td.acts a.btn { height: 26px; padding: 0 9px; margin-left: 4px; 
 td.acts button.sure { color: #fff; background: #c8322c; border-color: #c8322c; }
 .accBar { display: inline-block; vertical-align: middle; width: 54px; height: 6px; margin-right: 7px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .accBar i { display: block; width: 0; height: 100%; margin: 0; border-radius: 0; background: var(--accent); }
-.actTag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 11.5px; }
+.actTag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 11.5px; font-weight: 600; }
+table.board.timeline tr.mine td { background: rgba(123, 156, 255, 0.05); }
+/* the Timeline's chart of events: a lane for each sort, a dot for each, over the raid's length */
+.tlLanes { margin-bottom: 14px; padding: 8px 14px 10px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.02); }
+.tlAxis { position: relative; height: 18px; margin-left: 110px; color: var(--dim); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.tlAxis span { position: absolute; transform: translateX(-50%); }
+.tlAxis span:first-child { transform: none; }
+.tlLane { display: grid; grid-template-columns: 110px 1fr; align-items: center; height: 24px; }
+.tlName { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.tlName b { color: var(--dim); font-weight: 500; font-size: 11px; }
+.tlTrack { position: relative; height: 100%; border-top: 1px solid var(--line); }
+.tlTrack i { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; opacity: 0.8; cursor: var(--cur-hand); border: 1px solid rgba(0, 0, 0, 0.5); }
+.tlTrack i.mine { width: 12px; height: 12px; margin: -6px 0 0 -6px; border: 2px solid #fff; opacity: 1; z-index: 1; }
+.tlTrack i:hover { transform: scale(1.5); opacity: 1; z-index: 2; }
+.actChips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+#hp .actChips button.actChip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: transparent; font-size: 12px; }
+#hp .actChips button.actChip i { width: 8px; height: 8px; border-radius: 50%; }
+#hp .actChips button.actChip b { color: var(--dim); font-weight: 600; font-size: 11px; }
+#hp .actChips button.actChip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--bright); }
 tr.act-killed .actTag { background: rgba(239, 83, 80, 0.25); color: #ffb3ae; }
 tr.act-looted .actTag { background: rgba(127, 211, 107, 0.2); color: #b6ecaa; }
 tr.act-grenade .actTag, tr.act-threw .actTag { background: rgba(255, 167, 38, 0.22); color: #ffd699; }
@@ -1566,12 +1620,29 @@ tr.act-left .actTag { background: rgba(45, 212, 191, 0.2); color: #a5f0e5; }
 .donutLegend span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .donutLegend b { color: var(--bright); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .charts { margin-bottom: 14px; }
-.behLegend { gap: 4px 14px; margin-bottom: 10px; }
-.behLegend i { border-radius: 2px !important; width: 11px !important; height: 11px !important; border: 1px solid rgba(255, 255, 255, 0.25); }
-.behWrap { display: grid; grid-template-columns: 180px 1fr; border: 1px solid var(--line); border-radius: var(--radius-small); overflow: hidden; }
+/* Behaviour: where the bots' time went as one bar of shares and a key (each pressed to pick that sort out), then a bar
+   a bot */
+.behShare { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.02); }
+.behShare h4 { margin: 0 0 8px; color: var(--bright); font-size: 12.5px; font-weight: 600; }
+.behStrip { display: flex; height: 16px; margin-bottom: 10px; border-radius: 4px; overflow: hidden; gap: 1px; }
+.behStrip i { min-width: 2px; cursor: var(--cur-hand); transition: opacity 0.12s; }
+.behFocus .behStrip i:not(.on) { opacity: 0.2; }
+.behLegend { display: flex; flex-wrap: wrap; gap: 4px; }
+#hp .behLegend button.behKey { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent;
+  color: var(--text); font-size: 12px; }
+#hp .behLegend button.behKey i { width: 10px; height: 10px; border-radius: 3px; }
+#hp .behLegend button.behKey b { color: var(--dim); font-weight: 600; font-variant-numeric: tabular-nums; }
+#hp .behLegend button.behKey:hover { border-color: var(--line-strong); }
+#hp .behLegend button.behKey.on { border-color: var(--accent); background: var(--accent-soft); color: var(--bright); }
+.behFocus #hp .behLegend button.behKey:not(.on), .behFocus .behLegend button.behKey:not(.on) { opacity: 0.55; }
+.behWrap { display: grid; grid-template-columns: 210px 1fr; border: 1px solid var(--line); border-radius: var(--radius-small); overflow: hidden; background: rgba(255, 255, 255, 0.015); }
 .behNames { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
-.behNames button { display: block; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 11.5px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.behNames button:hover { background: var(--hover); }
+#hp .behNames button { display: flex; align-items: center; gap: 7px; padding: 0 10px; border: 0; border-radius: 0; background: transparent; font-size: 12px; text-align: left; white-space: nowrap; min-width: 0; }
+#hp .behNames button:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+#hp .behNames button:hover { background: var(--hover); }
+#hp .behNames button i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+#hp .behNames button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--bright); }
+#hp .behNames button small { margin-left: auto; padding-left: 6px; color: var(--dim); font-size: 10.5px; }
 .behPlot { position: relative; min-width: 0; cursor: crosshair; }
 .behPlot canvas { display: block; touch-action: none; }
 .winFold { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-small); padding: 6px 12px; }
@@ -1636,45 +1707,355 @@ table.board .linkBtn:hover { color: var(--accent); }
 .chartTip span { display: block; }
 .bars { margin: 0 0 14px; }
 .bars h4 { margin: 0 0 6px; color: var(--bright); font-size: 12.5px; font-weight: 600; }
-.bars > div { display: grid; grid-template-columns: 150px 1fr 34px; align-items: center; gap: 8px; margin: 3px 0; font-size: 12px; }
+.bars > div { display: grid; grid-template-columns: 150px 1fr minmax(34px, auto); align-items: center; gap: 8px; margin: 3px 0; font-size: 12px; }
 .bars > div > div { height: 10px; }
 .bars i { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; }
-.bars b { color: var(--bright); font-variant-numeric: tabular-nums; text-align: right; }
+.bars b { color: var(--bright); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 
-/* ---- a raid open: its bar of tabs under the top bar, and everything else a step lower ---- */
-#raidNav {
-  position: fixed;
-  top: max(50px, calc(env(safe-area-inset-top) + 50px));
-  left: max(8px, env(safe-area-inset-left));
-  right: max(8px, env(safe-area-inset-right));
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 40px;
-  padding: 0 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: #101016;
-  box-shadow: var(--shadow);
-  color: var(--text);
-  overflow-x: auto;
-  scrollbar-width: none;
+/* ---- the raid history page (/satellite/raids/, html.hist): laid out as Raid Review's, in Satellite's look ---- */
+/* the live map's way to it, in its menu */
+.tabTools a.btn { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-small); color: var(--accent); text-decoration: none; white-space: nowrap; }
+.tabTools a.btn:hover { background: var(--accent-soft); }
+a.histPlay { text-decoration: none; }
+/* the top bar of both pages: Live map | Raid history, the one shown lit (two sides of Satellite, not two buttons) */
+#modeNav { flex: none; display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+#modeNav a { display: inline-flex; align-items: center; height: 28px; padding: 0 14px; border-radius: 999px; color: var(--dim); font-size: 13px; font-weight: 600;
+  text-decoration: none; white-space: nowrap; transition: background 0.12s, color 0.12s; }
+#modeNav a:hover { color: var(--bright); background: var(--hover); }
+#modeNav a.on { color: var(--ink); background: var(--accent); cursor: default; }
+html.hist #modeNav { margin-right: auto; }
+html.hist #status, html.hist #backRaid, html.hist #session, html.hist #map, html.hist #mapBtn, html.hist #findBox, html.hist #listBtn,
+html.hist #follow, html.hist #reveal, html.hist #options, html.hist #mapTools, html.hist #panel, html.hist #notice, html.hist #recBadge,
+html.hist #sideClose, html.hist #squadBtn, html.hist #sideSort, html.hist #findList { display: none !important; }
+html.hist body:not(.hpMap) #fit, html.hist body:not(.hpMap) #full, html.hist body:not(.hpMap) #side, html.hist body:not(.hpMap) #killFeed,
+html.hist body:not(.hpMap) #squadPane, html.hist body:not(.hpMap) #miniMap, html.hist body:not(.hpMap) #tip { display: none !important; }
+/* the page itself, under the top bar */
+#hp { position: fixed; top: max(50px, calc(env(safe-area-inset-top) + 50px)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom)); z-index: 3; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius);
+  background: #101016; box-shadow: var(--shadow); color: var(--text); overflow: hidden; }
+#hp[hidden], #hp > [hidden] { display: none; }
+body.hpMap #hp { bottom: auto; border-color: var(--line-strong); }
+#hpHead { flex: none; padding: 0 16px 0 10px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, rgba(123, 156, 255, 0.06), transparent); }
+#hpTop { display: flex; align-items: stretch; gap: 10px; min-height: 64px; flex-wrap: wrap; row-gap: 0; }
+#hpTop > a.btn, #hpTop > button { align-self: center; }
+#hpTitleBox { flex: 0 0 auto; width: clamp(180px, 21vw, 360px); min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+#hpTitle { color: var(--bright); font-size: 18px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hpSub { display: flex; align-items: center; gap: 10px; margin-top: 3px; height: 20px; color: var(--dim); font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+#hpSub > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+#hp a.btn.ghost { border-color: transparent; background: transparent; color: var(--dim); padding: 0 10px; }
+#hp a.btn.ghost:hover { color: var(--bright); background: var(--hover); }
+/* the raid's tabs: underlined, as a page's own tabs */
+#hpTabs { flex: none; display: flex; gap: 2px; margin-left: 4px; padding-left: 8px; border-left: 1px solid var(--line); }
+#hpTabs a.tab { position: relative; display: inline-flex; align-items: center; height: 100%; padding: 0 12px; color: var(--dim); font-weight: 600; text-decoration: none; white-space: nowrap; }
+#hpTabs a.tab:hover { color: var(--bright); }
+#hpTabs a.tab.on { color: var(--bright); }
+#hpTabs a.tab.on::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+/* how a raid went, as a tag: survived green, killed red, cut short amber, recording blue */
+.outTag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; background: rgba(200, 205, 255, 0.08); color: var(--text); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.outTag.good { background: rgba(61, 220, 90, 0.14); color: #7be08f; }
+.outTag.bad { background: rgba(255, 77, 67, 0.14); color: #ff8a80; }
+.outTag.cut { background: rgba(245, 166, 35, 0.14); color: #f5b955; cursor: var(--cur); }
+.outTag.live { background: var(--accent-soft); color: var(--accent); }
+#hp .grow { flex: 1; }
+#hp a.btn, #hp button { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border: 1px solid rgba(200, 205, 255, 0.2); border-radius: var(--radius-small);
+  background: rgba(255, 255, 255, 0.035); color: var(--text); font: inherit; text-decoration: none; white-space: nowrap; cursor: pointer; }
+#hp a.btn:hover, #hp button:hover { background: var(--hover); border-color: var(--line-strong); }
+#hp a.btn.on { color: var(--ink); background: var(--accent); border-color: var(--accent); }
+#hp button:disabled { opacity: 0.5; cursor: default; }
+#hp button.danger { color: #ff8a80; border-color: rgba(255, 138, 128, 0.45); }
+#hp button.danger.sure { color: #fff; background: #c8322c; border-color: #c8322c; }
+/* the live map under the page shows only on a raid's Map */
+html.hist body:not(.hpMap) #stage { visibility: hidden; }
+/* the Raid events panel, in the replay's right-hand panel: no title or close of its own there (the fold has them) */
+html.hist #squadPane { position: static; width: auto; max-height: 440px; border: 0; background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; margin: 0 !important; }
+html.hist #squadHead { display: none; }
+#hpBody { flex: 1; overflow: auto; padding: 12px 14px 18px; -webkit-user-select: text; user-select: text; }
+.hpWrap { max-width: 1500px; margin: 0 auto; }
+.hpTools { margin-bottom: 8px; }
+.hpTools .hpCount { color: var(--bright); font-weight: 600; }
+.hpShowing { text-align: center; }
+/* the Overview: the raid at a glance, then three cards side by side (the raid, its kills, your raid), the leaderboard */
+.ovTiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.statTiles div { background: rgba(255, 255, 255, 0.02); }
+.statTiles div.out b { font-size: 17px; line-height: 26px; }
+.statTiles div.out.good b { color: #7be08f; }
+.statTiles div.out.bad b { color: #ff8a80; }
+.statTiles div.out.cut b { color: #f5b955; }
+.statTiles div[title] { cursor: var(--cur); }
+.ovCols { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; margin-bottom: 18px; align-items: start; }
+.ovCard { min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.02); }
+.ovCard h3 { margin: 0 0 8px; color: var(--bright); font-size: 13px; font-weight: 600; }
+.ovCard h4 { margin: 12px 0 4px; color: var(--dim); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.ovCard table.facts { width: 100%; }
+#hp .ovCard a.btn.ovMap { margin-top: 10px; width: 100%; justify-content: center; border-color: var(--line-strong); color: var(--accent); font-weight: 600; }
+#hp .ovCard a.btn.ovMap:hover { background: var(--accent-soft); }
+.ovFeed { max-height: 380px; overflow: auto; }
+#hp button.ovKill { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; width: 100%; height: auto; min-height: 30px; padding: 6px 8px; border: 0; border-left: 2px solid transparent;
+  border-radius: 0 5px 5px 0; background: transparent; color: var(--text); font: inherit; font-size: 12.5px; text-align: left; white-space: normal; cursor: var(--cur-hand); }
+#hp button.ovKill:hover { background: var(--hover); }
+#hp button.ovKill.mine { border-left-color: #fff; background: rgba(224, 72, 63, 0.09); }
+#hp button.ovKill.died { border-left-color: #ff4d43; }
+table.board.leader td:has(.accBar) { white-space: nowrap; }
+table.board th.num, table.board td.num { text-align: right; }
+table.board th.mid, table.board td.mid { text-align: center; }
+.cheatTag { display: inline-block; margin-left: 7px; padding: 0 6px; border-radius: 999px; background: rgba(255, 77, 67, 0.16); color: #ff8a80; font-size: 10.5px; font-weight: 700; vertical-align: 1px; cursor: var(--cur); }
+table.board.behTable td.num { color: var(--bright); font-weight: 600; border-left: 1px solid rgba(0, 0, 0, 0.25); }
+table.board.behTable tbody tr.pick:hover td { filter: brightness(1.25); }
+/* who came in together: a team's number, then its members */
+#hp .team button.linkBtn { height: auto; padding: 2px 4px; border: 0; background: transparent; font-size: 12.5px; }
+#hp .team button.linkBtn:hover { text-decoration: underline; }
+.ovKill .ovT { grid-row: span 2; color: var(--dim); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.ovKill .ovWho i { color: var(--dim); font-style: normal; }
+.ovKill small { color: var(--dim); font-size: 11.5px; }
+.ovLines > div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.ovLines span { color: var(--dim); }
+.ovLines b { color: var(--bright); font-weight: 600; text-align: right; }
+.ovLoot { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12.5px; }
+.ovLoot b { font-variant-numeric: tabular-nums; }
+/* the leaderboard: numbers to the right, the accuracy as a bar, the share and the count */
+table.board.leader th { cursor: var(--cur-hand); white-space: nowrap; }
+table.board.leader th.sorted { color: var(--accent); }
+.accBar { display: inline-block; vertical-align: middle; width: 54px; height: 6px; margin-right: 7px; border-radius: 3px; background: rgba(200, 205, 255, 0.1); overflow: hidden; }
+.accBar i { display: block !important; width: 0; height: 100% !important; margin: 0 !important; border-radius: 3px !important; }
+td .accPct { color: var(--bright); font-weight: 600; margin-right: 5px; }
+td small.dim { color: var(--dim); font-size: 11px; }
+/* the raids page: its records, as tiles and cards, each card a way into its raid */
+.recTiles { margin-bottom: 10px; }
+.recCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 18px; }
+.recCard { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.02);
+  color: var(--text); text-decoration: none; transition: border-color 0.12s, background 0.12s; min-width: 0; }
+a.recCard:not(.none):hover { border-color: var(--line-strong); background: var(--accent-soft); }
+.recCard.none { cursor: default; }
+.recTitle { color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.recCard b { color: var(--bright); font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recCard small { color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hpManage { margin: 4px 0 14px; padding: 4px 14px 10px; border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(255, 255, 255, 0.02); }
+/* thanks to Raid Review's makers: under the raids and every raid's Overview */
+.hpCredits { display: flex; align-items: center; gap: 14px; margin: 22px 0 6px; padding: 12px 16px; border: 1px solid rgba(123, 156, 255, 0.25); border-radius: var(--radius-small);
+  background: linear-gradient(90deg, rgba(123, 156, 255, 0.1), rgba(123, 156, 255, 0.02)); }
+.hpCredits > i { color: #ff6b8a; font-size: 20px; font-style: normal; }
+.hpCredits > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.hpCredits b { color: var(--bright); }
+.hpCredits span { color: var(--text); }
+.hpCredits a { color: var(--accent); font-size: 12px; }
+.winNote.bad { color: #ff8a80; }
+table.board.raids tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.022); }
+table.board.raids tbody tr.pick:hover td { background: var(--hover); }
+table.board.raids td.acts a.btn { height: 26px; padding: 0 10px; margin-left: 4px; }
+/* the map's own tools, in the raid's head on the Map where Export and Delete were: the floors, Selected floor only,
+   Positions | Heat map, Close map (where the row's too narrow, under it, in a row of their own: the tabs stay put) */
+#hpMapBar { display: flex; align-items: center; gap: 8px; margin-left: auto; padding: 8px 0; flex-wrap: wrap; justify-content: flex-end; }
+#hpMapBar[hidden], #hpTop > [hidden] { display: none !important; }
+/* on the Map the row is shared with the map's tools: the raid's name narrower (all of it when pointed at), the floor
+   switch's words short, and the tools a little smaller, so it all stays in the one row on most screens. The raid's
+   name has the same width on every tab (all of it when pointed at), so the tabs never move. */
+#hpMapBar { gap: 6px; }
+#hp #hpMapBar a.btn, #hp #hpMapBar button, #hpMapBar #hpFloorOnly { height: 30px; }
+#hpFloorOnly span { font-size: 0; }
+#hpFloorOnly span::after { content: attr(data-short); font-size: 12.5px; }
+#hpFloorOnly { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-small); font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+#hpFloorOnly:hover { border-color: var(--line-strong); }
+#hpFloorOnly input { accent-color: var(--accent); margin: 0; }
+#hpFloorHome:empty { display: none; }
+#hpFloorHome #floorBadge { position: static; transform: none; top: auto; left: auto; }
+#hpFloorHome #floorBadge.named { background: transparent; border-color: var(--line); }
+#hpView { flex: none; display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-small); }
+#hp #hpView button { height: 26px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: var(--dim); font-size: 12.5px; }
+#hp #hpView button:hover { color: var(--bright); background: var(--hover); }
+#hp #hpView button.on { color: var(--ink); background: var(--accent); }
+#hp a.btn.close { margin-left: 4px; border-color: var(--line-strong); color: var(--bright); font-weight: 600; }
+#hp a.btn.close:hover { background: var(--accent-soft); }
+/* the map comes up over the raid's page, and goes back to it on Close */
+@keyframes hpMapIn { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
+html.hist body.hpMap #stage { animation: hpMapIn 0.22s ease-out; }
+#hpPanels, #hpLegendBtn { display: none !important; }
+/* beside the map: the Raid list down the left (its legend) and what was going on at the moment down the right */
+html.hist body.hpMap #side { top: calc(var(--hp-under, 170px) + 8px); max-height: calc(100% - var(--hp-under, 170px) - 16px); width: min(300px, calc(100vw - 16px)); }
+#hpLegend { border-bottom: 1px solid var(--line); padding: 6px 12px 8px; font-size: 12px; }
+#hpLegend summary { cursor: pointer; color: var(--accent); font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+#hpLegend h4 { margin: 8px 0 4px; color: var(--bright); font-size: 12px; font-weight: 600; }
+#hpSide { position: fixed; top: calc(var(--hp-under, 170px) + 8px); right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom));
+  width: min(340px, calc(100vw - 16px)); z-index: 2; overflow: auto; padding: 4px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); box-shadow: var(--shadow); color: var(--text); font-size: 12.5px; }
+#hpSide[hidden], .hpSec[hidden] { display: none; }
+html.hist #hpSide { width: min(310px, calc(100vw - 16px)); padding: 0 0 4px; }
+.hpSideHead { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--line);
+  background: var(--panel-solid); color: var(--accent); font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; }
+#hp ~ #hpSide .hpSideHead button, .hpSideHead button { height: 24px; width: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--dim); font: inherit; font-size: 14px; letter-spacing: 0; }
+.hpSideHead button:hover { color: var(--bright); border-color: var(--line-strong); }
+/* put away: a tab on the right edge brings it back */
+#hpSideTab { position: fixed; right: 0; top: 50%; z-index: 2; transform: translateY(-50%); padding: 10px 8px; border: 1px solid var(--line-strong); border-right: 0; border-radius: 8px 0 0 8px;
+  background: var(--panel-solid); color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; writing-mode: vertical-rl; cursor: var(--cur-hand); box-shadow: var(--shadow); }
+#hpSideTab[hidden] { display: none; }
+.hpSec { padding: 6px 12px; border-bottom: 1px solid var(--line); }
+.hpSec:last-child { border-bottom: 0; }
+.hpSec > summary { cursor: pointer; color: var(--bright); font-weight: 600; padding: 3px 0; }
+.hpSec.empty > summary { color: var(--dim); font-weight: 500; }
+.hpSecCount { margin-left: 7px; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-weight: 700; }
+.hpSecCount:empty { display: none; }
+.hpNone { margin: 2px 0 4px; padding: 8px 10px; border: 1px dashed rgba(200, 205, 255, 0.14); border-radius: var(--radius-small); color: var(--dim); font-size: 12px; text-align: center; }
+.hpSeg { display: flex; padding: 2px; gap: 2px; margin: 2px 0 8px; border: 1px solid var(--line); border-radius: var(--radius-small); }
+#hpSide .hpSeg button { flex: 1; height: 26px; padding: 0 6px; border: 0; border-radius: 5px; background: transparent; color: var(--dim); font: inherit; font-size: 12px; cursor: var(--cur-hand); }
+#hpSide .hpSeg button:hover { color: var(--bright); background: var(--hover); }
+#hpSide .hpSeg button.on { color: var(--ink); background: var(--accent); }
+/* the bots and what each has: a row each, pressed to set out its gear under it */
+.invList { display: flex; flex-direction: column; gap: 1px; }
+.invRow { display: grid; grid-template-columns: 10px 1fr auto 12px; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 3px 6px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text); font: inherit; text-align: left; cursor: var(--cur-hand); }
+.invRow:hover, .invRow.open { background: var(--hover); }
+.invRow > i { width: 9px; height: 9px; border-radius: 50%; }
+.invRow.dead > i { opacity: 0.5; }
+.invName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bright); }
+.invName small { display: block; color: var(--dim); font-size: 11px; }
+.invRow > b { font-variant-numeric: tabular-nums; font-size: 12px; }
+.invRow > em { color: var(--dim); font-style: normal; font-size: 10px; }
+.invGear { margin: 0 0 6px 18px; padding: 4px 8px; border-left: 2px solid var(--line-strong); font-size: 11.5px; }
+.invItem { display: grid; grid-template-columns: 62px 1fr auto; gap: 6px; padding: 2px 0; }
+.invItem i { color: var(--dim); font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invItem em { font-style: normal; font-variant-numeric: tabular-nums; }
+.invItem.noLoot span, .invItem.noLoot i { opacity: 0.5; }
+.invItem.noLoot em { color: var(--dim); font-size: 11px; }
+.invGear .linkBtn { margin-top: 4px; }
+/* the Raid list: a bot's worth, pressed to set out its gear */
+.chip.gearBtn { cursor: var(--cur-hand); }
+.chip.gearBtn:hover { background: var(--hover); }
+.hpSecBody { padding: 4px 0 2px; }
+.hpSecBody .row { display: flex; align-items: center; gap: 8px; min-height: 26px; cursor: pointer; }
+.hpSecBody .row input { accent-color: var(--accent); }
+.hpSecBody .winTools { gap: 6px; margin: 4px 0 6px; }
+.hpSecBody .winTools input, .hpSecBody .winTools select { height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-small); background: transparent; color: var(--text); font: inherit; }
+.hpSecBody .winTools input[type=search] { width: 100%; }
+.hpSecBody .winTools input[type=number] { width: 120px; }
+.hpSecBody .winTools select { max-width: 100%; }
+.hpSecBody > .linkBtn { display: block; padding: 2px 0; font-size: 12px; }
+table.board.slim { font-size: 12px; margin-bottom: 4px; }
+table.board.slim td { padding: 4px 6px; white-space: normal; }
+table.board.slim td:first-child { white-space: normal; }
+table.board.slim td:last-child { text-align: right; white-space: nowrap; }
+table.board.slim td.sentCell { text-align: left; white-space: normal; }
+td.sentCell .sentGoal { display: block; margin-top: 2px; color: var(--text); font-size: 11.5px; overflow-wrap: anywhere; }
+/* the timeline under the map, between the two (as Raid Review's: the kills along it, the time, then the buttons) */
+html.hist #replayBar { left: max(8px, var(--menu-l, 0px)); right: max(8px, var(--menu-r, 0px)); width: auto; transform: none; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px 10px; }
+html.hist #replayBar[hidden] { display: none; }
+/* The timeline, as Raid Review's: a tall bar the width of the map, pressed or dragged anywhere to go there. In it a
+   faint line each minute, a red band over each fight, what's been played lit, and the playhead; along its top, inside
+   it, a skull for every kill, a stem down to its foot. */
+html.hist #replayTrack { flex: none; height: 66px; margin-top: 2px; border: 1px solid rgba(200, 205, 255, 0.14); border-radius: 8px; background: rgba(255, 255, 255, 0.025);
+  cursor: var(--cur-hand); touch-action: none; }
+html.hist #replaySeek { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+#replayGrid, #replayFights, #replayFill { position: absolute; inset: 0; pointer-events: none; border-radius: 7px; overflow: hidden; }
+#replayGrid i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(200, 205, 255, 0.07); }
+#replayGrid i::after { content: attr(data-t); position: absolute; left: 4px; bottom: 3px; color: rgba(200, 205, 255, 0.28); font-size: 10px; font-variant-numeric: tabular-nums; }
+#replayFights i { position: absolute; top: 0; bottom: 0; min-width: 3px; background: linear-gradient(180deg, rgba(216, 80, 74, 0.08), rgba(216, 80, 74, 0.26)); border-left: 1px solid rgba(216, 80, 74, 0.35); }
+#replayFill { right: auto; width: 0; border-radius: 7px 0 0 7px; background: linear-gradient(180deg, rgba(123, 156, 255, 0.05), rgba(123, 156, 255, 0.16)); }
+#replayHead { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); box-shadow: 0 0 8px rgba(123, 156, 255, 0.8); pointer-events: none; }
+#replayHead::after { content: ''; position: absolute; left: -5px; bottom: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid #0c0c12; }
+#replayHover { position: absolute; top: auto; bottom: 3px; transform: translateX(-50%); padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, 0.75); color: var(--bright); font-size: 11px;
+  font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+#replayHover[hidden] { display: none; }
+/* the kills: a row of their own along the bar's top, a little darker, a pin each; the player's own kills ringed in
+   white, a player's death black, a gas death an orange burst; kills close together share a pin with their count */
+html.hist #replayTicks { z-index: 1; left: 0; right: 0; top: 0; height: 26px; pointer-events: none; border-bottom: 1px solid rgba(200, 205, 255, 0.1);
+  border-radius: 7px 7px 0 0; background: rgba(0, 0, 0, 0.22); }
+html.hist #replayTicks[hidden], #replayFights[hidden] { display: none; }
+html.hist #replayGrid, html.hist #replayFights, html.hist #replayFill { top: 27px; border-radius: 0 0 7px 7px; }
+#replayTicks b.skull { position: absolute; top: 4px; width: 18px; height: 18px; margin-left: -9px; border: 1.5px solid rgba(0, 0, 0, 0.55); border-radius: 50%;
+  background: #c8463f; color: #fff; font-size: 11.5px; line-height: 15px; text-align: center; pointer-events: auto; cursor: var(--cur-hand);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); transition: transform 0.1s; }
+#replayTicks b.skull.mine { top: 2px; width: 22px; height: 22px; margin-left: -11px; border: 2px solid #fff; background: #e0483f; font-size: 13px; line-height: 18px; z-index: 2;
+  box-shadow: 0 0 0 2px rgba(224, 72, 63, 0.35), 0 1px 4px rgba(0, 0, 0, 0.6); }
+#replayTicks b.skull.died { background: #111; border-color: #ff4d43; z-index: 2; }
+#replayTicks b.skull.gas { background: #ff8a1c; color: #2a1200; }
+#replayTicks b.skull i.n { position: absolute; right: -7px; top: -3px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 7px; background: #f2f3f7; color: #15161d;
+  font-size: 9px; font-style: normal; font-weight: 700; line-height: 13px; text-align: center; }
+#replayTicks b.skull:hover { transform: scale(1.18); z-index: 3; }
+#replayTip .kcSep { height: 1px; margin: 7px 0; background: var(--line); }
+/* the card over a skull */
+#replayTip { position: absolute; z-index: 6; min-width: 200px; max-width: 320px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-small);
+  background: var(--panel-solid); box-shadow: var(--shadow); font-size: 12.5px; pointer-events: none; }
+#replayTip[hidden] { display: none; }
+#replayTip .kcHead { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 3px; }
+#replayTip .kcSort { color: var(--bright); font-size: 13px; }
+#replayTip .kcTime { color: var(--dim); font-variant-numeric: tabular-nums; }
+#replayTip .kcWho { font-weight: 600; }
+#replayTip .kcWho i { color: var(--dim); font-style: normal; }
+#replayTip .kcHow { color: var(--text); margin-top: 2px; }
+#replayTip .kcGo { color: var(--accent); margin-top: 5px; font-size: 11.5px; }
+#replayTimes { display: flex; justify-content: space-between; gap: 10px; color: var(--bright); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+#replayDebug { flex: 1; text-align: center; color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#replayDebug[hidden] { display: none; }
+#replayColor { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 10px; border: 1px solid var(--line); border-radius: var(--radius-small); cursor: pointer; }
+#replayColor input { width: 30px; height: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+#replayColorBack:disabled { opacity: 0.4; cursor: default; }
+/* the kill feed's way to the fight a kill ended, in a replay */
+#killList .kill .killView { pointer-events: auto; height: 20px; margin-left: 8px; padding: 0 7px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 5px;
+  background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 11px; cursor: pointer; text-shadow: none; }
+#killList .kill .killView:hover { background: var(--accent); color: var(--ink); border-color: var(--accent); }
+#replayTotal { color: var(--dim); }
+#replayButtons, #replayMore { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#replaySpeeds { display: inline-flex; gap: 4px; margin: 0 8px 0 4px; }
+#replaySpeeds button { min-width: 40px; padding: 0 8px; }
+#replayStop { width: 38px; padding: 0; }
+#replayMore { padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-small); }
+#replayMore[hidden] { display: none; }
+html.hist #replayBot { order: -1; }
+/* what's laid over the map keeps clear of the bars and panels */
+html.hist #miniMap { top: calc(var(--hp-under, 170px) + 8px); }
+html.hist #toasts { top: calc(var(--hp-under, 170px) + 8px); }
+/* the kill feed: over the map's bottom right, above the timeline (Raid Review's kill stream), wherever it was put on
+   the live map */
+html.hist body.hpMap #killFeed { left: auto !important; top: auto !important; right: calc(max(10px, var(--menu-r, 0px)) + 6px) !important; bottom: calc(var(--bar-over, 170px) + 8px) !important;
+  margin: 0 !important; max-height: 30vh; }
+html.hist body.hpMap #squadPane { margin-top: 58px; }
+.tableRoll { overflow-x: auto; margin-bottom: 4px; }
+.tableRoll > table.board { margin-bottom: 8px; }
+@media (max-width: 700px) {
+  #hp { left: 4px; right: 4px; }
+  #hpHead { padding: 0 8px; }
+  #hpTop { gap: 8px; height: auto; flex-wrap: wrap; padding-top: 8px; }
+  #hpTitleBox { flex: 1 1 0; max-width: none; height: 44px; }
+  /* Export and Delete as small signs, so the raid's name has the room */
+  #hp #hpExport, #hp #hpDelete { width: 36px; padding: 0; justify-content: center; font-size: 0; }
+  #hp #hpExport::before { content: '\2913'; font-size: 17px; }
+  #hp #hpDelete::before { content: '\2715'; font-size: 15px; }
+  #hp #hpDelete.sure { width: auto; padding: 0 10px; font-size: 12px; }
+  #hp #hpDelete.sure::before { content: none; }
+  #hpTitle { font-size: 16px; }
+  #hp a.btn, #hp button { height: 36px; padding: 0 11px; }
+  /* the tabs in one row, scrolled sideways when they don't fit */
+  #hpTabs { order: 9; flex: 1 0 100%; height: 40px; margin: 0; padding: 0; border: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  #hpTabs a.tab { padding: 0 11px; }
+  /* the map's bar: Close, the view and the panels in one row; the floors under it, scrolled sideways */
+  #hpMapBar { order: 10; flex: 1 0 100%; gap: 6px; padding: 0 0 8px; justify-content: flex-start; }
+  #hpClose { order: -1; }
+  #hp a.btn.close { margin-left: 0; }
+  #hpFloorHome { order: 5; flex: 1 0 100%; overflow-x: auto; scrollbar-width: none; }
+  #hpFloorOnly { order: 6; }
+  #hpFloorOnly span { font-size: 0; }
+  #hpFloorOnly span::after { content: attr(data-short); font-size: 12px; }
+  .recCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recCard b { font-size: 15px; }
+  .ovCols { grid-template-columns: minmax(0, 1fr); }
+  .tlLane, .tlAxis { grid-template-columns: 76px 1fr; }
+  .tlAxis { margin-left: 76px; }
+  .behWrap { grid-template-columns: 120px 1fr; }
+  #hp .behNames button small { display: none; }
+  html.hist #replayTrack { height: 58px; }
+  #replaySpeeds { margin: 0 2px; gap: 2px; }
+  #replaySpeeds button { min-width: 30px; padding: 0 4px; }
+  /* the raids on a phone: Type, Kills and Action left out (a raid is pressed to open it) */
+  table.board.raids th:nth-child(2), table.board.raids td:nth-child(2), table.board.raids th:nth-child(7), table.board.raids td:nth-child(7),
+  table.board.raids th:nth-child(8), table.board.raids td:nth-child(8) { display: none; }
+  #hpPanels, #hpLegendBtn { display: inline-flex !important; }
+  /* the Raid list and the map's key, over the map from Legend */
+  html.hist body.hpMap.hpLegend #side { display: flex !important; top: auto; left: 4px; right: 4px; bottom: 4px; width: auto; max-height: 58vh; z-index: 5; }
+  /* on a phone the panel beside the map comes up over it, from Details */
+  html.hist body.hpMap:not(.hpPanes) #hpSide { display: none; }
+  html.hist #hpSide { top: auto; left: 4px; right: 4px; bottom: 4px; width: auto; max-height: 58vh; z-index: 5; }
+  html.hist #replayBar { left: 4px; right: 4px; bottom: 4px; }
+  #replaySpeeds button { min-width: 34px; }
+  html.hist #miniMap { display: none; }
 }
-#raidNav[hidden] { display: none; }
-#raidNav > b { color: var(--bright); font-size: 12.5px; white-space: nowrap; }
-#raidNav nav { display: flex; flex: 1; gap: 2px; }
-#raidNav button { flex: none; height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: var(--radius-small); background: transparent; color: var(--dim); font: inherit; white-space: nowrap; cursor: pointer; }
-#raidNav button:hover { color: var(--text); background: var(--hover); }
-#raidNav nav button.on { color: var(--ink); background: var(--accent); border-color: var(--accent); }
-#rnBack, #rnLeave { border-color: var(--line) !important; color: var(--text) !important; }
-body.replaying #panel, body.replaying #side { top: max(96px, calc(env(safe-area-inset-top) + 96px)); }
-body.replaying #floorBadge { top: max(102px, calc(env(safe-area-inset-top) + 102px)); }
-body.replaying #toasts { top: max(142px, calc(env(safe-area-inset-top) + 142px)); }
-#raidWin { top: max(96px, calc(env(safe-area-inset-top) + 96px)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: 8px; max-width: none; z-index: 5; }
-@media (max-width: 700px) { #raidNav > b { display: none; } #miniMap { display: none; } }
-body.replaying #squadPane { margin-top: 46px; }
-
 /* Who's shown, under Raid: a kind on each line, with Off / Area / On beside its name */
 .filterGrid.whoGrid { grid-template-columns: 1fr; }
 .whoGrid .row.who { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 13px; }
@@ -1711,27 +2092,20 @@ body.replaying #squadPane { margin-top: 46px; }
 #exList .sideRow.exRow.on { box-shadow: inset 2px 0 0 var(--accent); background: var(--hover); }
 @media (hover: none), (pointer: coarse) { #exFind { height: 40px; font-size: 16px; } }
 
-/* the REC sign: the raid shown is being recorded, to the left of the floor badge */
+/* the REC sign: the raid shown is being recorded. In the status at the top, after what it says, divided from it by a
+   faint line (see showRec) */
 #recBadge {
-  position: fixed;
-  left: calc(50% - 96px);
-  top: max(56px, calc(env(safe-area-inset-top) + 56px));
-  transform: translateX(-100%);
-  z-index: 1;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 26px;
-  padding: 0 9px 0 8px;
-  border: 1px solid rgba(255, 90, 80, 0.75);
-  border-radius: 999px;
-  background: rgba(30, 8, 10, 0.88);
-  color: #ffb3ad;
-  font-size: 11.5px;
+  flex: none;
+  margin-left: 2px;
+  padding-left: 9px;
+  border-left: 1px solid var(--line);
+  color: #ff8a80;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  pointer-events: auto;
-  cursor: default;
 }
 #recBadge[hidden] { display: none; }
 #recBadge i { width: 8px; height: 8px; border-radius: 50%; background: #ff4b3e; box-shadow: 0 0 6px #ff4b3e; animation: recBlink 1.6s ease-in-out infinite; }
@@ -1740,3 +2114,137 @@ body.replaying #squadPane { margin-top: 46px; }
 
 /* a release without raid recording: none of it is shown (see RECORDING in livemap.js) */
 .norec [data-rec] { display: none !important; }
+
+/* The history page in one slim row at the top (html.oneBar): Satellite's logo and the Live map | Raid history switch,
+   back to the raids, the raid's name and how it went (when, how long and whose when pointed at), its tabs, then Export
+   and Delete, or on the Map its tools (Whole map, Full screen, the floors, This floor only, Positions | Heat map,
+   Close map), and the language. Satellite's own bar isn't shown. */
+html.oneBar #bar { display: none; }
+html.oneBar #hp { top: max(8px, env(safe-area-inset-top)); }
+html.oneBar #hpHead { padding: 0 10px 0 8px; }
+html.oneBar #hpTop { min-height: 48px; gap: 8px; align-items: center; }
+html.oneBar #hpTop > * { align-self: center; }
+html.oneBar #hpTabs { align-self: stretch; height: auto; }
+html.oneBar #hpTabs a.tab { padding: 0 10px; }
+html.oneBar #hp #brand { height: 34px; padding: 0 4px; border: 0; background: transparent; box-shadow: none; gap: 6px; }
+html.oneBar #hp #brand .ver { font-size: 10px; }
+html.oneBar #modeNav { margin-right: 4px; padding: 2px; }
+html.oneBar #modeNav a { height: 26px; padding: 0 11px; font-size: 12.5px; }
+html.oneBar #hpBack { padding: 0 8px; }
+/* the raid's name and how it went, in one line */
+html.oneBar #hpTitleBox { flex-direction: row; align-items: center; gap: 8px; width: clamp(150px, 15vw, 320px); padding-left: 10px; border-left: 1px solid var(--line); cursor: var(--cur); }
+html.oneBar #hpTitle { flex: 0 1 auto; min-width: 0; font-size: 15px; }
+html.oneBar #hpSub { flex: none; height: auto; margin: 0; }
+html.oneBar #hpSub > span:not(.outTag) { display: none; }
+/* Whole map and Full screen as icons with the map's tools */
+html.oneBar #hp #fit, html.oneBar #hp #full { height: 30px; padding: 0 12px; }
+html.oneBar #hp #fit .ico, html.oneBar #hp #full .ico { width: 17px; height: 17px; }
+html.oneBar #hpTop #langBox { height: 30px; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* on the Map its tools float over the top of the map, between the Raid list and the panel on the right, each a
+   button of its own as the live map's are, not in a bar: the row above stays one slim row */
+html.oneBar body.hpMap #hpMapBar { position: fixed; z-index: 2; top: calc(var(--hp-under, 60px) + 8px); left: max(8px, var(--menu-l, 0px)); right: max(8px, var(--menu-r, 0px));
+  margin: 0; padding: 0; justify-content: center; pointer-events: none; }
+html.oneBar body.hpMap #hpMapBar > * { pointer-events: auto; background: var(--panel); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); }
+html.oneBar body.hpMap #hpMapBar > #hpFloorHome:empty { display: none; }
+html.oneBar body.hpMap #hpMapBar #floorBadge.named { background: var(--panel); }
+/* (the minimap under them) */
+html.oneBar #miniMap { top: calc(var(--hp-under, 60px) + 52px); }
+
+html.oneBar #hp a.btn.close { padding: 0 10px; }
+@media (max-width: 700px) {
+  html.oneBar #hpTop { padding-top: 6px; }
+  html.oneBar #hpTitleBox { order: 5; flex: 1 1 0; width: auto; height: 36px; padding-left: 0; border: 0; }
+  html.oneBar #hpBack { order: 4; }
+  html.oneBar #hpExport, html.oneBar #hpDelete { order: 6; }
+  html.oneBar #hpTop #langBox { margin-left: auto; }
+  html.oneBar body.hpMap #hpMapBar { position: static; justify-content: flex-start; pointer-events: auto; padding-bottom: 8px; }
+  html.oneBar body.hpMap #hpMapBar > * { box-shadow: none; }
+}
+html.oneBar #hpHead.noRaid #hpBack, html.oneBar #hpHead.noRaid #hpTitleBox, html.oneBar #hpHead.noRaid #hpTabs, html.oneBar #hpHead.noRaid #hpExport,
+html.oneBar #hpHead.noRaid #hpDelete, html.oneBar #hpHead.noRaid #hpMapBar { display: none !important; }
+/* the history map's corner readout (scale, where the pointer and the player are, the credit) sits under the Raid list
+   and the timeline there: left out (the credits are on the raids page and under every Overview) */
+html.hist body.hpMap #readout, html.hist body.hpMap #hint { display: none !important; }
+/* The live map's bar, as the raid history's row (on a wider screen): one slim solid row the width of the screen, not
+   a line of buttons over the map. Satellite's logo and Live map | Raid history first, then whose game and the map, the
+   search, the Raid list and Follow, Whole map, Buildings and Full screen, the language
+   and the menu. What sits under it on the left and right starts under it. */
+@media (min-width: 701px) and (min-height: 521px) {
+  html:not(.hist) #bar { min-height: 48px; padding: 0 10px 0 8px; gap: 8px; flex-wrap: nowrap; pointer-events: auto; border: 1px solid var(--line); border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(123, 156, 255, 0.06), transparent), #101016; box-shadow: var(--shadow); }
+  html:not(.hist) #bar > * { box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html:not(.hist) #bar > button, html:not(.hist) #bar > select, html:not(.hist) #bar > #status, html:not(.hist) #bar > #findBox, html:not(.hist) #bar > #langBox {
+    height: 32px; border-color: rgba(200, 205, 255, 0.2); background: rgba(255, 255, 255, 0.035); }
+  html:not(.hist) #bar > button:hover { background: var(--hover); border-color: var(--line-strong); }
+  html:not(.hist) #bar > #brand { height: 34px; padding: 0 4px; border: 0; background: transparent; gap: 6px; }
+  html:not(.hist) #brand .ver { font-size: 10px; }
+  html:not(.hist) #modeNav { margin-right: 4px; padding: 2px; background: transparent; }
+  html:not(.hist) #modeNav a { height: 26px; padding: 0 11px; font-size: 12.5px; }
+  html:not(.hist) #panel, html:not(.hist) #side { top: max(66px, calc(env(safe-area-inset-top) + 66px)); }
+  html:not(.hist) #side { max-height: calc(100% - max(66px, calc(env(safe-area-inset-top) + 66px)) - max(8px, env(safe-area-inset-bottom))); }
+}
+/* (on a phone too: the live map's bar is one solid row, as the raid history's) */
+@media (max-width: 700px), (max-height: 520px) {
+  html:not(.hist) #bar { padding: 5px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(180deg, rgba(123, 156, 255, 0.06), transparent), #101016;
+    box-shadow: var(--shadow); pointer-events: auto; }
+  html:not(.hist) #bar > * { box-shadow: none; }
+  html:not(.hist) #bar > #brand { border: 0; background: transparent; }
+}
+/* the Raid list with nobody in it: "Not in a raid." in the middle of its box, and no empty row of counts over it */
+.rosterNone { margin: 14px 0; text-align: center; color: var(--dim); }
+#rosterTools:has(> #rosterSum:only-child:empty) { display: none; }
+/* Satellite's name beside its logo, in the bar's row (smaller than it was over the map) */
+html.oneBar #hp #brand .word, html:not(.hist) #bar > #brand .word { font-size: 13.5px; letter-spacing: 0.12em; }
+/* The live map's bar in two groups: Satellite, the switch, whose game, the map and the search on the left; the map's
+   own buttons, the language and the menu on the right. Its boxes keep one size whatever they say, so nothing in the
+   bar moves as the page loads or the game connects (a long name is cut short, all of it when pointed at). */
+#barGrow { display: none; }
+@media (min-width: 701px) and (min-height: 521px) {
+  html:not(.hist) #barGrow { display: block; flex: 1 1 0; min-width: 0; }
+  html:not(.hist) #options { margin-left: 0; }
+  html:not(.hist) #bar > #status { flex: none; width: 210px; }
+  html:not(.hist) #statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  html:not(.hist) #bar > #map, html:not(.hist) #bar > #mapBtn { flex: none; width: 220px; max-width: none; }
+  html:not(.hist) #bar > #mapBtn #mapBtnText { flex: 1; min-width: 0; }
+  html:not(.hist) #bar > #findBox { flex: 0 1 260px; width: 260px; min-width: 140px; }
+}
+/* (the map picker's place kept while the maps are still being asked for, so nothing beside it moves when it comes) */
+@media (min-width: 701px) and (min-height: 521px) {
+  /* the map picker and Buildings are always in the bar, from the moment the page opens, whatever's known yet: the map
+     picker with the last map's name until the maps have come, Buildings faint on a map that has none to open */
+  html:not(.hist) #bar > #mapBtn[hidden] { display: inline-flex !important; }
+  html:not(.hist) #bar > #reveal[hidden] { display: inline-flex !important; opacity: 0.4; pointer-events: none; }
+}
+/* Records: whose, as tabs over them (All players first), each with how many raids */
+.recTabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; }
+#hp .recTabs button { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.03);
+  color: var(--text); font-size: 13px; font-weight: 600; }
+#hp .recTabs button small { padding: 1px 7px; border-radius: 999px; background: rgba(200, 205, 255, 0.1); color: var(--dim); font-size: 11px; font-weight: 600; }
+#hp .recTabs button:hover { border-color: var(--line-strong); background: var(--hover); }
+#hp .recTabs button.on { border-color: var(--accent); background: var(--accent); color: var(--ink); }
+#hp .recTabs button.on small { background: rgba(0, 0, 0, 0.18); color: var(--ink); }
+/* All: the players, as a little leaderboard */
+table.board.recBoard { margin: 4px 0 12px; }
+table.board.recBoard td { white-space: nowrap; }
+.recRank { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 8px; border-radius: 50%; background: rgba(200, 205, 255, 0.1); color: var(--bright); font-size: 11px; }
+table.board.recBoard tbody tr:first-child .recRank { background: #f5c451; color: #1b1408; }
+/* a raid kept for a record */
+small.recHeld { color: #f5c451 !important; }
+/* What's kept */
+.keepForm { flex-wrap: wrap; align-items: center; gap: 12px; }
+.keepField { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.keepField input { width: 90px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-small); background: transparent; color: var(--bright); font: inherit; }
+.keepField small { color: var(--dim); }
+#hp .recPer { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-small); }
+#hp .recPer button { height: 26px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: var(--dim); font-size: 12.5px; }
+#hp .recPer button.on { color: var(--ink); background: var(--accent); }
+table.board.recBoard tr.on td { background: var(--accent-soft); color: var(--bright); }
+/* (the floors' wrapper on the history map: no box of its own; the floors' group is the rounded one) */
+html.oneBar body.hpMap #hpMapBar > #hpFloorHome { background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.oneBar body.hpMap #hpMapBar #floorBadge { border-radius: var(--radius-small); background: var(--panel); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); overflow: hidden; }
+/* a tile is one line big and one line small, whatever it says (cut short, all of it when pointed at): every tile in
+   a row the same size */
+.statTiles div { min-width: 0; }
+.statTiles b, .statTiles span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.statTiles div.out b { font-size: 22px; line-height: inherit; }

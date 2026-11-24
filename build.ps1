@@ -146,6 +146,8 @@ function Label([string] $loc) {
 function AddonZip([string] $loc) {
     if ($loc -match '^factory4_(day|night)(~.+)$') { return "$name-Addon-$(Label ('factory' + $Matches[2]))" }
     if ($loc -match '^bigmap(~.+)$') { return "$name-Addon-$(Label ('customs' + $Matches[1]))" }
+    # (Tutorial-Backport's location: by what it is, not its id)
+    if ($loc -ceq 'Sandbox_start') { return "$name-Addon-Tutorial" }
     "$name-Addon-$(Label $loc)"
 }
 
@@ -204,15 +206,23 @@ public static class SatelliteTiles {
     }
 }
 '@
-function PackTiles([string] $mapsDir) {
+# the most pixels a metre a shrunk map keeps (see tools/webp_tiles.py): 12 looks the same as the 16 captured
+$shrinkPxPerMetre = 12
+function PackTiles([string] $mapsDir, [switch] $Shrink) {
     foreach ($map in Get-ChildItem -LiteralPath $mapsDir -Directory) {
         $versions = @(Get-ChildItem -LiteralPath $map.FullName -Directory)
         if ($versions.Count -ne 1) { throw "$($map.Name) has $($versions.Count) capture folders; it should have one." }
         [SatelliteTiles]::Pack($versions[0].FullName) | Out-Null
     }
     # then the tiles WebP, half the size of the JPEGs captured (tools/webp_tiles.py; a pack that's WebP already is
-    # only read). A release is never made with JPEG tiles: no Python or Pillow stops the build.
-    & $python (Join-Path $root 'tools\webp_tiles.py') $mapsDir
+    # only read). A release is never made with JPEG tiles: no Python or Pillow stops the build. With -Shrink (the
+    # game's own maps and the backports), this copy is also made smaller first: sharp enough, and each floor's tiles
+    # blank outside the buildings, which the page never shows. The scans in the SPT folder stay as they are.
+    if ($Shrink) {
+        & $python (Join-Path $root 'tools\webp_tiles.py') $mapsDir --most-px-per-metre $shrinkPxPerMetre
+    } else {
+        & $python (Join-Path $root 'tools\webp_tiles.py') $mapsDir
+    }
     if ($LASTEXITCODE -ne 0) { throw "Couldn't make the tiles in $mapsDir WebP." }
 }
 
@@ -255,7 +265,7 @@ if (-not $NoMaps -and -not $addonsOnly) {
     $mapsTo = Join-Path $mod 'maps'
     New-Item -ItemType Directory -Force $mapsTo | Out-Null
     foreach ($game in $gameMaps) { Copy-Item -LiteralPath (Join-Path $mapsFrom $game) -Destination $mapsTo -Recurse }
-    PackTiles $mapsTo
+    PackTiles $mapsTo -Shrink
     Pack $stage (Join-Path $dist "$name-$version.zip")
 }
 
@@ -273,7 +283,9 @@ foreach ($group in $groups) {
     $addonMaps = Join-Path $addonStage "SPT_Runtime\user\mods\$name\maps"
     New-Item -ItemType Directory -Force $addonMaps | Out-Null
     foreach ($map in $group.Group) { Copy-Item -LiteralPath $map.FullName -Destination $addonMaps -Recurse }
-    PackTiles $addonMaps
+    # the backports are shrunk like the game's own maps; the other add-ons (classic, events, a mod's own map) aren't
+    $backport = @($group.Group | Where-Object { $_.Name -like '*~backport' }).Count -eq $group.Group.Count
+    PackTiles $addonMaps -Shrink:$backport
     Pack $addonStage (Join-Path $dist "$($group.Name)-$addonVersion.zip")
 }
 

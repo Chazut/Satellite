@@ -11,7 +11,7 @@
     <AssemblyName>Satellite.Client</AssemblyName>
     <RootNamespace>Satellite.Client</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <Version>1.0.3</Version>
+    <Version>1.1.0</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <DebugType>none</DebugType>

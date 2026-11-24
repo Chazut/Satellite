@@ -339,6 +339,17 @@ namespace Satellite.Client
                 var status = Convert.ToString(__0);
                 var exit = __3 ?? "";
                 var at = __instance.Position;
+                // "inv": what they have on them now, [template, how many] (the server prices it: what they got out with)
+                var had = new List<KeyValuePair<string, int>>();
+                try
+                {
+                    Had(__instance.Inventory != null ? __instance.Inventory.Equipment : null, had, 0);
+                }
+                catch (Exception)
+                {
+                    had.Clear();
+                }
+
                 Events.Add("end", __instance.ProfileId, null, Time.realtimeSinceStartup, to =>
                 {
                     to.Append("{\"st\":");
@@ -346,12 +357,74 @@ namespace Satellite.Client
                     to.Append(",\"ex\":");
                     World.Text(to, exit);
                     World.Spot(to, "at", at);
+                    if (had.Count > 0)
+                    {
+                        to.Append(",\"inv\":[");
+                        for (var i = 0; i < had.Count; i++)
+                        {
+                            to.Append(i > 0 ? ",[" : "[");
+                            World.Text(to, had[i].Key);
+                            to.Append(',').Append(had[i].Value).Append(']');
+                        }
+
+                        to.Append(']');
+                    }
+
                     to.Append('}');
                 });
             }
             catch (Exception)
             {
                 // not told
+            }
+        }
+
+        // everything somebody has on them: what's worn in each slot (not the pockets themselves) and what's in it, the
+        // secure container's too, a few bags deep
+        private static void Had(EFT.InventoryLogic.CompoundItem holder, List<KeyValuePair<string, int>> into, int depth)
+        {
+            if (holder == null || depth > 4 || into.Count > 400)
+            {
+                return;
+            }
+
+            if (holder.Slots != null)
+            {
+                foreach (var slot in holder.Slots)
+                {
+                    var worn = slot != null ? slot.ContainedItem : null;
+                    if (worn == null)
+                    {
+                        continue;
+                    }
+
+                    if (depth > 0 || (slot.ID != "Pockets" && slot.ID != "SecuredContainer"))
+                    {
+                        into.Add(new KeyValuePair<string, int>(worn.TemplateId.ToString(), Math.Max(1, worn.StackObjectsCount)));
+                    }
+
+                    if (depth == 0 && worn is EFT.InventoryLogic.CompoundItem bag)
+                    {
+                        Had(bag, into, depth + 1);
+                    }
+                }
+            }
+
+            if (holder.Grids == null)
+            {
+                return;
+            }
+
+            foreach (var grid in holder.Grids)
+            {
+                foreach (var item in grid.Items)
+                {
+                    into.Add(new KeyValuePair<string, int>(item.TemplateId.ToString(), Math.Max(1, item.StackObjectsCount)));
+                    if (item is EFT.InventoryLogic.CompoundItem inner && inner.Grids != null && inner.Grids.Length > 0)
+                    {
+                        Had(inner, into, depth + 1);
+                    }
+                }
             }
         }
 

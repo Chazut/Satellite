@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.1.0
+
+- Raid history: the server records every raid, whether the page is open or not, and keeps it. **Live map | Raid history** at the top of the page leads to it, at `/satellite/raids/`, laid out as Raid Review's. Raid Review (by ekky and Chazut) is merged into Satellite: everything it showed of a raid is here.
+  - **Recent raids**: every raid as a table (player, type, map, how it went, time in raid, when, kills), with Refresh and Import raid. Records at the top (raids, time in raid, survived, kills, what was looted, the most played map, best loot, most kills and more), for all players together or one at a time: each game with Satellite records its own raids.
+  - **A raid**: Overview (the raid at a glance, every kill in order, teams and a leaderboard), Stats (charts over the raid, your health among them), Timeline (every kill, pick-up, drop, grenade, extraction and switch, filtered by sort), Behaviour (what every bot was doing, a bar each) and Map. Every view has its own address, so it can be bookmarked or opened in another tab. Export raid and Delete raid in its head.
+  - **The map of a raid**: a replay with a timeline (the kills along it as pins, the fights as red bands), play at ½× to 16×, a heat map, trails, a minimap, and beside it, as of the moment shown: raid events, loot, switches, ghost hearing, bot objectives, fields, ORBIT's objectives, QuestingBots' quests, airdrops and every bot's inventory. Pressing a kill plays its fight.
+  - **What's kept** (Manage recordings): the newest so many raids and/or so many MB, for everyone or each player's own. A raid that holds a record is kept until another beats it; imported raids are never deleted to make room. `config.jsonc` has `history.record` and `history.keep`.
+  - Raids Raid Review recorded can be imported: from a Raid Review folder beside Satellite, or from a zip Raid Review exported. Raids can be exported as a zip and imported on another Satellite.
+  - Recorded: who was where, kills, shots, what each bot had decided (SAIN's or the game's), pick-ups, drops, grenades, bot levels and sides, downed players, Fika's other players, Phobos's field, and the loot of the time.
+- The game's own maps and the backport add-ons are about a quarter of the size to download (the main zip from about 410 MB to about 125 MB). The pictures are 12 pixels to a metre instead of 16, which looks the same, and each building floor's pictures keep only the buildings: the rest was never shown. The snow and late autumn maps and the other add-ons are as before.
+- The bar at the top is one slim row across the screen, not a line of separate buttons over the map: Satellite's logo, whose game and the map, the search, the Raid list and Follow, then Whole map, Buildings and Full screen as icons (named when pointed at), the language and the menu. The Raid list and the menu start under it. Its boxes keep their size while the page loads and the game connects.
+- The map's own pointer shows from the moment the page opens, not the computer's busy pointer while it loads: its pictures are part of the page.
+- A MapVariants version is named once: Customs (Classic), not Customs (Customs - Classic).
+- Opening the menu no longer moves the map: it stays in the middle of the screen.
+- You are in the Raid list too, first, with your health and level; pressing your row follows you again.
+- Tutorial-Backport's tutorial (SageSPT) is named Tutorial on the map once a map of it has been captured.
+- Settings > Screen > Cursor: pick the mouse pointer. Satellite (as before), Arrow, Sharp, Small, Cartoon, Gauntlet and Large, all from Kenney's Cursor Pack (CC0), or System for the computer's own.
+- Loot spawn points off the map's picture are left out: Factory's loot table has over a hundred of them, drawn as rings on nothing at the map's edge.
+- The REC sign is in the status at the top ("In raid · Customs ● REC"), not over the map.
+- Containers that only spawn in some raids (hidden caches, buried barrels) and quest places that trader and quest mods add (Lotus and others) are on the map now: once a page is open, the game sends where its raid's containers and quest places stand, once a raid, and the ones the map didn't have are added. Quest goals that send you to such a place get their marker.
+- A colour picked in Settings > Colours in Firefox on Windows is the one kept, not black.
+- An item a mod gave no name goes by its short name, else its template's own name, not its id.
+- A building with a few floors has a button for each by name (Ground floor, 2nd floor, 3rd floor..., and what's underground on that map: Tunnels on Factory, Bunker on Reserve and Woods, Parking on Interchange, Underground on Ground Zero, Basement elsewhere), with Auto first. Many floors keep the arrows. Floors are counted by the building's own storey height, so a building with tall storeys has no numbers missing (Interchange's mall: Ground floor, 2nd floor, 3rd floor), no two floors share a name, and three or more levels underground are numbered (Bunker, Bunker 2, Bunker 3). What's underground is told by the ground round each building as the map's capture measured it, so a building on low ground (Lighthouse's water treatment, by the sea) starts at its ground floor and a bunker under a hill (Woods) is a bunker. Labs, the Labyrinth and Terminal are named from the level they're played on; the Icebreaker has decks. Every building has a button for each floor by name, however many (the row scrolls past what fits), and one with a single floor shows its name.
+- While a floor of a building is shown, the rest of the map is darker, so the floor stands out. Settings > View > "Map round a floor" sets how dark, or not at all. Within the building, what's another floor (the ground floor round Factory's tunnels) is as dark, and the floor shown has a gold outline where it covers less than the building.
+- A floor a map's capture saw under the whole map (one of Factory's has one, 15 m under the tunnels) has no button: it isn't a floor anybody walks on.
+- In the Raid list, how much health somebody has left is a number by their name (in amber or red once hurt) and a clearer bar along the row. Pointed at, it says what each part of the body has left, and a player's energy and water.
+- Somebody followed or in a fight is marked by a short bar inside their row in the Raid list, not by its edge.
+- What somebody wears or carries counts towards what they're worth only if it can be looted, as the game has it: not a PMC's melee, an armband, a special slot's tool (the multitool and the like) or the pockets themselves. It's still listed, marked "can't be looted".
+- Pressing somebody in the Raid list follows them on the map; what they wear and carry is set out from the worth beside their name.
+- Somebody killed by a gas explosion is marked with an orange burst and "Gas explosion".
+- Magazines a bot drops in a quick reload lie on the map until picked up, with a ring while a bot goes back for one (COMET).
+- One of PBT's cheaters says what PBT made of it (its personality and its cheats) when pointed at, and in the Raid list.
+- COMET squad moves that were declined, cut short or had no role assigned say so.
+- Loose loot a quest wants found in raid is a hexagon with a tick (as the game marks found-in-raid items), not an F. In a container's list it has a FIR tag beside its name, and its worth stays in line with the others.
+
 ## 1.0.3
 
 - In a Fika raid, the quest items and places of the friends in it show too, each saying whose quest it is, and their quests are in the Quests list. The "Friends' quests" switch turns it off.

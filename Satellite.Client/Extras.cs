@@ -534,6 +534,58 @@ namespace Satellite.Client
                 return false;
             }
         }
+
+        // the body's parts in the order the page names them: head, chest, stomach, left arm, right arm, left leg, right leg
+        internal static readonly EBodyPart[] Parts =
+        {
+            EBodyPart.Head, EBodyPart.Chest, EBodyPart.Stomach, EBodyPart.LeftArm, EBodyPart.RightArm, EBodyPart.LeftLeg, EBodyPart.RightLeg
+        };
+
+        // what each part of the body has left, into `into` (as long as Parts); false when it can't be told
+        internal static bool PartsOf(Player player, int[] into)
+        {
+            try
+            {
+                var health = player != null ? player.HealthController : null;
+                if (health == null)
+                {
+                    return false;
+                }
+
+                for (var i = 0; i < Parts.Length; i++)
+                {
+                    into[i] = Mathf.RoundToInt(health.GetBodyPartHealth(Parts[i], true).Current);
+                }
+
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // a person's energy and water, as the game shows them
+        internal static bool UpkeepOf(Player player, out int energy, out int water)
+        {
+            energy = water = 0;
+            try
+            {
+                var health = player != null ? player.HealthController : null;
+                if (health == null)
+                {
+                    return false;
+                }
+
+                energy = Mathf.RoundToInt(health.Energy.Current);
+                water = Mathf.RoundToInt(health.Hydration.Current);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
     }
 
     // ORBIT's ghosts (bots it has parked far from every player and moves along as numbers): the fights it works out
@@ -891,7 +943,83 @@ namespace Satellite.Client
         }
 
         private static bool _looked;
-        private static FieldInfo _accounts;
+        private static FieldInfo _accounts, _rolled, _forced;
+        private static PropertyInfo _personality, _cheats, _forcedValue;
+        private static Type _cheatType;
+
+        private static void Look()
+        {
+            if (_looked)
+            {
+                return;
+            }
+
+            _looked = true;
+            try
+            {
+                const BindingFlags all = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+                var roster = Types.Find("PBT.Client.Cheaters.CheaterRoster");
+                _accounts = roster?.GetField("accounts", all);
+                // what it rolled for each: its personality and its cheats (read, never asked for: asking can roll one)
+                _rolled = roster?.GetField("rolled", all);
+                _forced = roster?.GetField("forced", all);
+                var args = _rolled?.FieldType.GetGenericArguments();
+                var entry = args != null && args.Length == 2 ? args[1] : null;
+                _personality = entry?.GetProperty("Type");
+                _cheats = entry?.GetProperty("Cheats");
+                _cheatType = _cheats?.PropertyType;
+                _forcedValue = _forced?.FieldType.GetProperty("Value");
+            }
+            catch (Exception)
+            {
+                _accounts = null;
+            }
+        }
+
+        // "personality|cheat,cheat" for one of PBT's cheaters, as PBT rolled it; null while it hasn't yet (asked
+        // again later), "" when it can't be told (an older PBT)
+        internal static string Detail(Player player)
+        {
+            Look();
+            try
+            {
+                if (_rolled == null || _personality == null || _cheats == null || _cheatType == null || !_cheatType.IsEnum
+                    || player?.Profile == null || !int.TryParse(player.Profile.AccountId, out var account))
+                {
+                    return "";
+                }
+
+                var entries = _rolled.GetValue(null) as System.Collections.IDictionary;
+                var entry = entries != null && entries.Contains(account) ? entries[account] : null;
+                if (entry == null)
+                {
+                    return null;
+                }
+
+                var bits = Convert.ToUInt64(_cheats.GetValue(entry, null));
+                var config = _forced?.GetValue(null);
+                if (config != null && _forcedValue != null)
+                {
+                    bits |= Convert.ToUInt64(_forcedValue.GetValue(config, null));
+                }
+
+                var names = new System.Collections.Generic.List<string>();
+                foreach (var value in Enum.GetValues(_cheatType))
+                {
+                    var bit = Convert.ToUInt64(value);
+                    if (bit != 0 && (bit & (bit - 1)) == 0 && (bits & bit) != 0)
+                    {
+                        names.Add(Enum.GetName(_cheatType, value));
+                    }
+                }
+
+                return (_personality.GetValue(entry, null)?.ToString() ?? "") + "|" + string.Join(",", names);
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
 
         internal static bool Is(Player player, string layer)
         {
@@ -900,19 +1028,7 @@ namespace Satellite.Client
                 return true;
             }
 
-            if (!_looked)
-            {
-                _looked = true;
-                try
-                {
-                    _accounts = Types.Find("PBT.Client.Cheaters.CheaterRoster")
-                        ?.GetField("accounts", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                }
-                catch (Exception)
-                {
-                    _accounts = null;
-                }
-            }
+            Look();
 
             try
             {

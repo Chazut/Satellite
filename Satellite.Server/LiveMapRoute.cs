@@ -83,6 +83,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         public int ThingsSent;
         // that, as a page is answered (names added, packed): made once for each change, not for each page that asks
         public volatile ThingsAnswer? ThingsMade;
+        // the raid's containers and quest places that its map's places.json doesn't have (POST api/more), as JSON text:
+        // {"loc","boxes":[..],"zones":[..]}; null: none
+        public volatile string? More;
         // what has happened in the raid it's in (see Events in the game's plugin): the latest, for a page opened later
         public readonly Lock EventsLock = new();
         public readonly List<(long Number, string Json)> Events = [];
@@ -204,6 +207,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 case "api/things":
                     await SendJson(context, ThingsFor(query["session"].ToString()), cancellationToken);
                     return;
+                case "api/more" when post:
+                    await SaveMore(sessionId, context, cancellationToken);
+                    return;
                 case "api/quests":
                     await SendJson(context, QuestsFor(query["session"].ToString()), cancellationToken);
                     return;
@@ -255,6 +261,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 case "api/history/deleteAll" when post:
                     await SendJson(context, DeleteAllRecordings(), cancellationToken);
                     return;
+                case "api/history/keep" when post:
+                    await SendJson(context, SaveKeep(context), cancellationToken);
+                    return;
                 case "api/history/tidy" when post:
                     await SendJson(context, TidyRecordings(), cancellationToken);
                     return;
@@ -273,6 +282,22 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                     await SendWebFile(context, "index.html", cancellationToken);
                     return;
             }
+
+#if RECORDING
+            // the raid history page: the page itself at any address under raids/ (it reads the rest of the address:
+            // raids/<id>/<tab>), so each of its views can be gone to straight away
+            if (path.Equals("raids", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect(Root + "/raids/" + context.Request.QueryString);
+                return;
+            }
+
+            if (path.StartsWith("raids/", StringComparison.OrdinalIgnoreCase))
+            {
+                await SendWebFile(context, "index.html", cancellationToken);
+                return;
+            }
+#endif
 
             if (path.StartsWith("map/", StringComparison.OrdinalIgnoreCase))
             {

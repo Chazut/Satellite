@@ -259,15 +259,7 @@ public partial class LiveMapRoute
                 return sent.Sent;
             }
 
-            if (!_places.TryGetValue(location, out text))
-            {
-                var file = Path.Combine(MapsFolder, location, "places.json");
-                text = File.Exists(file) ? File.ReadAllText(file) : null;
-                if (text != null)
-                {
-                    _places[location] = text;
-                }
-            }
+            text = PlacesText(location);
         }
 
         if (text == null || JsonNode.Parse(text) is not JsonObject places)
@@ -327,6 +319,22 @@ public partial class LiveMapRoute
         return answer;
     }
 
+    // a location's places.json, as it's kept; null: none (under _mapsLock)
+    private string? PlacesText(string location)
+    {
+        if (!_places.TryGetValue(location, out var text))
+        {
+            var file = Path.Combine(MapsFolder, location, "places.json");
+            text = File.Exists(file) ? File.ReadAllText(file) : null;
+            if (text != null)
+            {
+                _places[location] = text;
+            }
+        }
+
+        return text;
+    }
+
     // a location's places as a page is answered, and the places.json text it was made of
     private readonly Dictionary<string, (string From, Answer Sent)> _placesSent = new(StringComparer.Ordinal);
 
@@ -349,6 +357,77 @@ public partial class LiveMapRoute
         {
             context.Response.StatusCode = 400;
             return;
+        }
+
+        await SendJson(context, "{\"saved\":true}", cancellationToken);
+    }
+
+    // POST api/more: where the raid's containers and quest places stand, once a raid. Only the ones the location's
+    // places.json doesn't have are kept (a cache that spawns by chance, a quest place a mod adds), for the game's
+    // pages to add to the map.
+    private async Task SaveMore(MongoId sessionId, HttpContext context, CancellationToken cancellationToken)
+    {
+        var id = GameSession(sessionId);
+        if (id == null)
+        {
+            context.Response.StatusCode = 403;
+            return;
+        }
+
+        var sent = JsonNode.Parse(await ReadBody(context, cancellationToken)) as JsonObject;
+        var location = sent?["loc"] is JsonValue loc && loc.TryGetValue<string>(out var name) ? name : "";
+        if (sent == null || !LocationName().IsMatch(location))
+        {
+            context.Response.StatusCode = 400;
+            return;
+        }
+
+        // the ids places.json has already
+        var known = new HashSet<string>(StringComparer.Ordinal);
+        string? text;
+        lock (_mapsLock)
+        {
+            text = PlacesText(WithoutSnow(location));
+        }
+
+        try
+        {
+            if (text != null && JsonNode.Parse(text) is JsonObject places)
+            {
+                foreach (var list in new[] { "boxes", "zones" })
+                {
+                    foreach (var thing in places[list] as JsonArray ?? [])
+                    {
+                        if (thing?["id"] is JsonValue v && v.TryGetValue<string>(out var thingId))
+                        {
+                            known.Add(thingId);
+                        }
+                    }
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // all of them are new, then
+        }
+
+        JsonArray New(string list) =>
+            new(Plain(sent[list], 5000).Where(t => t?["id"] is JsonValue v && v.TryGetValue<string>(out var thing) && !known.Contains(thing))
+                .Select(t => t!.DeepClone()).ToArray());
+
+        var boxes = New("boxes");
+        var zones = New("zones");
+        var session = _sessions.GetOrAdd(id, key => new Session(key));
+        session.More = boxes.Count + zones.Count > 0
+            ? new JsonObject { ["loc"] = location, ["boxes"] = boxes, ["zones"] = zones }.ToJsonString()
+            : null;
+
+        // the pages ask for the loot again, which brings them
+        session.ThingsMade = null;
+        if (session.Things != null)
+        {
+            var count = Interlocked.Increment(ref session.ThingsSent);
+            Publish(session, "{\"t\":\"things\",\"v\":" + count + ",\"loc\":" + JsonSerializer.Serialize(location) + "}");
         }
 
         await SendJson(context, "{\"saved\":true}", cancellationToken);
@@ -435,6 +514,22 @@ public partial class LiveMapRoute
                     named.Add(tpl);
                 }
             }
+        }
+
+        // the raid's containers and quest places places.json doesn't have, when they're of this raid's location
+        if (session.More is { } moreText && JsonNode.Parse(moreText) is JsonObject more
+            && more["loc"]?.GetValue<string>() == things["loc"]?.GetValue<string>())
+        {
+            more.Remove("loc");
+            foreach (var box in more["boxes"] as JsonArray ?? [])
+            {
+                if (box?["tpl"] is JsonValue v && v.TryGetValue<string>(out var tpl))
+                {
+                    named.Add(tpl);
+                }
+            }
+
+            things["more"] = more;
         }
 
         things["sid"] = session.Id;
@@ -599,10 +694,17 @@ public partial class LiveMapRoute
     private JsonObject NameOf(string id)
     {
         var locale = Locale();
+        var name = locale.GetValueOrDefault(id + " Name");
+        var shortName = locale.GetValueOrDefault(id + " ShortName");
+        // an item a mod gave no name goes by its short name, else its template's own name, before its id
+        var internalName = MongoId.IsValidMongoId(id) && templates.Items.TryGetValue(new MongoId(id), out var template) ? template.Name : null;
         var entry = new JsonObject
         {
-            ["n"] = locale.GetValueOrDefault(id + " Name") ?? id,
-            ["s"] = locale.GetValueOrDefault(id + " ShortName") ?? ""
+            ["n"] = !string.IsNullOrWhiteSpace(name) ? name
+                : !string.IsNullOrWhiteSpace(shortName) ? shortName
+                : !string.IsNullOrWhiteSpace(internalName) ? internalName
+                : id,
+            ["s"] = shortName ?? ""
         };
         if (!MongoId.IsValidMongoId(id))
         {
@@ -628,6 +730,14 @@ public partial class LiveMapRoute
             if (item.Properties?.QuestItem == true)
             {
                 entry["q"] = 1;
+            }
+
+            // "u": can't be taken off somebody wearing it in that slot, of those sides ("Scabbard|Bear,Usec": a PMC's
+            // melee), so what somebody carries is worth only what can be looted
+            if (item.Properties?.Unlootable == true && !string.IsNullOrEmpty(item.Properties.UnlootableFromSlot))
+            {
+                var sides = item.Properties.UnlootableFromSide?.Select(s => s.ToString()) ?? [];
+                entry["u"] = item.Properties.UnlootableFromSlot + "|" + string.Join(",", sides);
             }
 
             var sort = ContainerSorts.FirstOrDefault(s => s.Name.IsMatch(item.Name ?? "")).Sort;

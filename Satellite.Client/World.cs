@@ -14,6 +14,9 @@ namespace Satellite.Client
     // the ways out. Places are sent as [east, north, height] in metres, the game's own x, z and y.
     internal static class World
     {
+        // what each part of somebody's body has left, filled for each one sent (see "hb")
+        private static readonly int[] PartsNow = new int[Health.Parts.Length];
+
         private sealed class Dot
         {
             public int Id;
@@ -68,6 +71,8 @@ namespace Satellite.Client
             public string ObjectiveBy;
             // one of PBT's cheaters
             public bool Cheater;
+            // what PBT made of it: "personality|cheat,cheat" (null: not read yet, "": nothing to read)
+            public string CheatSaid;
             // an airdrop: its crate (what's in it is told by the crate's id), and whether it's still coming down
             public LootableContainer Crate;
             public bool Falling;
@@ -298,6 +303,10 @@ namespace Satellite.Client
                 }
 
                 dot.Cheater = dot.Cheater || Cheaters.Is(player, dot.Layer);
+                if (dot.Cheater && dot.CheatSaid == null)
+                {
+                    dot.CheatSaid = Cheaters.Detail(player);
+                }
                 // the bots it goes about with, when it isn't on its own
                 var band = bot != null ? bot.BotsGroup : null;
                 dot.Band = band != null && band.MembersCount > 1 ? band.Id : 0;
@@ -586,6 +595,8 @@ namespace Satellite.Client
                 var killer = dead.KillerId;
                 string killerName = null, killerKind = null, weapon = null, part = null;
                 var far = -1f;
+                // killed by a gas explosion (Lab's gas, a burst pipe): nobody did it, and it's said as such
+                var gas = false;
                 var where = dead.Position;
                 Vector3? from = null;
                 // killed by their own hand (their own grenade, a fall): said as such, not as no killer known
@@ -606,6 +617,9 @@ namespace Satellite.Client
                     weapon = item != null ? item.LocalizedShortName() : null;
                     part = LastPart != null ? Convert.ToString(LastPart.GetValue(dead)) : null;
                     var aggressor = LastHit != null ? LastHit.GetValue(dead) as IPlayer : null;
+                    var kind = kept == null ? null : kept.GetField("DamageType") != null ? kept.GetField("DamageType").GetValue(info)
+                        : kept.GetProperty("DamageType") != null ? kept.GetProperty("DamageType").GetValue(info, null) : null;
+                    gas = kind != null && kind.ToString() == "HotGases" && aggressor == null;
                     if (aggressor != null && aggressor.ProfileId == dead.ProfileId && string.IsNullOrEmpty(killer))
                     {
                         self = true;
@@ -646,6 +660,11 @@ namespace Satellite.Client
                     else if (self)
                     {
                         to.Append(",\"self\":1");
+                    }
+
+                    if (gas)
+                    {
+                        to.Append(",\"gas\":1");
                     }
 
                     if (!string.IsNullOrEmpty(weapon))
@@ -1498,6 +1517,29 @@ namespace Satellite.Client
             if (dot.Player != null && Health.Of(dot.Player, out var hurt, out var whole))
             {
                 to.Append(",\"hp\":[").Append(hurt).Append(',').Append(whole).Append(']');
+
+                // "hb": while hurt, what each part of the body has left (head, chest, stomach, arms, legs)
+                if (hurt < whole && Health.PartsOf(dot.Player, PartsNow))
+                {
+                    to.Append(",\"hb\":[");
+                    for (var i = 0; i < PartsNow.Length; i++)
+                    {
+                        if (i > 0)
+                        {
+                            to.Append(',');
+                        }
+
+                        to.Append(PartsNow[i]);
+                    }
+
+                    to.Append(']');
+                }
+            }
+
+            // "eh": somebody playing's energy and water
+            if (dot.Person && dot.Player != null && Health.UpkeepOf(dot.Player, out var energy, out var water))
+            {
+                to.Append(",\"eh\":[").Append(energy).Append(',').Append(water).Append(']');
             }
 
             // a bot. "df": how hard; "ps": SAIN's personality; "ly": the brain layer deciding for it; "gh": parked
@@ -1562,6 +1604,12 @@ namespace Satellite.Client
                 if (dot.Cheater)
                 {
                     to.Append(",\"ch\":1");
+                    // "chd": PBT's personality for it and the cheats it has, "personality|cheat,cheat"
+                    if (!string.IsNullOrEmpty(dot.CheatSaid))
+                    {
+                        to.Append(",\"chd\":");
+                        Text(to, dot.CheatSaid);
+                    }
                 }
 
                 // "og": where ORBIT has it heading

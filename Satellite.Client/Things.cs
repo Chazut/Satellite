@@ -18,6 +18,9 @@ namespace Satellite.Client
     internal static class Things
     {
         internal const string LootRoute = "/satellite/api/things";
+        private const string MoreRoute = "/satellite/api/more";
+        private const float MoreAgain = 30f;
+        private const int MoreTries = 3;
 
         // the scene is all there by then
         private const float Settle = 12f;
@@ -37,6 +40,13 @@ namespace Satellite.Client
         private static readonly Outbox Out = new Outbox();
         // the loot that's a mounted gun (asked of each piece of loot once, not every time)
         private static readonly Dictionary<int, bool> Mounted = new Dictionary<int, bool>();
+        // Where this raid's containers and quest places stand, sent once a raid (see LookAround): the map scanner's
+        // places.json has only what was there when it scanned, so a cache that spawns by chance, or a quest place a
+        // mod adds, isn't in it. Null once sent.
+        private static byte[] _more;
+        private static volatile bool _moreSending;
+        private static float _moreNext;
+        private static volatile int _moreTries;
         // what looking at the loot costs the game, for the plugin's line in the log
         internal static double Spent, Worst;
         internal static int Looks;
@@ -101,6 +111,9 @@ namespace Satellite.Client
                 Boxes.Clear();
                 Locked.Clear();
                 Mounted.Clear();
+                _more = null;
+                _moreNext = 0f;
+                _moreTries = 0;
             }
 
             // nothing is sent until the server has said which map (which version of the location) this is, so the
@@ -121,6 +134,11 @@ namespace Satellite.Client
             {
                 _looking = true;
                 plugin.StartCoroutine(LookAround(world));
+            }
+
+            if (_more != null && !_moreSending && Time.unscaledTime >= _moreNext)
+            {
+                SendMore(plugin);
             }
 
             if (_looked && watched && !_sending && Time.unscaledTime >= _nextLoot)
@@ -165,6 +183,101 @@ namespace Satellite.Client
 
             _looked = true;
             _looking = false;
+
+            yield return null;
+            if (Singleton<GameWorld>.Instance != world)
+            {
+                yield break;
+            }
+
+            _more = More(world);
+        }
+
+        // {"loc":..,"boxes":[{"id","tpl","p","key"?}],"zones":[{"id","p"}]}: every container this raid has and every
+        // place a quest can send you, as the map scanner writes them into places.json (the server keeps only the
+        // ones that aren't in it). Made once a raid, from the containers already found and one search for the places.
+        private static byte[] More(GameWorld world)
+        {
+            var to = new StringBuilder(32 * 1024);
+            to.Append("{\"loc\":");
+            World.Text(to, World.Location());
+            to.Append(",\"boxes\":[");
+            var count = 0;
+            foreach (var box in Boxes)
+            {
+                if (box == null || !box.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                Comma(to, count++);
+                to.Append("{\"id\":");
+                World.Text(to, box.Id);
+                to.Append(",\"tpl\":");
+                World.Text(to, box.Template ?? "");
+                to.Append(",\"p\":");
+                At(to, box.transform.position);
+                if (!string.IsNullOrEmpty(box.KeyId))
+                {
+                    to.Append(",\"key\":");
+                    World.Text(to, box.KeyId);
+                }
+
+                to.Append('}');
+            }
+
+            // the middle of each trigger's area, as the scanner takes it
+            to.Append("],\"zones\":[");
+            count = 0;
+            foreach (var trigger in UnityEngine.Object.FindObjectsOfType<TriggerWithId>())
+            {
+                if (trigger == null || string.IsNullOrEmpty(trigger.Id))
+                {
+                    continue;
+                }
+
+                var area = trigger.GetComponent<Collider>();
+                Comma(to, count++);
+                to.Append("{\"id\":");
+                World.Text(to, trigger.Id);
+                to.Append(",\"p\":");
+                At(to, area != null ? area.bounds.center : trigger.transform.position);
+                to.Append('}');
+            }
+
+            to.Append("]}");
+            return Encoding.UTF8.GetBytes(to.ToString());
+        }
+
+        // [east, north, height]
+        private static void At(StringBuilder to, Vector3 at)
+        {
+            to.Append('[');
+            World.Number(to, at.x);
+            to.Append(',');
+            World.Number(to, at.z);
+            to.Append(',');
+            World.Number(to, at.y);
+            to.Append(']');
+        }
+
+        // sent once; again in a while, a few times at most, only when the server couldn't be reached (an answer, even a
+        // refusal from a server without the route, ends it). A new world throws it away.
+        private static void SendMore(Plugin plugin)
+        {
+            var bytes = _more;
+            _moreSending = true;
+            _moreNext = Time.unscaledTime + MoreAgain;
+            _moreTries++;
+            plugin.Post(MoreRoute, bytes, (ok, answer) =>
+            {
+                if ((ok || answer != null || _moreTries >= MoreTries) && ReferenceEquals(_more, bytes))
+                {
+                    _more = null;
+                }
+
+                _moreSending = false;
+            });
         }
 
         // ---- what lies about in this raid -------------------------------------------------------------------------

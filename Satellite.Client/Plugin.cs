@@ -21,7 +21,7 @@ namespace Satellite.Client
     {
         public const string Guid = "com.fums.satellite";
         public const string Name = "Fums-Satellite";
-        public const string Version = "1.0.3";
+        public const string Version = "1.1.0";
 
         private const string PushRoute = "/satellite/api/push";
 

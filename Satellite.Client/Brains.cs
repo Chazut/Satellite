@@ -258,7 +258,8 @@ namespace Satellite.Client
                 at++;
             }
 
-            if (at + 3 >= json.Length || json[at] != '"' || json[at + 1] != 'S' || json[at + 2] != '0')
+            // the squad ones (S01..S06), and W04: a bot going back for a magazine it dropped in a quick reload
+            if (at + 4 >= json.Length || json[at] != '"' || !(json[at + 1] == 'S' && json[at + 2] == '0' || json[at + 1] == 'W' && json[at + 2] == '0' && json[at + 3] == '4'))
             {
                 return;
             }
@@ -290,6 +291,7 @@ namespace Satellite.Client
             }
 
             Squads.Clear();
+            MagStages.Clear();
         }
 
         // Reads what COMET has said since the last report. Called before the markers of a full report are written.
@@ -365,6 +367,12 @@ namespace Satellite.Client
 
             var profileId = Word(said, "profileId");
             var feature = Word(said, "feature");
+            if (feature == "W04")
+            {
+                Magazine(said, profileId);
+                return;
+            }
+
             var crossfire = Part(said, "crossfire");
             if (profileId.Length == 0 || feature.Length != 3 || crossfire == null || !Amount(said, "realtime", out var when))
             {
@@ -410,6 +418,67 @@ namespace Satellite.Client
                 var session = Word(said, "session");
                 Events.Add("comet.squad", profileId, Word(said, "name"), when, to => Write(to, squad, session));
             }
+        }
+
+        // A magazine a bot dropped in a quick reload, and its going back for it (COMET's W04 "RecoverMagazine"): said as
+        // an event ("comet.mag") each time it moves on a stage: {"st":"queued"|"started"|"arrived"|"pickup-wait"|
+        // "pickup-started"|"pickup-ready"|"completed"|"failed"|"interrupted"|"unavailable","id":the magazine's item id,
+        // "i":its name,"tpl":its template,"at":[east,north,height] where it lies}. A page keeps it on the ground until
+        // it's picked up (completed, unavailable).
+        private static readonly System.Collections.Generic.Dictionary<string, string> MagStages = new System.Collections.Generic.Dictionary<string, string>();
+
+        private static void Magazine(Newtonsoft.Json.Linq.JObject said, string profileId)
+        {
+            var mag = Part(said, "magazineRecovery");
+            var stage = Word(said, "stage");
+            var id = mag != null ? Word(mag, "magazine") : "";
+            if (Word(said, "decision") != "RecoverMagazine" || id.Length == 0 || stage.Length == 0 || !Amount(said, "realtime", out var when)
+                || (MagStages.TryGetValue(id, out var was) && was == stage) || UnityEngine.Time.realtimeSinceStartup - when > 10f)
+            {
+                return;
+            }
+
+            if (MagStages.Count > 512)
+            {
+                MagStages.Clear();
+            }
+
+            MagStages[id] = stage;
+            var name = Word(mag, "itemName");
+            var tpl = Word(mag, "template");
+            var hasAt = Amount(mag, "x", out var x) & Amount(mag, "y", out var y) & Amount(mag, "z", out var z);
+            Events.Add("comet.mag", profileId, Word(said, "name"), when, to =>
+            {
+                to.Append("{\"st\":");
+                World.Text(to, stage);
+                to.Append(",\"id\":");
+                World.Text(to, id);
+                if (name.Length > 0)
+                {
+                    to.Append(",\"i\":");
+                    World.Text(to, name);
+                }
+
+                if (tpl.Length > 0)
+                {
+                    to.Append(",\"tpl\":");
+                    World.Text(to, tpl);
+                }
+
+                if (hasAt)
+                {
+                    // the game's x, z and y: east, north, height
+                    to.Append(",\"at\":[");
+                    World.Number(to, x);
+                    to.Append(',');
+                    World.Number(to, z);
+                    to.Append(',');
+                    World.Number(to, y);
+                    to.Append(']');
+                }
+
+                to.Append('}');
+            });
         }
 
         // what the bot's squad has it doing now: null when COMET has said nothing lately, or that it's over
