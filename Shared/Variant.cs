@@ -111,6 +111,7 @@ namespace Satellite.Shared
         private static MethodInfo _displayName;
         private static PropertyInfo _current;
         private static PropertyInfo _currentLocation;
+        private static PropertyInfo _selected;
 
         // the map's key: as the server matched it, or else the guess
         internal static string Key()
@@ -150,7 +151,7 @@ namespace Satellite.Shared
 
         private static void Work(string id)
         {
-            var variant = Asked(id, out var managed, out var known);
+            var variant = Asked(id, out var managed, out var known, out var word);
             if (!known)
             {
                 // MapVariants hasn't picked yet; asked again on the next report
@@ -161,7 +162,7 @@ namespace Satellite.Shared
             if (managed && !string.IsNullOrEmpty(variant))
             {
                 _variantName = Named(id, variant);
-                var clean = Regex.Replace(variant.Trim().ToLowerInvariant(), "[^a-z0-9_-]", "");
+                var clean = Regex.Replace((word ?? variant).Trim().ToLowerInvariant(), "[^a-z0-9_-]", "");
                 if (clean.Length > 24)
                 {
                     clean = clean.Substring(0, 24);
@@ -178,11 +179,13 @@ namespace Satellite.Shared
                 + $"; scenes: {_scenes.Count} ({string.Join(", ", _scenes)}).");
         }
 
-        // the version MapVariants says is loaded, if it looks after this location
-        private static string Asked(string id, out bool managed, out bool known)
+        // the version MapVariants says is loaded, if it looks after this location. word: the version's own name for the
+        // map's key, when MapVariants (1.2 on) says whose it is; "backport" is every mod's backport, "manimal" is Manimal's
+        private static string Asked(string id, out bool managed, out bool known, out string word)
         {
             managed = false;
             known = true;
+            word = null;
             try
             {
                 Look();
@@ -201,6 +204,7 @@ namespace Satellite.Shared
                     return null;
                 }
 
+                word = Word(_selected?.GetValue(null, null) as string);
                 return variant;
             }
             catch (Exception e)
@@ -209,6 +213,19 @@ namespace Satellite.Shared
                 managed = false;
                 return null;
             }
+        }
+
+        // "owner:variant" from MapVariants' SelectedId: the plugin that registered the version, and that mod's own word
+        // for it ("com.manimal.interchange:manimal"); the game's own map is "spt:shipped"
+        private static string Word(string selected)
+        {
+            var colon = selected?.LastIndexOf(':') ?? -1;
+            if (colon <= 0 || colon == selected.Length - 1)
+            {
+                return null;
+            }
+
+            return selected == "spt:shipped" ? Original : selected.Substring(colon + 1);
         }
 
         private static string Named(string id, string variant)
@@ -254,6 +271,8 @@ namespace Satellite.Shared
                 _displayName = maps.GetMethod("DisplayName", flags, null, new[] { typeof(string), typeof(string) }, null);
                 _current = maps.GetProperty("CurrentVariant", flags);
                 _currentLocation = maps.GetProperty("CurrentLocationId", flags);
+                // 1.2 on; before that the key is CurrentVariant's word
+                _selected = maps.GetProperty("SelectedId", flags);
                 Log.LogInfo("MapVariants found: each version of a map it switches is kept apart.");
                 return;
             }
