@@ -951,6 +951,29 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             }
         }
 
+        // and every other profile on the server, not playing now ("off"): a page can be kept on one player's game
+        // while a friend plays, before that player has started theirs (not a Fika headless's own profile)
+        try
+        {
+            var live = new HashSet<string>(list.Select(g => (string?)g?["sid"] ?? ""));
+            foreach (var (profileId, profile) in saveServer.GetProfiles())
+            {
+                var id = profileId.ToString();
+                var name = profile?.CharacterData?.PmcData?.Info?.Nickname;
+                var user = profile?.ProfileInfo?.Username ?? "";
+                if (live.Contains(id) || string.IsNullOrEmpty(name) || user.StartsWith("headless_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                list.Add(new JsonObject { ["sid"] = id, ["name"] = name, ["raid"] = false, ["off"] = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Debug($"[Satellite] No profiles to list: {ex.Message}");
+        }
+
         return new JsonObject { ["games"] = list }.ToJsonString();
     }
 

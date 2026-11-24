@@ -233,7 +233,7 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: true, keyStates: false,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, keyStates: false,
     myQuests: true, otherLoot: 30, floorDim: 70, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -259,6 +259,9 @@
   delete prefs.areaPmc;
   // (once: ORBIT's squad plans and ghost fights used to start on; every page has them off now, until turned on)
   if (!prefs.botPlansOff) { prefs.orbitMain = false; prefs.orbitRush = false; prefs.orbitFights = false; prefs.botPlansOff = true; }
+  // (once: a PMC killed by a bot used to have a red ring to begin with; now only a player's kills have one, until
+  // Corpses > "PMCs killed by bots" is turned on)
+  if (!prefs.botKillsOff) { prefs.botKills = false; prefs.botKillsOff = true; }
   // the Loot tab's Explorer: where its items are from ('real': this raid, 'can': what can spawn), of which kind ('' any,
   // a kind of LOOT_KINDS, or 'quest'), of the wishlist ('' any, 'all' on it, or one of its groups '0'..'4'), in what
   // order, and whether the whole list is shown
@@ -641,15 +644,33 @@
     if (!map) return;
     const slack = 48;
     const v = view();
-    // (the map stays in the middle of the screen whether the menu is open or not: opening it doesn't move the map.
-    // On a phone the menu is a sheet: see cover)
-    const covered = 0;
-    const left = prefs.swap ? covered : 0, right = covered - left;
+    // (the map stays in the middle of the screen whether the menu is open or not: opening it doesn't move the map.)
+    // But it can be dragged on until its edge is clear of what's laid over it (the menu, the Raid list, the bar along
+    // the top, a phone's sheet), so no part of it is stuck underneath.
+    const { left, right, top, bottom } = overMap();
     const wide = (v.max.x - v.min.x) * zoom, tall = (v.max.y - v.min.y) * zoom;
-    if (wide + 2 * slack <= vw - covered) panX = -zoom * (v.min.x + v.max.x) / 2 + (left - right) / 2;
+    if (wide + 2 * slack <= vw - left - right) panX = -zoom * (v.min.x + v.max.x) / 2;
     else panX = Math.min(Math.max(panX, vw / 2 - slack - right - zoom * v.max.x), slack - vw / 2 + left - zoom * v.min.x);
-    if (tall + 2 * slack <= vh) panY = zoom * (v.min.y + v.max.y) / 2;
-    else panY = Math.min(Math.max(panY, vh / 2 - slack + zoom * v.min.y), slack - vh / 2 + zoom * v.max.y);
+    if (tall + 2 * slack <= vh - top - bottom) panY = zoom * (v.min.y + v.max.y) / 2;
+    else panY = Math.min(Math.max(panY, vh / 2 - slack - bottom + zoom * v.min.y), slack - vh / 2 + top + zoom * v.max.y);
+  }
+  // how far in from each side of the screen what's laid over the map reaches (pixels)
+  function overMap() {
+    const out = { left: 0, right: 0, top: 0, bottom: 0 };
+    for (const id of ['panel', 'side', 'bar']) {
+      const el = $(id);
+      if (!el || el.hidden) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      // across the screen (most of its width): along the top or the bottom (a phone's sheet); else down one side
+      if (r.width > vw * 0.6) {
+        if (r.top + r.height / 2 < vh / 2) out.top = Math.max(out.top, r.bottom);
+        else out.bottom = Math.max(out.bottom, vh - r.top);
+      } else if (r.left + r.width / 2 > vw / 2) out.right = Math.max(out.right, vw - r.left);
+      else out.left = Math.max(out.left, r.right);
+    }
+    out.bottom = Math.max(out.bottom, cover.b);
+    return out;
   }
   // the part of the map that's on the screen, in screen pixels
   function mapBox() {
@@ -1303,9 +1324,13 @@
     // on a map with things underground (a bunker, a car park), with the spawn points round it 3.5 m or more over all of
     // it; anywhere else it's a building on lower ground (by the sea, down a slope) and its lowest floor is its ground floor.
     if (!Number.isFinite(ground)) ground = measured || kind && Number.isFinite(near) && hs[hs.length - 1][1] <= near - 3.5 ? Infinity : hs[0][1];
+    // Where the capture found the floor one walks into from the ground outside ("gn", see tools/outlines.js), that's
+    // the ground floor, whatever the ground's height says: under it is underground, over it the storeys.
+    const entry = !below && bd && Number.isFinite(bd.gn) ? floorLevel(place, bd.gn) : NaN;
+    if (Number.isFinite(entry)) ground = entry;
     // (the ground not measured round it: a level under 3 m below the ground floor is part of it, not a basement, as
     // the space under the Labyrinth's floor plates)
-    if (h < ground - 1.8 && !measured && ground - h < 3) return T('{name} (lower)', { name: T('Ground floor') });
+    if (h < ground - 1.8 && !measured && !Number.isFinite(entry) && ground - h < 3) return T('{name} (lower)', { name: T('Ground floor') });
     if (h < ground - 1.8) {
       const under = T(kind || 'Basement');
       // nearest the ground first
@@ -5032,7 +5057,8 @@
   const gameName = g => (g.name || T('Game') + ' …' + g.sid.slice(-4)) + (g.hl ? ' (' + T('headless') + ')' : '');
   function listGames() {
     const pick = $('session');
-    const rows = games.map(g => ({ sid: g.sid, text: gameName(g) + (g.raid ? ' · ' + T('in raid') : '') }));
+    // (every profile on the server is listed, the ones not playing too, so the page can be kept on one)
+    const rows = games.map(g => ({ sid: g.sid, text: gameName(g) + (g.off ? ' · ' + T('not playing') : g.raid ? ' · ' + T('in raid') : '') }));
     if (prefs.player && !games.some(g => g.sid === prefs.player.sid)) {
       rows.push({ sid: prefs.player.sid, text: gameName(prefs.player) + ' · ' + T('not playing') });
     }
@@ -5077,9 +5103,10 @@
       if (mine && mine.name && mine.name !== prefs.player.name) { prefs.player.name = mine.name; save(); }
       // Nobody picked, and the game shown isn't in a raid (or has gone): another that is in one is shown instead.
       // (Told here, since only the game shown is listened to.)
-      if (!prefs.player && games.length) {
-        const shownGame = games.find(g => g.sid === sid);
-        const better = shownGame && shownGame.raid ? null : games.find(g => g.raid) || (shownGame ? null : games[0]);
+      const playing = games.filter(g => !g.off);
+      if (!prefs.player && playing.length) {
+        const shownGame = playing.find(g => g.sid === sid);
+        const better = shownGame && shownGame.raid ? null : playing.find(g => g.raid) || (shownGame ? null : playing[0]);
         if (better && better.sid !== sid) { forget(); sid = better.sid; listen(); }
       }
     } catch (e) { /* asked again in a moment */ }
@@ -8344,7 +8371,8 @@
       if (fresh) showMap(shownNow, true); else { map = shownNow; placeZones(); }
       $('map').value = map.loc;
     }
-    raidKey = '';
+    // (the raid's map as it may be now: only a raid's map that's new or captured again counts as the raid changing. A
+    // map written again, any of them, took the map back to the player and its starting zoom mid-raid.)
     if (report) raidChanged();
     if (!map) showMap(maps.find(m => m.loc === prefs.map) || maps[0], false);
   }

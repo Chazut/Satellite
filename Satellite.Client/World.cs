@@ -1088,7 +1088,7 @@ namespace Satellite.Client
                     var name = point.Settings != null ? point.Settings.Name : "";
                     Still.Add(new Dot
                     {
-                        Id = ++_nextId, Kind = "Extract", Exit = point, At = point.transform.position,
+                        Id = ++_nextId, Kind = "Extract", Exit = point, At = ExitPlace.Of(point),
                         Text = string.IsNullOrEmpty(name) ? "" : name.Localized(),
                         Secret = point is EFT.Interactive.SecretExfiltrations.SecretExfiltrationPoint
                     });
