@@ -563,10 +563,16 @@ public partial class LiveMapRoute
                 }
 
                 var copy = entry.DeepClone();
-                // Better Flea's price, once it's been asked for (FleaPrices), over SPT's
-                if (copy is JsonObject named && FleaPrice(id) is { } flea)
+                // handbook prices only (a game without the flea market, FleaPrices), else Better Flea's price, once
+                // it's been asked for, over SPT's
+                if (copy is JsonObject named && HandbookOnly())
                 {
-                    named["p"] = Math.Round(flea);
+                    _handbook ??= (templates.Handbook?.Items ?? []).GroupBy(i => i.Id.ToString()).ToDictionary(g => g.Key, g => g.First().Price ?? 0);
+                    named["p"] = Math.Round(_handbook.GetValueOrDefault(id));
+                }
+                else if (copy is JsonObject fleaNamed && FleaPrice(id) is { } flea)
+                {
+                    fleaNamed["p"] = Math.Round(flea);
                 }
 
                 all[id] = copy;

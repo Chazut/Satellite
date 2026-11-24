@@ -30,6 +30,43 @@ public partial class LiveMapRoute
     // goes up whenever new prices come in, so what was made with the old ones is made again
     private int _fleaVersion;
 
+    // Handbook prices only, for a game played without the flea market: every item is worth what the handbook says,
+    // whatever the flea (SPT's or Better Flea's) has. Set from the page (Loot > Filters > Prices), for every page on
+    // this server, and kept as the file "handbook-prices" in Satellite's folder, so a restart keeps it.
+    private string HandbookFile => Path.Combine(Folder, "handbook-prices");
+    private bool? _handbookOnly;
+    private bool HandbookOnly() => _handbookOnly ??= File.Exists(HandbookFile);
+
+    // GET api/prices: {"handbook"}; POST ?handbook=1 prices by the handbook from now on, ?handbook=0 by the flea again
+    private string Pricing(HttpContext context, bool post)
+    {
+        if (post)
+        {
+            var handbook = context.Request.Query["handbook"] == "1";
+            try
+            {
+                if (handbook)
+                {
+                    File.WriteAllText(HandbookFile, "");
+                }
+                else if (File.Exists(HandbookFile))
+                {
+                    File.Delete(HandbookFile);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                logger.Warning($"[Satellite] Couldn't keep the price setting (only until the server restarts): {ex.Message}");
+            }
+
+            _handbookOnly = handbook;
+            // what was priced the other way is made again
+            Interlocked.Increment(ref _fleaVersion);
+        }
+
+        return new JsonObject { ["handbook"] = HandbookOnly() }.ToJsonString();
+    }
+
     private static readonly HttpClient Flea = new(new HttpClientHandler
     {
         // this server's own certificate, which is SPT's self-signed one: only ever this server is asked

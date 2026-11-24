@@ -186,7 +186,10 @@ namespace Satellite.Client
         // are kept: S01 crossfire angles, S02 a second way in, S03 support and flank, S04 covering a teammate who is
         // busy, S05 answering a teammate's death, S06 the squad going in together. Each has a "crossfire" part: how
         // far along it is, whether COMET has the bot doing it yet ("applied") or only means to, the plan its squad
-        // shares, who it's against and where the bot is sent.
+        // shares, who it's against and where the bot is sent. A newer COMET has two more, said as its other decisions
+        // are (no "crossfire" part): S10 grenade suppression (one throws, the rest hold angles: "squadGrenade") and S11
+        // a siege (each watches a way out of the building the enemy is in: "siege"). An older COMET says neither, and
+        // all this is left alone without COMET.
 
         internal sealed class Squad
         {
@@ -206,6 +209,9 @@ namespace Satellite.Client
             public float Y;
             public float Z;
             public float At;
+            // S10, S11: how long it holds without being said again (they're said as they start and end, not every
+            // half second)
+            public float Hold;
         }
 
         private const int MostHeard = 256;
@@ -241,7 +247,7 @@ namespace Satellite.Client
         // is made (Sort). Its "feature" is among the first things in it.
         private static void Hear(string json)
         {
-            if (World.BrainsOff || json == null || json.Length > MostLength)
+            if (World.BrainsOff || json == null)
             {
                 return;
             }
@@ -258,8 +264,21 @@ namespace Satellite.Client
                 at++;
             }
 
-            // the squad ones (S01..S06), and W04: a bot going back for a magazine it dropped in a quick reload
-            if (at + 4 >= json.Length || json[at] != '"' || !(json[at + 1] == 'S' && json[at + 2] == '0' || json[at + 1] == 'W' && json[at + 2] == '0' && json[at + 3] == '4'))
+            // the squad ones (S01..S06, S10, S11), and W04: a bot going back for a magazine it dropped in a quick reload
+            if (at + 4 >= json.Length || json[at] != '"')
+            {
+                return;
+            }
+
+            if (json[at + 1] == 'S' && json[at + 2] == '1' && (json[at + 3] == '0' || json[at + 3] == '1') && json[at + 4] == '"')
+            {
+                json = Cut(json, json[at + 3] == '0' ? "squadGrenade" : "siege");
+                if (json == null)
+                {
+                    return;
+                }
+            }
+            else if (json.Length > MostLength || !(json[at + 1] == 'S' && json[at + 2] == '0' || json[at + 1] == 'W' && json[at + 2] == '0' && json[at + 3] == '4'))
             {
                 return;
             }
@@ -280,6 +299,114 @@ namespace Satellite.Client
                 _saidHeard = true;
                 Plugin.Log.LogInfo("COMET's first squad decision heard.");
             }
+        }
+
+        // An S10 or S11 decision cut down to what's read of it: its feature, stage, when, whose, what and the tactic's
+        // own part (a flat object), found by where COMET puts them (whose and what come after its config). Null when
+        // it isn't said that way.
+        private static string Cut(string json, string part)
+        {
+            var whose = json.IndexOf("\"profileId\":", StringComparison.Ordinal);
+            if (whose < 0)
+            {
+                return null;
+            }
+
+            var cut = new System.Text.StringBuilder(256).Append('{');
+            Keep(cut, json, "feature", 0);
+            Keep(cut, json, "stage", 0);
+            Keep(cut, json, "session", 0);
+            Keep(cut, json, "realtime", 0);
+            Keep(cut, json, "profileId", whose);
+            Keep(cut, json, "name", whose);
+            Keep(cut, json, "decision", whose);
+            var from = json.IndexOf("\"" + part + "\":{", whose, StringComparison.Ordinal);
+            var to = from < 0 ? -1 : json.IndexOf('}', from);
+            if (to > from && to - from < 2048)
+            {
+                cut.Append(json, from, to - from + 1).Append(',');
+            }
+
+            cut.Length--;
+            return cut.Append('}').ToString();
+        }
+
+        // "name":value (a string or a number), the first after from, onto what's kept
+        private static void Keep(System.Text.StringBuilder to, string json, string name, int from)
+        {
+            var at = json.IndexOf("\"" + name + "\":", from, StringComparison.Ordinal);
+            if (at < 0)
+            {
+                return;
+            }
+
+            var start = at + name.Length + 3;
+            var end = start;
+            if (end < json.Length && json[end] == '"')
+            {
+                for (end++; end < json.Length && json[end] != '"'; end++)
+                {
+                    if (json[end] == '\\')
+                    {
+                        end++;
+                    }
+                }
+
+                end++;
+            }
+            else
+            {
+                while (end < json.Length && json[end] != ',' && json[end] != '}')
+                {
+                    end++;
+                }
+            }
+
+            if (end <= json.Length && end - start < 512)
+            {
+                to.Append(json, at, end - at).Append(',');
+            }
+        }
+
+        // Grenade suppression (S10: "Grenade suppression - throw" or "- hold angle") and a siege (S11: "Siege - watch
+        // exit"), as a squad tactic like the rest: on from when it's picked ("selected") until it's let go
+        private static void Tactic(Newtonsoft.Json.Linq.JObject said, string profileId, string feature, float when)
+        {
+            var stage = Word(said, "stage");
+            var decision = Word(said, "decision");
+            var part = Part(said, feature == "S10" ? "squadGrenade" : "siege");
+            var over = stage == "released" || stage == "rejected";
+            if (!over && stage != "selected" && stage != "accepted" && stage != "started")
+            {
+                return;
+            }
+
+            var contact = part == null ? "" : feature == "S10" ? Word(part, "contact") : Word(part, "target");
+            var thrower = feature == "S10" && part != null ? Word(part, "thrower") : "";
+            var mate = "";
+            if (thrower.Length > 0 && thrower != profileId)
+            {
+                World.Names.TryGetValue(thrower, out mate);
+            }
+
+            var squad = new Squad
+            {
+                Feature = feature,
+                State = over ? "ended" : "active",
+                Applied = !over,
+                Ended = over,
+                At = when,
+                Hold = feature == "S10" ? 12f : 60f,
+                Contact = contact,
+                Mate = mate ?? "",
+                Role = decision.IndexOf("throw", StringComparison.OrdinalIgnoreCase) >= 0 ? "throw"
+                    : decision.IndexOf("hold", StringComparison.OrdinalIgnoreCase) >= 0 ? "hold"
+                    : decision.IndexOf("exit", StringComparison.OrdinalIgnoreCase) >= 0 ? "watch" : "",
+                Sub = part != null && feature == "S11" ? Word(part, "exit") : "",
+                // (the squad's members share it by who it's against)
+                Plan = contact.Length > 0 ? feature + ":" + contact : "",
+            };
+            Told(said, profileId, squad, when);
         }
 
         // a new raid: nothing said in the last one stands
@@ -373,6 +500,12 @@ namespace Satellite.Client
                 return;
             }
 
+            if ((feature == "S10" || feature == "S11") && profileId.Length > 0 && Amount(said, "realtime", out var told))
+            {
+                Tactic(said, profileId, feature, told);
+                return;
+            }
+
             var crossfire = Part(said, "crossfire");
             if (profileId.Length == 0 || feature.Length != 3 || crossfire == null || !Amount(said, "realtime", out var when))
             {
@@ -409,7 +542,12 @@ namespace Satellite.Client
                 squad.Z = z;
             }
 
-            squad.Key = feature + "|" + squad.State + "|" + squad.Applied + "|" + squad.Role + "|" + squad.Sub + "|" + squad.Plan + "|" + squad.Fire;
+            Told(said, profileId, squad, when);
+        }
+
+        private static void Told(Newtonsoft.Json.Linq.JObject said, string profileId, Squad squad, float when)
+        {
+            squad.Key = squad.Feature + "|" + squad.State + "|" + squad.Applied + "|" + squad.Role + "|" + squad.Sub + "|" + squad.Plan + "|" + squad.Fire;
             Squads.TryGetValue(profileId, out var before);
             Squads[profileId] = squad;
             // an event only when it changed, and not for what was said long ago while nobody was looking
@@ -489,8 +627,9 @@ namespace Satellite.Client
                 return null;
             }
 
-            // said again every half second while the bot is doing it, and once at each change otherwise
-            if (UnityEngine.Time.realtimeSinceStartup - squad.At < 2.5f)
+            // said again every half second while the bot is doing it, and once at each change otherwise (grenade
+            // suppression and a siege only as they start and end: held as long as they're likely to last)
+            if (UnityEngine.Time.realtimeSinceStartup - squad.At < (squad.Hold > 0f ? squad.Hold : 2.5f))
             {
                 return squad;
             }

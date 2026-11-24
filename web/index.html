@@ -27,20 +27,26 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
 </div>
 
 <div id="notice" hidden><span id="noticeText"></span><button id="noticeClose" type="button" title="Hide this message" aria-label="Hide this message">&#10005;</button></div>
-<div id="recBadge" data-rec hidden title="This raid is being recorded on the server, to watch again under History. config.jsonc's history.record turns recording off; Settings > Markers and names hides this sign."><i></i>REC</div>
 <div id="floorBadge" hidden><button id="floorDown" type="button" title="Floor down ( [ )" aria-label="Floor down">&#9660;</button><span id="floorText" title="Gold: a floor picked by hand. Press to go back to the floor it would show by itself"></span><button id="floorUp" type="button" title="Floor up ( ] )" aria-label="Floor up">&#9650;</button><span id="floorPick" role="group" aria-label="Floor"></span></div>
 <div id="debugLine" hidden></div>
 <!-- a replay's timeline, under the map (as Raid Review's): the kills along it, the time, then play, stop, how fast,
      and more switches behind the cog -->
 <div id="replayBar" data-rec class="ui" hidden>
   <div id="replayBot" hidden><b id="replayBotName"></b><div id="replayBotStrip" title="What this one was doing over the raid. Press to go to a moment."></div></div>
-  <div id="replayTrack"><div id="replayGrid"></div><div id="replayFights"></div><div id="replayFill"></div><div id="replayHead"></div><div id="replayHover" hidden></div><div id="replayTicks"></div><input type="range" id="replaySeek" min="0" max="1000" step="1" value="0" aria-label="Time in the raid"></div>
+  <div id="replayTrack"><div id="replayGrid"></div><div id="replayFights"></div><div id="replaySprees"></div><div id="replayFill"></div><div id="replayHead"></div><div id="replayHover" hidden></div><div id="replayTicks"></div><input type="range" id="replaySeek" min="0" max="1000" step="1" value="0" aria-label="Time in the raid"></div>
   <div id="replayTip" hidden></div>
   <div id="replayTimes"><span id="replayClock"></span><span id="replayDebug" hidden></span><span id="replayTotal"></span></div>
   <div id="replayButtons">
     <button id="replayPlay" type="button"></button>
     <button id="replayStop" type="button" title="Stop: back to the start" aria-label="Stop">&#9632;</button>
     <span id="replaySpeeds" role="group" aria-label="How fast it plays"></span>
+    <!-- how the replay is drawn: Performance (the same, drawn at most 15 times a second: markers a moment behind, far
+         less of the computer), Normal, or Debug (with what's going on under the timeline, and what mods add for it) -->
+    <span id="replayModes" role="group" aria-label="Replay mode">
+      <button type="button" data-mode="perf" title="Performance: the same replay, drawn at most 15 times a second. Markers move a moment behind, and it takes far less of the computer: for watching while playing. Settings > Screen > Performance mode is the same switch.">Performance</button>
+      <button type="button" data-mode="normal" title="Normal: drawn as often as the screen shows.">Normal</button>
+      <button type="button" data-mode="debug" title="Debug: under the timeline, how far through, how fast and which of the recording's reports is shown, and whatever more a mod's debugging adds.">Debug</button>
+    </span>
     <button id="replayGear" type="button" title="More switches" aria-label="More switches">&#9881;</button>
   </div>
   <!-- what's drawn on the replay's map, each on (lit) or off: Raid Review's Hide players, Hide events, Hide ballistics,
@@ -51,10 +57,10 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
     <button id="replayShots" type="button" title="Every bullet as a line from the gun to where it went.">Shots</button>
     <button id="replayTrails" type="button" title="Where each one has been in the last minute, as a line behind them.">Trails</button>
     <button id="replayKeep" type="button" title="In a replay: every death so far stays marked, not only the last few seconds'.">Keep kill marks</button>
+    <button id="replaySpree" type="button" title="Along the bottom of the timeline: when somebody picked up a lot in a short while (a bot clearing a marked room, say). Pressed, the map goes there, following them.">Loot sprees</button>
     <button id="replayDoing" type="button" title="What each bot is doing, under its name, as the mod deciding for it has it (SAIN, ORBIT, COMET...).">Behaviour</button>
     <button id="replayFacing" type="button" title="Everybody as an arrow pointing the way they face. Off: a dot.">Facing arrows</button>
     <button id="replayMini" type="button" title="In a replay: the whole map small in a corner, with where everybody is and has been. Press it to go there.">Minimap</button>
-    <button id="replayDebugBtn" type="button" title="Under the timeline: how far through, how fast, and which of the recording's reports is shown.">Debug</button>
     <label id="replayColor" title="Your own marker's colour, on the history page and the live map (Settings > Colours has it too)"><span>Your colour</span><input type="color" id="replayColorPick"></label>
     <button id="replayColorBack" type="button" title="Your marker back to its own colour">Reset</button>
   </div>
@@ -74,6 +80,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
   <button id="mapBtn" type="button" title="Map" aria-haspopup="true" aria-expanded="false" hidden><span id="mapBtnText"></span><span class="caret" aria-hidden="true">&#9662;</span></button>
   <label id="findBox" title="Find loot, containers holding it, locks by their key, switches, spawn points, quests and extracts, by name (/ to type here, Escape clears). Loot is found as the Loot tab is set to show it: what's in this raid, what can spawn, or both."><input id="find" type="search" placeholder="Find loot, keys, switches, spawns…" autocomplete="off" spellcheck="false"><small id="findCount"></small><button id="findClear" type="button" title="Clear the search: back to the map as it was (Escape)" aria-label="Clear the search" hidden>&#10005;</button></label>
   <span id="barGrow" aria-hidden="true"></span>
+  <!-- raid recording: on (red, blinking while the raid shown is recorded) or stopped; pressed, it stops or starts it -->
+  <button id="recBtn" data-rec type="button" hidden><i></i><span id="recText">REC</span></button>
   <button id="listBtn" type="button" title="Who is in the raid: the list beside the map (P)">Raid list</button>
   <button id="follow" type="button" title="Keep the player in the middle (;)">Follow</button>
   <button id="fit" type="button" title="Show the whole map (0)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6"/></svg><span class="lbl">Whole map</span></button>
@@ -101,6 +109,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <button type="button" data-tab="loot" title="Loot: what's shown, and the best of it (L)">Loot</button>
       <button type="button" data-tab="quests" title="Quests (Q)">Quests</button>
       <button type="button" data-tab="map" title="The view, and what's drawn on the map">Map</button>
+      <button type="button" data-tab="presets" title="Ready-made sets of switches: everything, only the essentials, or only what you'd know in the game">Presets</button>
       <button type="button" data-tab="history" data-rec title="The raids played, to watch again">History</button>
       <button type="button" data-tab="settings" title="Settings">Settings</button>
     </nav>
@@ -154,6 +163,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <option value="0">Anything</option><option value="5000">5,000 ₽</option><option value="10000">10,000 ₽</option>
         <option value="20000">20,000 ₽</option><option value="50000">50,000 ₽</option><option value="100000">100,000 ₽</option>
         <option value="200000">200,000 ₽</option></select></label>
+      <label class="row range" title="What things are worth on the map, in the Raid list and in replays. Raids already recorded keep their totals and records as priced when they were played. Flea market: its prices (Better Flea's, when it's in). Handbook: the handbook's price of each, for a game played without the flea. Set for this server: every page showing it changes too."><span>Prices</span><select id="optPrices">
+        <option value="flea">Flea market</option><option value="handbook">Handbook</option></select></label>
       <label class="row" title="Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute."><input type="checkbox" id="optWishOnly"><span>Only my wishlist</span></label>
       <details class="group" data-group="lootKinds" open>
         <summary>Kinds of loot</summary>
@@ -254,6 +265,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <label class="row" title="Pressing a building on the map opens it to show its inside; pressing off it shuts it. Off: pressing a building does nothing, and the Buildings button is put away."><input type="checkbox" id="optPressOpen"><span>Open a building when pressed</span></label>
       <label class="row range" id="floorRow" title="Which floor of a building to show, outlined, with the rest of the map dimmed. Auto: the building and floor the player is on, and the view from above while they're out in the open. A floor number: that floor of the building the player is in, or of the one in the middle of the screen." hidden><span>Floor</span><select id="optFloor"></select></label>
       <label class="row range" title="How dark the rest of the map is while a floor of a building is shown, so the floor stands out. All the way left: not darkened. The history page uses it too."><span>Map round a floor <small id="floorDimText"></small></span><input type="range" id="optFloorDim" min="0" max="90" step="5"></label>
+      <label class="row sub" title="While a floor of a building is shown: the rest of the map and the building's other floors in grey, so the floor shown, in colour, stands out. The history page uses it too."><input type="checkbox" id="optFloorGrey"><span>Grey round a floor</span></label>
+      <label class="row sub" title="While a floor of a building is shown: the building's other floors aren't drawn at all, only the floor shown, so its rooms and corridors are all that's there. Off: they're dimmed."><input type="checkbox" id="optFloorHide"><span>Hide other floors</span></label>
       <label class="row range" title="Which way up this map is. Usual: as the maps people know (tarkov.dev) have it. Kept for each map."><span>Map turned</span><select id="optTurn">
         <option value="auto">Usual way up</option><option value="0">Game's north up</option><option value="90">A quarter left</option>
         <option value="180">Upside down</option><option value="270">A quarter right</option></select></label>
@@ -263,6 +276,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <div id="edgeKinds" class="filterGrid"></div>
       </details>
       <label class="row" title="The places and items of the quests you have started that are off the screen: a yellow arrow at the screen's edge points to each, with how far it is from you."><input type="checkbox" id="optEdgeQuests"><span>Point to my quests off screen</span></label>
+      <label class="row" title="The extracts shown on the map that are off the screen (yours only, unless Extracts > Mine only is off): their diamond at the screen's edge, in its colour, pointing to it with how far it is from you."><input type="checkbox" id="optEdgeExits"><span>Point to extracts off screen</span></label>
       </details>
       <details class="group" data-group="bots" open>
         <summary>People and bots</summary>
@@ -272,6 +286,9 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" title="Power switches and levers on the map, green once switched."><input type="checkbox" id="optSwitches"><span>Switches</span></label>
         <label class="row" title="A burst where a grenade goes off, and an arc to it from whoever threw it."><input type="checkbox" id="optGrenades"><span>Grenades</span></label>
         <label class="row" title="By each player and PMC who came in with others: their team's number, in the team's colour."><input type="checkbox" id="optSquadMarks"><span>Team numbers</span></label>
+        <label class="row" title="Each PMC who came in with others drawn in their team's colour (the colour of their team number), so who's with whom shows at a glance. Off: every PMC in the PMC colour."><input type="checkbox" id="optSquadCols"><span>Team colours</span></label>
+        <label class="row" title="After the name of each player and PMC who came in with others, on the map and in the Raid list: their team's number (#2), as on their team badge."><input type="checkbox" id="optTeamNames"><span>Team number by names</span></label>
+        <label class="row" title="Doors opened, shut and unlocked: said on the map where the door is, with who did it (the one nearest it), and listed with the raid's events. Needs Satellite 1.1.0's game plugin."><input type="checkbox" id="optDoorEvents"><span>Doors on the map</span></label>
         <label class="row" title="Phobos's field over the map: the arrows its bots are drawn along, and its zones."><input type="checkbox" id="optPhobosField"><span>Phobos field</span></label>
         <label data-rec class="row" title="In a replay: the whole map small in a corner, with where everybody is and has been. Press it to go there."><input type="checkbox" id="optMinimap"><span>Minimap in replays</span></label>
         <label data-rec class="row" title="In a replay: every death so far stays marked, not only the last few seconds'."><input type="checkbox" id="optKillKeep"><span>Keep kill marks in replays</span></label>
@@ -285,6 +302,8 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row sub" title="The bar over everybody, hurt or not."><input type="checkbox" id="optHealthAll"><span>Also when not hurt</span></label>
         <label class="row" title="Under each bot's marker, always: what it is doing now, as SAIN, COMET, ORBIT, QuestingBots or Phobos has it (looting, heading for a quest, in a fight). Off: only by the pointer and in the Raid list."><input type="checkbox" id="optMapDoing"><span>What each bot is doing</span></label>
         <label class="row" title="By each bot of the squad you point at or follow: its part in what COMET has the squad doing (Flanking, Covering a teammate), under its marker."><input type="checkbox" id="optSquadParts"><span>Squad parts on the map</span></label>
+        <label class="row" title="A small badge by each bot for what it's doing this moment, as SAIN or COMET has it: pushing (red), falling back (blue), reloading (amber), healing (green), throwing a grenade (orange), getting to cover (grey)."><input type="checkbox" id="optActionIcons"><span>Action icons</span></label>
+        <label class="row" title="Over each bot while its squad carries out a COMET tactic: its part in it in a word (Support, Flank, Crossfire, Storm...), for every squad, not only the one pointed at."><input type="checkbox" id="optTacticWords"><span>Squad tactic words</span></label>
         <details class="group sub" data-group="orbitMap" open>
           <summary>ORBIT on the map</summary>
           <label class="row" id="optOrbitLinesRow" title="A thin blue line from every ORBIT bot to the place it is heading for, with a small circle there. Off: only for the bot you point at or follow."><input type="checkbox" id="optOrbitLines"><span>Lines to where all are heading</span></label>
@@ -330,6 +349,24 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       </div>
     </section>
 
+    <section data-tab="presets" hidden>
+      <div class="segHead">Presets</div>
+      <p>One press sets the switches in the other tabs for a way of playing. Change any of them afterwards as you like. Colours, layout, language and the map's view stay as they are. The page reloads to put a preset on.</p>
+      <div id="presetList"></div>
+      <div class="segHead">My presets</div>
+      <div id="myPresetList"></div>
+      <p>Start from a preset, change what you like (quest items on, say), then save it here as your own.</p>
+      <button type="button" class="linkBtn" id="presetSave" title="Keeps the switches as they are now (who's shown, loot, quests, what's drawn, the kill feed) as a preset of your own, under a name you pick. Colours, layout and the map's view aren't part of it.">Save the switches as they are now</button>
+      <button type="button" class="linkBtn" id="presetUndo" hidden></button>
+      <div class="segHead">All settings</div>
+      <button type="button" class="linkBtn" id="resetAll" title="Every switch, slider, colour and the layout of this page, back as they were the first time it was opened. Your own presets are kept. Nothing on the server or in the game changes.">Reset every setting to its default</button>
+      <div id="prefsFile">
+        <button type="button" class="linkBtn" id="prefsExport" title="Saves every setting of this page to a file, your own presets with them, to load in another browser or on another PC.">Export settings</button>
+        <button type="button" class="linkBtn" id="prefsImport" title="Loads settings saved with Export. They replace the ones on this page.">Import settings</button>
+        <input type="file" id="prefsPick" accept=".json,application/json" hidden>
+      </div>
+    </section>
+
     <section data-tab="settings" hidden>
       <nav class="subTabs"><button type="button" data-view="options">Options</button><button type="button" data-view="about">About</button></nav>
       <div class="view" data-view="options">
@@ -342,7 +379,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row range" title="Whose name is written under their marker. Bosses include their guards and the Goons. Pointing at a marker always names it."><span>Names under</span><select id="optNames">
         <option value="some">Bosses and friends</option><option value="players">PMCs, bosses and friends</option><option value="all">Everyone</option></select></label>
         <label class="row" title="Your name under your own marker. It shows by itself while friends are in the raid with you; this shows it always."><input type="checkbox" id="optMyName"><span>Always show my name</span></label>
-        <label data-rec class="row" title="A red REC sign at the top of the map while the raid shown is being recorded on the server."><input type="checkbox" id="optRecSign"><span>Recording sign</span></label>
+        <label data-rec class="row" title="REC in the bar at the top: red while raids are recorded (blinking while the raid shown is), grey when recording is stopped. Pressed, it stops or starts recording. Off: not shown (recording can still be stopped under Raid history > Manage recordings)."><input type="checkbox" id="optRecSign"><span>Recording button</span></label>
         <label class="row" title="Names written in Cyrillic (scavs, bosses) are shown in Latin letters; the bosses by the names players know them by (Kollontay, Reshala)."><input type="checkbox" id="optLatin"><span>Names in English letters</span></label>
       </details>
       <details class="group" data-group="screen" open>
@@ -353,6 +390,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
           <option value="toon">Cartoon</option><option value="gauntlet">Gauntlet</option><option value="large">Large</option><option value="system">System</option></select></label>
         <label class="row" title="On a phone: draw two pixels to a point at most, not the three or four its screen has. Much smoother, a little less sharp. No effect on a computer."><input type="checkbox" id="optPhoneLight"><span>Lighter drawing on a phone</span></label>
         <label class="row" title="Asks the browser not to let the screen dim or lock while this page is open and in front. Not every browser allows it."><input type="checkbox" id="optAwake"><span>Keep the screen on</span></label>
+        <label class="row" title="Draws the map at most 15 times a second, not as often as the screen shows a new picture: markers move less smoothly, and the page takes a third or less of the computer's time. For a slow computer, a laptop on its battery, or a replay watched while playing."><input type="checkbox" id="optLowPower"><span>Performance mode</span></label>
         <label class="row" title="Shows everything a tenth of a second late, at the pace the game sent it, so a slow or uneven connection doesn't make the map stutter. On by itself when the page is opened over the internet."><input type="checkbox" id="optSmooth"><span>Smooth over a slow connection</span></label>
         <label class="row" title="A few numbers in the corner, for finding out why the map isn't smooth: frames drawn a second, the slowest one, how long the page works on each, and how evenly the game's reports arrive."><input type="checkbox" id="optSpeed"><span>Show speed numbers</span></label>
       </details>
@@ -372,12 +410,6 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" title="A short sound with each alert, for when the map is on another screen. Off unless you turn it on."><input type="checkbox" id="optAlertSound"><span>Play a sound</span></label>
       <div id="alerts" class="filterGrid"></div>
       </details>
-      <button type="button" class="linkBtn" id="resetAll" title="Every switch, slider, colour and the layout of this page, back as they were the first time it was opened. Nothing on the server or in the game changes.">Reset every setting to its default</button>
-      <div id="prefsFile">
-        <button type="button" class="linkBtn" id="prefsExport" title="Saves every setting of this page to a file, to load in another browser or on another PC.">Export settings</button>
-        <button type="button" class="linkBtn" id="prefsImport" title="Loads settings saved with Export. They replace the ones on this page.">Import settings</button>
-        <input type="file" id="prefsPick" accept=".json,application/json" hidden>
-      </div>
       </div>
       <div class="view" data-view="about" hidden>
       <details class="group" data-group="phone" open>

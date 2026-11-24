@@ -51,6 +51,16 @@ namespace Satellite.Client
         internal static double Spent, Worst;
         internal static int Looks;
         private static readonly System.Diagnostics.Stopwatch Clock = new System.Diagnostics.Stopwatch();
+        // The loot report is made a little at a time, never more than SliceMs of a frame (on Streets, made at once,
+        // it held the game up 6 to 50 ms every few seconds): what lies about and who's alive are taken as they stand
+        // when it starts, and gone through over the frames after.
+        private const double SliceMs = 1.5;
+        private static readonly System.Diagnostics.Stopwatch Slice = new System.Diagnostics.Stopwatch();
+        private static bool _building;
+        // the player's raid is over (Release): nothing more is looked at in it
+        private static bool _over;
+        private static readonly List<LootItem> LootNow = new List<LootItem>();
+        private static readonly List<Player> AliveNow = new List<Player>();
 
         // what the server's config.jsonc keeps off the page: "loose", "contents", "locks", "spawns", "carried"
         private static volatile HashSet<string> _off = new HashSet<string>();
@@ -108,6 +118,8 @@ namespace Satellite.Client
                 _looked = false;
                 _looking = false;
                 _lootPrint = 0;
+                _building = false;
+                _over = false;
                 Boxes.Clear();
                 Locked.Clear();
                 Mounted.Clear();
@@ -118,7 +130,7 @@ namespace Satellite.Client
 
             // nothing is sent until the server has said which map (which version of the location) this is, so the
             // places of one version never land on another's
-            if (!World.Started() || !Variant.Resolved)
+            if (!World.Started() || !Variant.Resolved || _over)
             {
                 return;
             }
@@ -141,16 +153,24 @@ namespace Satellite.Client
                 SendMore(plugin);
             }
 
-            if (_looked && watched && !_sending && Time.unscaledTime >= _nextLoot)
+            if (_looked && watched && !_sending && !_building && Time.unscaledTime >= _nextLoot)
             {
                 _nextLoot = Time.unscaledTime + LootGap;
-                Clock.Restart();
-                SendLoot(plugin, world);
-                var ms = Clock.Elapsed.TotalMilliseconds;
-                Spent += ms;
-                Worst = Math.Max(Worst, ms);
+                _building = true;
                 Looks++;
+                plugin.StartCoroutine(Sliced(MakeLoot(plugin, world)));
             }
+        }
+
+        // The player's raid is over: what was held of it let go of now (see Recorded.Release)
+        internal static void Release()
+        {
+            _over = true;
+            Boxes.Clear();
+            Locked.Clear();
+            Mounted.Clear();
+            LootNow.Clear();
+            AliveNow.Clear();
         }
 
         // ---- the containers and locks ---------------------------------------------------------------------------
@@ -287,8 +307,62 @@ namespace Satellite.Client
         //  item; kp is 1 for a body a person playing killed (not a bot); profile is whose body it is (the corpse
         //  marker has it too); inside
         //  only lists containers (and bodies) with something in them; open lists the locks that aren't locked any more
-        private static void SendLoot(Plugin plugin, GameWorld world)
+        // Each frame's share of it run, timed (for the plugin's line in the log: the worst is one frame's) and kept out
+        // of the game's way: a failure says so once and rests until the next raid, as Tick does.
+        private static IEnumerator Sliced(IEnumerator work)
         {
+            while (true)
+            {
+                bool more;
+                Clock.Restart();
+                try
+                {
+                    more = work.MoveNext();
+                }
+                catch (Exception e)
+                {
+                    if (_broken != _world)
+                    {
+                        Plugin.Log.LogError($"Couldn't read the loot and places: {e}");
+                    }
+
+                    _broken = _world;
+                    _sending = false;
+                    _building = false;
+                    yield break;
+                }
+
+                var ms = Clock.Elapsed.TotalMilliseconds;
+                Spent += ms;
+                Worst = Math.Max(Worst, ms);
+                if (!more)
+                {
+                    break;
+                }
+
+                yield return work.Current;
+            }
+
+            _building = false;
+        }
+
+        // past this frame's share: on in the next frame (false: the raid is over, give up)
+        private static bool Full()
+        {
+            return Slice.Elapsed.TotalMilliseconds > SliceMs;
+        }
+
+        private static IEnumerator MakeLoot(Plugin plugin, GameWorld world)
+        {
+            Slice.Restart();
+            LootNow.Clear();
+            foreach (var loot in world.LootItems.GetValuesEnumerator())
+            {
+                LootNow.Add(loot);
+            }
+
+            AliveNow.Clear();
+            AliveNow.AddRange(world.AllAlivePlayersList);
             var to = Report;
             to.Length = 0;
             to.Append("{\"loc\":");
@@ -297,8 +371,19 @@ namespace Satellite.Client
             var count = 0;
             if (On("loose"))
             {
-                foreach (var loot in world.LootItems.GetValuesEnumerator())
+                foreach (var loot in LootNow)
                 {
+                    if (Full())
+                    {
+                        yield return null;
+                        if (Singleton<GameWorld>.Instance != world || _over)
+                        {
+                            yield break;
+                        }
+
+                        Slice.Restart();
+                    }
+
                     // not the bodies, nor the mounted guns (the game keeps both as loot)
                     if (loot == null || loot is Corpse || loot.Item == null || string.IsNullOrEmpty(loot.TemplateId))
                     {
@@ -342,12 +427,23 @@ namespace Satellite.Client
                 // the location's containers, and the crates of the airdrops
                 foreach (var box in Boxes)
                 {
-                    Inside(to, box, ref filled);
+                    if (Full())
+                    {
+                        yield return null;
+                        if (Singleton<GameWorld>.Instance != world || _over)
+                        {
+                            yield break;
+                        }
+
+                        Slice.Restart();
+                    }
+
+                    filled = Inside(to, box, filled);
                 }
 
                 foreach (var box in World.Crates())
                 {
-                    Inside(to, box, ref filled);
+                    filled = Inside(to, box, filled);
                 }
             }
 
@@ -355,9 +451,20 @@ namespace Satellite.Client
             // the parts of its guns, which come with the gun)
             if (On("contents"))
             {
-                foreach (var loot in world.LootItems.GetValuesEnumerator())
+                foreach (var loot in LootNow)
                 {
                     var body = loot as Corpse;
+                    if (body != null && Full())
+                    {
+                        yield return null;
+                        if (Singleton<GameWorld>.Instance != world || _over)
+                        {
+                            yield break;
+                        }
+
+                        Slice.Restart();
+                    }
+
                     var root = body != null ? body.Item as CompoundItem : null;
                     if (root == null || string.IsNullOrEmpty(body.ItemId))
                     {
@@ -403,7 +510,7 @@ namespace Satellite.Client
             var bodies = 0;
             if (On("contents"))
             {
-                foreach (var loot in world.LootItems.GetValuesEnumerator())
+                foreach (var loot in LootNow)
                 {
                     var body = loot as Corpse;
                     if (body == null || string.IsNullOrEmpty(body.ItemId))
@@ -467,8 +574,19 @@ namespace Satellite.Client
             var carrying = 0;
             if (On("carried"))
             {
-                foreach (var player in world.AllAlivePlayersList)
+                foreach (var player in AliveNow)
                 {
+                    if (Full())
+                    {
+                        yield return null;
+                        if (Singleton<GameWorld>.Instance != world || _over)
+                        {
+                            yield break;
+                        }
+
+                        Slice.Restart();
+                    }
+
                     CompoundItem worn = null;
                     try
                     {
@@ -523,12 +641,14 @@ namespace Satellite.Client
             }
 
             to.Append("}}");
+            LootNow.Clear();
+            AliveNow.Clear();
             // nothing changed since it was last sent (nearly always): nothing is made of it and nothing sent
             var size = Out.Take(to);
             var print = Out.Print();
             if (print == _lootPrint)
             {
-                return;
+                yield break;
             }
 
             _sending = true;
@@ -541,12 +661,12 @@ namespace Satellite.Client
         }
 
         // what's in one container, if anything: "box id":[[tpl,count],..]
-        private static void Inside(StringBuilder to, LootableContainer box, ref int filled)
+        private static int Inside(StringBuilder to, LootableContainer box, int filled)
         {
             var root = box != null && box.ItemOwner != null ? box.ItemOwner.RootItem as CompoundItem : null;
             if (root == null || root.Grids == null)
             {
-                return;
+                return filled;
             }
 
             var first = true;
@@ -578,6 +698,8 @@ namespace Satellite.Client
             {
                 to.Append(']');
             }
+
+            return filled;
         }
 
         private static readonly List<Item> Carried = new List<Item>();

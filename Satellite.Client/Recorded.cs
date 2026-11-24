@@ -18,6 +18,8 @@ namespace Satellite.Client
     //   "left"        a bot left the raid alive (it extracted): {"wk":what kind it was,"at":[..]}
     //   "orbit.main"  what each ORBIT squad is out to do, whenever that changes: {"s":ORBIT's own snapshot}
     //   "orbit.field" ORBIT's field over the map, every two minutes: {"s":ORBIT's own snapshot}
+    //   "door"        a door opened, shut or unlocked: {"id","nm":its name,"st":how it stands now,"was":before,
+    //                 "at":[..]}, whose: the nearest one alive within DoorReach of it (with nobody that near, not told)
     // ORBIT's snapshots are passed on as they are (every public field, by its own name), so a newer ORBIT's are
     // recorded whole without this plugin knowing them; places in them are the game's own x, y (height), z.
     internal static class Recorded
@@ -28,6 +30,8 @@ namespace Satellite.Client
         private static GameWorld _world;
         private static readonly Dictionary<WorldInteractiveObject, string> Switches = new Dictionary<WorldInteractiveObject, string>();
         private static bool _switchesFailed;
+        private static readonly Dictionary<WorldInteractiveObject, string> Doors = new Dictionary<WorldInteractiveObject, string>();
+        private const float DoorReach = 4f;
 
         // called with every report of a raid that's watched or recorded
         internal static void Tick()
@@ -174,6 +178,36 @@ namespace Satellite.Client
             to.Append(']');
         }
 
+        // The player's raid is over: the switches and doors let go of at once, not when the next raid begins, so the
+        // game's clean-up after the raid finds nothing of it held here. (The world is kept, so they aren't looked for
+        // again in the raid that's ending.)
+        internal static void Release()
+        {
+            Unhook(Switches, SwitchChanged);
+            Unhook(Doors, DoorChanged);
+            Things.Release();
+        }
+
+        private static void Unhook(Dictionary<WorldInteractiveObject, string> all, WorldInteractiveObjectInteract changed)
+        {
+            foreach (var one in all.Keys)
+            {
+                try
+                {
+                    if (one != null)
+                    {
+                        one.OnDoorStateChanged -= changed;
+                    }
+                }
+                catch (Exception)
+                {
+                    // gone with its scene
+                }
+            }
+
+            all.Clear();
+        }
+
         internal static void Forget()
         {
             _phobosAt = -1000f;
@@ -193,6 +227,22 @@ namespace Satellite.Client
             }
 
             Switches.Clear();
+            foreach (var one in Doors.Keys)
+            {
+                try
+                {
+                    if (one != null)
+                    {
+                        one.OnDoorStateChanged -= DoorChanged;
+                    }
+                }
+                catch (Exception)
+                {
+                    // gone with its scene
+                }
+            }
+
+            Doors.Clear();
             _world = null;
             _mainRevision = int.MinValue;
             _fieldAt = -1000f;
@@ -216,6 +266,14 @@ namespace Satellite.Client
                 var lights = 0;
                 foreach (var one in LocationScene.GetAllObjects<WorldInteractiveObject>(true))
                 {
+                    // a door: told only when somebody opens, shuts or unlocks it (at most 1500 a map)
+                    if (one is Door && !Doors.ContainsKey(one) && Doors.Count < 1500)
+                    {
+                        Doors[one] = string.IsNullOrEmpty(one.Id) ? "i" + one.GetInstanceID() : one.Id;
+                        one.OnDoorStateChanged += DoorChanged;
+                        continue;
+                    }
+
                     if (!(one is Switch) || one == null || Switches.ContainsKey(one))
                     {
                         continue;
@@ -256,6 +314,66 @@ namespace Satellite.Client
                 {
                     Said(one, id, after);
                 }
+            }
+            catch (Exception)
+            {
+                // not told
+            }
+        }
+
+        private static void DoorChanged(WorldInteractiveObject one, EDoorState before, EDoorState after)
+        {
+            try
+            {
+                // (the moments in between, interacting and being breached, aren't told: only where it ends up)
+                if (one == null || before == after || !Doors.TryGetValue(one, out var id) || _world == null
+                    || !(after == EDoorState.Open || after == EDoorState.Shut))
+                {
+                    return;
+                }
+
+                var at = one.transform.position;
+                string who = null;
+                var best = DoorReach * DoorReach;
+                foreach (var player in _world.AllAlivePlayersList)
+                {
+                    if (player == null)
+                    {
+                        continue;
+                    }
+
+                    var d = (player.Position - at).sqrMagnitude;
+                    if (d < best)
+                    {
+                        best = d;
+                        who = player.ProfileId;
+                    }
+                }
+
+                // (nobody by it: the map moving its own doors, not news)
+                if (who == null)
+                {
+                    return;
+                }
+
+                World.Names.TryGetValue(who, out var name);
+
+                var doorName = one.name ?? "";
+                var now = after.ToString();
+                var was = before.ToString();
+                Events.Add("door", who, name, Time.realtimeSinceStartup, to =>
+                {
+                    to.Append("{\"id\":");
+                    World.Text(to, id);
+                    to.Append(",\"nm\":");
+                    World.Text(to, doorName);
+                    to.Append(",\"st\":");
+                    World.Text(to, now);
+                    to.Append(",\"was\":");
+                    World.Text(to, was);
+                    World.Spot(to, "at", at);
+                    to.Append('}');
+                });
             }
             catch (Exception)
             {
@@ -338,6 +456,7 @@ namespace Satellite.Client
 
                 var status = Convert.ToString(__0);
                 var exit = __3 ?? "";
+                Release();
                 var at = __instance.Position;
                 // "inv": what they have on them now, [template, how many] (the server prices it: what they got out with)
                 var had = new List<KeyValuePair<string, int>>();

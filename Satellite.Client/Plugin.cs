@@ -38,6 +38,7 @@ namespace Satellite.Client
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<int> _rate;
         private ConfigEntry<KeyboardShortcut> _open;
+        private ConfigEntry<KeyboardShortcut> _openHistory;
 
         // set by the server's answers, which arrive on another thread
         private volatile int _watchers;
@@ -85,11 +86,13 @@ namespace Satellite.Client
                 // the map works without them
             }
             _enabled = Config.Bind("General", "Enabled", true,
-                "Turns the Open the map key on or off. The map itself keeps working either way.");
+                "Turns the Open the map and Open the raid history keys on or off. The map itself keeps working either way.");
             _rate = Config.Bind("General", "Updates per second", 10,
                 new ConfigDescription("How often moving markers are reported while a page is open.", new AcceptableValueRange<int>(1, 30)));
             _open = Config.Bind("General", "Open the map", new KeyboardShortcut(KeyCode.M, KeyCode.LeftAlt),
                 "Opens the map in your browser, at the server this game is connected to.");
+            _openHistory = Config.Bind("General", "Open the raid history", new KeyboardShortcut(KeyCode.H, KeyCode.LeftAlt),
+                "Opens the raid history in your browser (the raids recorded, and their replays), at the server this game is connected to.");
 
             // A Fika headless host: nobody plays it, so the server never offers it as a game to watch, but the raid is
             // shown from what it says (see FikaHost on the server)
@@ -125,9 +128,14 @@ namespace Satellite.Client
 
         private void Update()
         {
-            if (_enabled.Value && OpenPressed())
+            if (_enabled.Value && OpenPressed(_open.Value))
             {
-                OpenMap();
+                OpenMap("");
+            }
+            else if (_enabled.Value && OpenPressed(_openHistory.Value))
+            {
+                // (the page goes on to the raid history, where the server records raids; else it stays the map)
+                OpenMap("?menu=history");
             }
 
             try
@@ -171,9 +179,8 @@ namespace Satellite.Client
 
         // The key went down with its other keys held. Not BepInEx's own test, which says no while any other key is
         // held: the key to walk forward, say.
-        private bool OpenPressed()
+        private bool OpenPressed(KeyboardShortcut keys)
         {
-            var keys = _open.Value;
             if (keys.MainKey == KeyCode.None || !UnityInput.Current.GetKeyDown(keys.MainKey))
             {
                 return false;
@@ -206,11 +213,11 @@ namespace Satellite.Client
         };
 
         // the page, at the address the game itself uses for its server: so it's right on another PC's server too
-        private void OpenMap()
+        private void OpenMap(string page)
         {
             try
             {
-                var url = RequestHandler.Host.TrimEnd('/') + "/satellite/";
+                var url = RequestHandler.Host.TrimEnd('/') + "/satellite/" + page;
                 Application.OpenURL(url);
                 Log.LogInfo($"Opened the map: {url}");
             }

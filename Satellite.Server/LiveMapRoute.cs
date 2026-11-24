@@ -267,6 +267,12 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                 case "api/history/tidy" when post:
                     await SendJson(context, TidyRecordings(), cancellationToken);
                     return;
+                case "api/prices":
+                    await SendJson(context, Pricing(context, post), cancellationToken);
+                    return;
+                case "api/history/pause":
+                    await SendJson(context, Pausing(context, post), cancellationToken);
+                    return;
                 case "api/history/rr":
                     await SendJson(context, RrList(), cancellationToken);
                     return;
@@ -763,7 +769,7 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
             node["layersOff"] = LayersOffList();
             // "rec": this raid is being recorded (the page shows a sign); not in a replay, where it's always so
 #if RECORDING
-            if (History().Record && node["raid"] is JsonValue inRaid && inRaid.TryGetValue<bool>(out var raiding) && raiding && node["rid"] is JsonValue)
+            if (RecordOn() && node["raid"] is JsonValue inRaid && inRaid.TryGetValue<bool>(out var raiding) && raiding && node["rid"] is JsonValue)
             {
                 node["rec"] = 1;
             }

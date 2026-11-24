@@ -71,6 +71,10 @@ public partial class LiveMapRoute
         // what the player had on them as the raid ended (the "end" event's "inv": [template, how many]), priced as
         // "out" when it's kept: what they got out with, when they got out
         public readonly List<(string Tpl, int Count)> HadOn = [];
+        // what the player went in with, as their profile had it when the raid began (as a PMC, and as a Scav): what they
+        // got out with less this is what the raid gained them ("gain")
+        public List<(string Tpl, int Count)>? WentIn;
+        public List<(string Tpl, int Count)>? WentInScav;
         // the wait before the raid began (the game said "go":0), and how long it was: -1 until the raid has begun
         public bool Waited;
         public long Lead = -1;
@@ -264,7 +268,7 @@ public partial class LiveMapRoute
     // reports once a minute at the most, as a line {"t":"th","d":{...}}, so a replay has the loot of the time.
     private void RecordThings(Session session)
     {
-        if (!History().Record || !_recording.TryGetValue(session.Id, out var to) || (to.ThingsAt != 0 && Now - to.ThingsAt < 60_000))
+        if (!RecordOn() || !_recording.TryGetValue(session.Id, out var to) || (to.ThingsAt != 0 && Now - to.ThingsAt < 60_000))
         {
             return;
         }
@@ -342,12 +346,59 @@ public partial class LiveMapRoute
     }
 
     // whether the game should report though nobody watches: it's in a raid, and raids are recorded
-    private bool Recorded(Session session) => session.Raid && History().Record;
+    private bool Recorded(Session session) => session.Raid && RecordOn();
+
+    // Recording stopped from the page (the live map's REC button): nothing is recorded, the raid going on included,
+    // until it's started again. Kept as the file history/paused being there, so a restart keeps it stopped.
+    private string PausedFile => Path.Combine(HistoryFolder, "paused");
+    private bool? _paused;
+    private bool Paused() => _paused ??= File.Exists(PausedFile);
+    private bool RecordOn() => History().Record && !Paused();
+
+    // GET api/history/pause: {"on": config.jsonc records, "paused"}; POST ?paused=1 stops recording (the raids being
+    // recorded are ended as far as they got), ?paused=0 starts it again from the next report
+    private string Pausing(HttpContext context, bool post)
+    {
+        if (post)
+        {
+            var stop = context.Request.Query["paused"] == "1";
+            try
+            {
+                Directory.CreateDirectory(HistoryFolder);
+                if (stop)
+                {
+                    File.WriteAllText(PausedFile, "");
+                }
+                else if (File.Exists(PausedFile))
+                {
+                    File.Delete(PausedFile);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                logger.Warning($"[Satellite] Couldn't {(stop ? "stop" : "start")} recording for good (only until the server restarts): {ex.Message}");
+            }
+
+            _paused = stop;
+            if (stop)
+            {
+                foreach (var (sid, of) in _recording)
+                {
+                    if (_recording.TryRemove(new KeyValuePair<string, Recording>(sid, of)))
+                    {
+                        End(of);
+                    }
+                }
+            }
+        }
+
+        return new JsonObject { ["on"] = History().Record, ["paused"] = Paused() }.ToJsonString();
+    }
 
     // A report on its way to the pages: kept, when it's a raid's.
     private void Record(Session session, string report)
     {
-        if (!History().Record || !report.StartsWith("{\"t\":\"", StringComparison.Ordinal))
+        if (!RecordOn() || !report.StartsWith("{\"t\":\"", StringComparison.Ordinal))
         {
             return;
         }
@@ -552,12 +603,79 @@ public partial class LiveMapRoute
         var file = Path.Combine(HistoryFolder, id + ".rec");
         return new Recording(id, session.Id, rid)
         {
+            WentIn = KitOf(session.Id, false),
+            WentInScav = KitOf(session.Id, true),
             Out = new StreamWriter(new FileStream(file, FileMode.Create, FileAccess.Write, FileShare.Read, 1 << 16), new UTF8Encoding(false)),
             BeganTick = Now,
             LastTick = Now,
             AboutAt = Now,
             Began = new DateTimeOffset(began).ToUnixTimeMilliseconds()
         };
+    }
+
+    // Everything a profile's character has on them (worn, and all that's in it, the pockets' and secure container's
+    // too): [template, how many]. Until the raid is over the profile holds what they went in with. Read wider than the
+    // game's plugin reads what they got out with (Recorded.Had), so nothing they went in with is ever counted as gained.
+    private List<(string Tpl, int Count)>? KitOf(string sid, bool scav)
+    {
+        try
+        {
+            foreach (var (profileId, profile) in saveServer.GetProfiles())
+            {
+                if (profileId.ToString() != sid)
+                {
+                    continue;
+                }
+
+                var inventory = scav ? profile?.CharacterData?.ScavData?.Inventory : profile?.CharacterData?.PmcData?.Inventory;
+                if (inventory?.Items is not { } items || inventory.Equipment?.ToString() is not { Length: > 0 } worn)
+                {
+                    return null;
+                }
+
+                var inside = items.Where(i => i.ParentId != null).ToLookup(i => i.ParentId!.ToString());
+                var kit = new List<(string Tpl, int Count)>();
+                var seen = new HashSet<string>();
+                var next = new Queue<string>();
+                next.Enqueue(worn);
+                while (next.Count > 0 && kit.Count < 2000)
+                {
+                    foreach (var item in inside[next.Dequeue()])
+                    {
+                        var id = item.Id.ToString();
+                        if (!seen.Add(id))
+                        {
+                            continue;
+                        }
+
+                        kit.Add((item.Template.ToString(), Math.Max(1, (int)Math.Round(item.Upd?.StackObjectsCount ?? 1))));
+                        next.Enqueue(id);
+                    }
+                }
+
+                return kit;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Debug($"[Satellite] What was taken into the raid isn't known: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    // an extract's name as the game shows it in English ("E8_yard" is "Courtyard"); null when the game has none
+    private string? ExitTitle(string exit)
+    {
+        if (exit.Length == 0)
+        {
+            return null;
+        }
+
+        lock (_namesLock)
+        {
+            return Locale().TryGetValue(exit, out var title) && !string.IsNullOrWhiteSpace(title) && title != exit ? title : null;
+        }
     }
 
     private static void Write(Recording to, string report)
@@ -613,17 +731,38 @@ public partial class LiveMapRoute
             about["exitName"] = of.ExitName;
         }
 
-        // what the player got out with, priced (only told by a newer plugin, as the raid ends)
+        if (ExitTitle(of.ExitName) is { } exitTitle)
+        {
+            about["exitTitle"] = exitTitle;
+        }
+
+        // what the player got out with, priced (only told by a newer plugin, as the raid ends): "out" all of it, kit and
+        // all; "gain" only what they hadn't on them going in (by template and how many, so kit lost or used up doesn't
+        // take from what was found)
         if (of.HadOn.Count > 0)
         {
             var names = Names(of.HadOn.Select(o => o.Tpl).Distinct());
+            double PriceOf(string tpl) => names[tpl]?["p"] is JsonValue p && p.TryGetValue<double>(out var price) ? price : 0;
             double carried = 0;
             foreach (var (tpl, count) in of.HadOn)
             {
-                carried += (names[tpl]?["p"] is JsonValue p && p.TryGetValue<double>(out var price) ? price : 0) * count;
+                carried += PriceOf(tpl) * count;
             }
 
             about["out"] = Math.Round(carried);
+            var wentIn = of.Side.Equals("Savage", StringComparison.OrdinalIgnoreCase) ? of.WentInScav : of.WentIn;
+            if (wentIn != null)
+            {
+                var before = wentIn.GroupBy(o => o.Tpl).ToDictionary(g => g.Key, g => g.Sum(o => o.Count));
+                double gain = 0;
+                foreach (var got in of.HadOn.GroupBy(o => o.Tpl))
+                {
+                    gain += PriceOf(got.Key) * Math.Max(0, got.Sum(o => o.Count) - before.GetValueOrDefault(got.Key));
+                }
+
+                about["gain"] = Math.Round(gain);
+                about["in"] = Math.Round(Math.Max(0, carried - gain));
+            }
         }
 
         Tallied(about, of.Tally);
@@ -751,7 +890,8 @@ public partial class LiveMapRoute
                      {
                          a => Num(a, "mine"), a => Num(a, "loot"), Best, a => Num(a, "bots"), a => Num(a, "hurt"),
                          a => Out(a) ? Num(a, "ms") - Num(a, "lead") : 0,
-                         a => Out(a) ? (a.ContainsKey("out") ? Num(a, "out") : Num(a, "loot")) : 0
+                         // (what the raid gained them: a raid from before that was kept counts what was picked up)
+                         a => Out(a) ? (a.ContainsKey("gain") ? Num(a, "gain") : Num(a, "loot")) : 0
                      })
             {
                 var top = mine.OrderByDescending(r => of(r.About)).FirstOrDefault();
@@ -945,6 +1085,13 @@ public partial class LiveMapRoute
                             File.WriteAllText(file, about.ToJsonString());
                         }
 
+                        // its extract by the name the game shows (not kept: a raid from before has it this way too)
+                        if (!about.ContainsKey("exitTitle") && about["exitName"] is JsonValue exitName && exitName.TryGetValue<string>(out var exitId)
+                            && ExitTitle(exitId) is { } exitTitle)
+                        {
+                            about["exitTitle"] = exitTitle;
+                        }
+
                         // (and one recorded before its numbers were kept: counted in the background, listed next time)
                         if (going == null && !about.ContainsKey("st"))
                         {
@@ -967,7 +1114,7 @@ public partial class LiveMapRoute
         // "keep": what's kept (see Keeping); "held": the raids kept because they hold a record
         var rule = Keeping();
         var held = RecordHolders(raids.OfType<JsonObject>().Select(a => (a["id"]?.GetValue<string>() ?? "", a)).ToList());
-        return new JsonObject { ["counting"] = older.Count, ["on"] = on, ["raids"] = raids, ["bytes"] = HistoryBytes(), ["keep"] = rule.Keep, ["mb"] = rule.Mb, ["per"] = rule.Per,
+        return new JsonObject { ["counting"] = older.Count, ["on"] = on, ["paused"] = Paused(), ["raids"] = raids, ["bytes"] = HistoryBytes(), ["keep"] = rule.Keep, ["mb"] = rule.Mb, ["per"] = rule.Per,
             ["held"] = new JsonArray(held.Select(h => (JsonNode?)JsonValue.Create(h)).ToArray()), ["rr"] = RrFolders().Any() }.ToJsonString();
     }
 
