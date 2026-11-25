@@ -54,6 +54,18 @@ namespace Satellite.Client
             _raid = raid ? Guid.NewGuid().ToString("N") : "";
             _began = Time.realtimeSinceStartup;
             Brains.Forget();
+            if (!raid)
+            {
+                CometLog.RaidLeft();
+            }
+        }
+
+        // the raid things said now belong to, and when its clock began: the one going on, else the one just left
+        internal static bool ClockOf(out string raid, out float began)
+        {
+            raid = _raid.Length > 0 ? _raid : _lastRaid;
+            began = _raid.Length > 0 ? _began : _lastBegan;
+            return !string.IsNullOrEmpty(raid);
         }
 
         // milliseconds on the raid's clock at a moment of the game's own (Time.realtimeSinceStartup)

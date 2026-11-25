@@ -65,6 +65,11 @@ public partial class LiveMapRoute
         // a Fika headless ran the raid; when what lies about was last kept
         public bool Headless;
         public long ThingsAt;
+        // the raid's containers, where each stands (see Session.Spots): written once, as {"t":"pl","d":{...}}
+        public bool SpotsKept;
+        // the recording's ms less the plugin's raid clock ("clk"), as of its latest full report: COMET's decisions
+        // come on the raid's clock (see CometRecord); long.MinValue until one has said
+        public long ClockLag = long.MinValue;
         // how it ended for the player ("Survived", "Killed", "Runner"..), and by which extract
         public string Exit = "";
         public string ExitName = "";
@@ -268,7 +273,13 @@ public partial class LiveMapRoute
     // reports once a minute at the most, as a line {"t":"th","d":{...}}, so a replay has the loot of the time.
     private void RecordThings(Session session)
     {
-        if (!RecordOn() || !_recording.TryGetValue(session.Id, out var to) || (to.ThingsAt != 0 && Now - to.ThingsAt < 60_000))
+        if (!RecordOn() || !_recording.TryGetValue(session.Id, out var to))
+        {
+            return;
+        }
+
+        RecordSpots(session, to);
+        if (to.ThingsAt != 0 && Now - to.ThingsAt < 60_000)
         {
             return;
         }
@@ -287,6 +298,27 @@ public partial class LiveMapRoute
         catch (Exception ex) when (ex is IOException or JsonException or InvalidOperationException or ObjectDisposedException)
         {
             logger.Debug($"[Satellite] Loot not recorded: {ex.Message}");
+        }
+    }
+
+    // Where each of the raid's containers stands, as the game sent them (POST api/more), once a recording: a replay
+    // finds a container by them, not by the map's places.json, whose ids for some of a location's containers are another
+    // raid's. Sent as the raid loads, so only ones sent shortly before the recording began, or since, are this raid's.
+    private void RecordSpots(Session session, Recording to)
+    {
+        if (to.SpotsKept || session.Spots is not { } spots || session.SpotsAt < to.BeganTick - 120_000)
+        {
+            return;
+        }
+
+        try
+        {
+            to.SpotsKept = true;
+            Write(to, "{\"t\":\"pl\",\"d\":" + spots + "}");
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            logger.Debug($"[Satellite] Containers not recorded: {ex.Message}");
         }
     }
 
@@ -524,6 +556,10 @@ public partial class LiveMapRoute
             }
 
             now.Tally.Take(root);
+            if (root.TryGetProperty("clk", out var clock) && clock.TryGetInt64(out var clk))
+            {
+                now.ClockLag = Now - now.BeganTick - clk;
+            }
 
             if (root.TryGetProperty("go", out var go) && go.ValueKind == JsonValueKind.Number && go.GetInt32() == 0)
             {
@@ -945,7 +981,7 @@ public partial class LiveMapRoute
             var held = RecordHolders(raids);
             bool Spared((string Id, JsonObject About) r) => held.Contains(r.Id) || _recording.Values.Any(o => o.Id == r.Id)
                 || (r.About["imported"] is JsonValue v && v.TryGetValue<bool>(out var yes) && yes);
-            long Size(string id) => new[] { ".json", ".rec", ".rec.gz" }.Select(e => new FileInfo(Path.Combine(HistoryFolder, id + e))).Where(f => f.Exists).Sum(f => f.Length);
+            long Size(string id) => new[] { ".json", ".rec", ".rec.gz", ".comet.gz" }.Select(e => new FileInfo(Path.Combine(HistoryFolder, id + e))).Where(f => f.Exists).Sum(f => f.Length);
             var groups = rule.Per == "player"
                 ? raids.GroupBy(r => r.About["sid"]?.GetValue<string>() ?? r.About["name"]?.GetValue<string>() ?? "").Select(g => g.ToList())
                 : [raids];
@@ -1000,10 +1036,12 @@ public partial class LiveMapRoute
 
     private void Forget(string id)
     {
-        foreach (var end in new[] { ".json", ".rec", ".rec.gz" })
+        foreach (var end in new[] { ".json", ".rec", ".rec.gz", ".comet.gz" })
         {
             File.Delete(Path.Combine(HistoryFolder, id + end));
         }
+
+        _cometFiles.TryRemove(id, out _);
     }
 
     // raids not heard from in a while (the game was closed, or its server lost): over
@@ -1263,9 +1301,18 @@ public partial class LiveMapRoute
             using (var archive = new ZipArchive(File.Create(zip), ZipArchiveMode.Create))
             {
                 archive.CreateEntryFromFile(about, "raid.json", CompressionLevel.Optimal);
-                using var to = archive.CreateEntry("raid.rec", CompressionLevel.Optimal).Open();
-                using var from = new GZipStream(File.OpenRead(packed), CompressionMode.Decompress);
-                from.CopyTo(to);
+                using (var to = archive.CreateEntry("raid.rec", CompressionLevel.Optimal).Open())
+                using (var from = new GZipStream(File.OpenRead(packed), CompressionMode.Decompress))
+                {
+                    from.CopyTo(to);
+                }
+
+                // COMET's decisions, packed already
+                var comet = Path.Combine(HistoryFolder, id + ".comet.gz");
+                if (File.Exists(comet))
+                {
+                    archive.CreateEntryFromFile(comet, "raid.comet.gz", CompressionLevel.NoCompression);
+                }
             }
 
             context.Response.ContentType = "application/zip";
@@ -1375,6 +1422,27 @@ public partial class LiveMapRoute
 
             about.Remove("live");
             about["imported"] = true;
+            // COMET's decisions, when the raid has them: kept as they are, if they read as such
+            if (archive.GetEntry("raid.comet.gz") is { } cometEntry && cometEntry.Length <= MostUnpacked)
+            {
+                var comet = Path.Combine(HistoryFolder, id + ".comet.gz");
+                try
+                {
+                    cometEntry.ExtractToFile(comet, true);
+                    await using var check = new GZipStream(File.OpenRead(comet), CompressionMode.Decompress);
+                    var head = new byte[24];
+                    var got = await check.ReadAsync(head, cancellationToken);
+                    if (got == 0 || !Regex.IsMatch(Encoding.UTF8.GetString(head, 0, got), @"^(c\t[0-9]+\t\{|[0-9]+\t[^\t\n]*\t)"))
+                    {
+                        throw new InvalidDataException("not COMET's decisions");
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidDataException or IOException)
+                {
+                    File.Delete(comet);
+                }
+            }
+
             File.Move(rec, Path.Combine(HistoryFolder, id + ".rec.gz"));
             File.WriteAllText(Path.Combine(HistoryFolder, id + ".json"), about.ToJsonString());
             return new JsonObject { ["ok"] = true, ["id"] = id }.ToJsonString();

@@ -36,7 +36,7 @@
         <DefineConstants>$(DefineConstants);RECORDING</DefineConstants>
     </PropertyGroup>
     <ItemGroup Condition="'$(Recording)' != 'true'">
-        <Compile Remove="Recorder.cs;RaidReviewImport.cs" />
+        <Compile Remove="Recorder.cs;RaidReviewImport.cs;CometRecord.cs" />
     </ItemGroup>
 
 </Project>

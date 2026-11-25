@@ -614,7 +614,7 @@ namespace Satellite.Client
                     var kept = info != null ? info.GetType() : null;
                     var item = (kept != null ? (kept.GetField("Weapon") != null ? kept.GetField("Weapon").GetValue(info)
                         : kept.GetProperty("Weapon") != null ? kept.GetProperty("Weapon").GetValue(info, null) : null) : null) as EFT.InventoryLogic.Item;
-                    weapon = item != null ? item.LocalizedShortName() : null;
+                    weapon = item != null ? RichText.Plain(item.LocalizedShortName()) : null;
                     part = LastPart != null ? Convert.ToString(LastPart.GetValue(dead)) : null;
                     var aggressor = LastHit != null ? LastHit.GetValue(dead) as IPlayer : null;
                     var kind = kept == null ? null : kept.GetField("DamageType") != null ? kept.GetField("DamageType").GetValue(info)
@@ -1089,7 +1089,7 @@ namespace Satellite.Client
                     Still.Add(new Dot
                     {
                         Id = ++_nextId, Kind = "Extract", Exit = point, At = ExitPlace.Of(point),
-                        Text = string.IsNullOrEmpty(name) ? "" : name.Localized(),
+                        Text = string.IsNullOrEmpty(name) ? "" : RichText.Plain(name.Localized()),
                         Secret = point is EFT.Interactive.SecretExfiltrations.SecretExfiltrationPoint
                     });
                 }
@@ -1123,7 +1123,7 @@ namespace Satellite.Client
                     Still.Add(new Dot
                     {
                         Id = ++_nextId, Kind = "Transit", Transit = point, At = point.transform.position,
-                        Text = string.IsNullOrEmpty(name) ? "" : name.Localized(), To = point.parameters.location
+                        Text = string.IsNullOrEmpty(name) ? "" : RichText.Plain(name.Localized()), To = point.parameters.location
                     });
                 }
             }

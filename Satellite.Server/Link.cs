@@ -15,7 +15,7 @@ public partial class LiveMapRoute
     private async Task Link(MongoId sessionId, HttpContext context, string route, CancellationToken cancellationToken)
     {
         var id = GameSession(sessionId);
-        if (id == null || (route != "push" && route != "things"))
+        if (id == null || (route != "push" && route != "things" && route != "comet"))
         {
             context.Response.StatusCode = id == null ? 403 : 404;
             return;
@@ -30,6 +30,16 @@ public partial class LiveMapRoute
         {
             // the game went away without closing it (quit, crashed): nothing to say
         }
+    }
+
+    // COMET's decisions for the raid's recording (see CometRecord): nothing without recording
+    private string? CometLinked(string id, byte[] body)
+    {
+#if RECORDING
+        return CometTaken(id, body) ? "{\"saved\":true}" : null;
+#else
+        return null;
+#endif
     }
 
     private async Task AnswerLink(WebSocket socket, string id, string route, CancellationToken cancellationToken)
@@ -64,7 +74,7 @@ public partial class LiveMapRoute
             try
             {
                 var body = message.ToArray();
-                answer = route == "push" ? Pushed(id, body) : ThingsTaken(id, body) ? "{\"saved\":true}" : null;
+                answer = route == "push" ? Pushed(id, body) : route == "comet" ? CometLinked(id, body) : ThingsTaken(id, body) ? "{\"saved\":true}" : null;
             }
             catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or KeyNotFoundException)
             {

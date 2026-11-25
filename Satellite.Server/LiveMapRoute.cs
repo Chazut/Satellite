@@ -86,6 +86,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         // the raid's containers and quest places that its map's places.json doesn't have (POST api/more), as JSON text:
         // {"loc","boxes":[..],"zones":[..]}; null: none
         public volatile string? More;
+        // all of the raid's containers as that sent them, {"loc","boxes":[..]} (null: none yet), and when (Now): kept with
+        // the raid's recording, so its replay has them whatever places.json says by then
+        public volatile string? Spots;
+        public long SpotsAt;
         // what has happened in the raid it's in (see Events in the game's plugin): the latest, for a page opened later
         public readonly Lock EventsLock = new();
         public readonly List<(long Number, string Json)> Events = [];
@@ -248,6 +252,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                     return;
                 case "api/history/rec":
                     await SendRecording(context, query["id"].ToString(), cancellationToken);
+                    return;
+                case "api/history/comet":
+                    await SendComet(context, query["id"].ToString(), query["p"].ToString(), query["sum"].ToString() == "1", cancellationToken);
                     return;
                 case "api/history/export":
                     await ExportRecording(context, query["id"].ToString(), cancellationToken);
@@ -520,6 +527,13 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         const bool slow = false;
 #endif
         var answer = new StringBuilder(160).Append("{\"w\":").Append(slow ? 1 : watchers).Append(slow ? ",\"slow\":1" : "").Append(_offAnswer);
+#if RECORDING
+        // COMET's decisions, for the raid's recording (see CometRecord)
+        if (CometAsked(session) is var comet and > 0)
+        {
+            answer.Append(",\"cm\":").Append(comet);
+        }
+#endif
         if (location != null)
         {
             answer.Append(",\"loc\":").Append(JsonSerializer.Serialize(location));

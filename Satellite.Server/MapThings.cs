@@ -192,6 +192,9 @@ public partial class LiveMapRoute
 
     // A list of flat objects: strings, numbers, true or false, and lists of up to three numbers. Anything else in
     // them is dropped; a list that isn't one comes back empty.
+    // a number in JSON, or NaN
+    private static double Number(JsonNode? node) => node is JsonValue v && v.TryGetValue<double>(out var d) ? d : double.NaN;
+
     private static JsonArray Plain(JsonNode? list, int most)
     {
         var kept = new JsonArray();
@@ -362,9 +365,11 @@ public partial class LiveMapRoute
         await SendJson(context, "{\"saved\":true}", cancellationToken);
     }
 
-    // POST api/more: where the raid's containers and quest places stand, once a raid. Only the ones the location's
-    // places.json doesn't have are kept (a cache that spawns by chance, a quest place a mod adds), for the game's
-    // pages to add to the map.
+    // POST api/more: where the raid's containers and quest places stand, once a raid. For the game's pages, only the
+    // ones the location's places.json doesn't have (a cache that spawns by chance, a quest place a mod adds), or has
+    // somewhere else: some of a location's containers have other ids from raid to raid (about 150 of Streets'), so an id
+    // in places.json can be another container in this raid. All of the raid's containers are kept too (Spots), for its
+    // recording: a replay goes by them, whatever places.json says by then.
     private async Task SaveMore(MongoId sessionId, HttpContext context, CancellationToken cancellationToken)
     {
         var id = GameSession(sessionId);
@@ -382,8 +387,8 @@ public partial class LiveMapRoute
             return;
         }
 
-        // the ids places.json has already
-        var known = new HashSet<string>(StringComparer.Ordinal);
+        // the ids places.json has already, and where each stands
+        var known = new Dictionary<string, JsonArray?>(StringComparer.Ordinal);
         string? text;
         lock (_mapsLock)
         {
@@ -400,7 +405,7 @@ public partial class LiveMapRoute
                     {
                         if (thing?["id"] is JsonValue v && v.TryGetValue<string>(out var thingId))
                         {
-                            known.Add(thingId);
+                            known[thingId] = thing["p"] as JsonArray;
                         }
                     }
                 }
@@ -411,16 +416,24 @@ public partial class LiveMapRoute
             // all of them are new, then
         }
 
-        JsonArray New(string list) =>
-            new(Plain(sent[list], 5000).Where(t => t?["id"] is JsonValue v && v.TryGetValue<string>(out var thing) && !known.Contains(thing))
+        // (a place more than a metre from where places.json has it is another one under the same id)
+        bool Same(JsonArray? had, JsonNode? now) =>
+            had is { Count: >= 3 } && now is JsonArray { Count: >= 3 } at
+            && Math.Pow(Number(had[0]) - Number(at[0]), 2) + Math.Pow(Number(had[1]) - Number(at[1]), 2) + Math.Pow(Number(had[2]) - Number(at[2]), 2) <= 1;
+
+        var allBoxes = Plain(sent["boxes"], 5000);
+        JsonArray New(JsonArray all) =>
+            new(all.Where(t => t?["id"] is JsonValue v && v.TryGetValue<string>(out var thing) && !(known.TryGetValue(thing, out var had) && Same(had, t["p"])))
                 .Select(t => t!.DeepClone()).ToArray());
 
-        var boxes = New("boxes");
-        var zones = New("zones");
+        var boxes = New(allBoxes);
+        var zones = New(Plain(sent["zones"], 5000));
         var session = _sessions.GetOrAdd(id, key => new Session(key));
         session.More = boxes.Count + zones.Count > 0
             ? new JsonObject { ["loc"] = location, ["boxes"] = boxes, ["zones"] = zones }.ToJsonString()
             : null;
+        session.Spots = allBoxes.Count > 0 ? new JsonObject { ["loc"] = location, ["boxes"] = allBoxes }.ToJsonString() : null;
+        session.SpotsAt = Now;
 
         // the pages ask for the loot again, which brings them
         session.ThingsMade = null;
@@ -547,6 +560,8 @@ public partial class LiveMapRoute
 
     private readonly Lock _namesLock = new();
     private Dictionary<string, string>? _locale;
+    // the colour a mod gave an item's name in the game's rich text, by item id ("#ff8000"): see NameOf
+    private readonly Dictionary<string, string> _tints = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, double>? _handbook;
     private readonly Dictionary<string, JsonObject> _names = new(StringComparer.Ordinal);
 
@@ -593,7 +608,13 @@ public partial class LiveMapRoute
             {
                 foreach (var (key, value) in locales.GetLocaleDb("en") ?? [])
                 {
-                    _locale[key] = value;
+                    // (without the rich text some mods add to names, but with an item name's colour: see RichText)
+                    if (key.EndsWith(" Name", StringComparison.OrdinalIgnoreCase) && RichText.Colour(value) is { } tint)
+                    {
+                        _tints[key[..^5]] = tint;
+                    }
+
+                    _locale[key] = RichText.Plain(value);
                 }
             }
             catch (Exception ex)
@@ -712,6 +733,12 @@ public partial class LiveMapRoute
                 : id,
             ["s"] = shortName ?? ""
         };
+        // "t": the colour a mod gave its name in the game, for the page to show it in (Loot > More > Mods' name colours on the page)
+        if (_tints.TryGetValue(id, out var tint))
+        {
+            entry["t"] = tint;
+        }
+
         if (!MongoId.IsValidMongoId(id))
         {
             return entry;

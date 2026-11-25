@@ -307,7 +307,7 @@ namespace Satellite.Client
                     var type = item.GetType().Name;
                     Out[key] = new Gone
                     {
-                        At = now, Who = who, Template = item.TemplateId.ToString(), Said = item.LocalizedShortName(), Count = item.StackObjectsCount,
+                        At = now, Who = who, Template = item.TemplateId.ToString(), Said = RichText.Plain(item.LocalizedShortName()), Count = item.StackObjectsCount,
                         Grenade = type.IndexOf("ThrowWeap", StringComparison.OrdinalIgnoreCase) >= 0 || type.IndexOf("Grenade", StringComparison.OrdinalIgnoreCase) >= 0,
                         Where = __instance.Position
                     };
@@ -326,7 +326,7 @@ namespace Satellite.Client
                 World.Names.TryGetValue(who, out var name);
                 World.Kinds.TryGetValue(who, out var kind);
                 var template = item.TemplateId.ToString();
-                var said = item.LocalizedShortName();
+                var said = RichText.Plain(item.LocalizedShortName());
                 var count = item.StackObjectsCount;
                 var quest = item.QuestItem;
                 var where = __instance.Position;

@@ -71,7 +71,14 @@
     // false: no raid is recorded
     "record": true,
     // how many raids are kept: the oldest are deleted beyond this
-    "keep": 30
+    "keep": 30,
+    // with COMET: what each bot decided and why, kept with the raid for its replay (not yet shown in a replay). false: not recorded
+    "comet": false,
+    // true: all of what COMET says, its settings and its reports of the whole raid too, for its debug views
+    // (several times the size)
+    "cometDebug": false,
+    // the most COMET's decisions may take for one raid (MB): the rest of that raid's are left out
+    "cometMb": 100
   },
   // The SPT server itself. Restart the server after a change.
   "server": {

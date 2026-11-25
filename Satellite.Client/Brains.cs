@@ -88,6 +88,7 @@ namespace Satellite.Client
                         _crossfire = Direct<Func<string, string>>(Said(decisions, "GetCrossfireDecision"));
                         _after = Direct<Func<string, string>>(Said(decisions, "GetPostCombatDecision"));
                         Listen(decisions);
+                        CometLog.Bind(decisions);
                     }
                 }
             }

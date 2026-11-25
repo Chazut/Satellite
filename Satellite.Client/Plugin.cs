@@ -142,6 +142,7 @@ namespace Satellite.Client
             {
                 _pushLink.Tick(Time.unscaledDeltaTime);
                 _thingsLink.Tick(Time.unscaledDeltaTime);
+                CometLog.Tick(Time.unscaledDeltaTime);
                 Things.Tick(this, _watchers > 0 && !_failed);
 
                 _wait -= Time.unscaledDeltaTime;
@@ -448,6 +449,8 @@ namespace Satellite.Client
                     var read = JObject.Parse(answer);
                     _watchers = read.Value<int?>("w") ?? 0;
                     _slow = (read.Value<int?>("slow") ?? 0) > 0;
+                    // COMET's decisions, for the raid's recording (see CometLog)
+                    CometLog.Mode = read.Value<int?>("cm") ?? 0;
                     // the kinds of marker the server's config keeps off the page
                     if (read["off"] is JArray off)
                     {

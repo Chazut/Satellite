@@ -180,6 +180,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <div id="filtersLoot" class="filterGrid"></div>
         <label class="row" title="What's in containers, bodies and airdrops, and what bots wear and carry, by the pointer, in the Raid list and in Best loot. Off: you only see what's lying about. Containers then show only up close, all alike."><input type="checkbox" id="optPeek"><span>Show what's inside things</span></label>
         <label class="row" title="The short name of each piece of loose loot, once zoomed in close enough"><input type="checkbox" id="optItemNames"><span>Item names</span></label>
+        <label class="row" title="The name at the top of an item's tooltip in the colour another mod gives it in the game (ODT's Item Info, for one). Worth keeps its own colours."><input type="checkbox" id="optModTints"><span>Mods' name colours</span></label>
         <label class="row" title="What somebody picks up is written on the map where they stood, for a few seconds. For the kinds of people shown, and loot worth showing."><input type="checkbox" id="optLootFloats"><span>Pick-ups on the map</span></label>
         <label class="row range" title="Containers and bodies worth less than that only show once you've zoomed in this close (the screen's short side this many metres across or fewer). Item names show from there too. Further right: from further out."><span>Show all within <small id="closeText"></small></span><input type="range" id="optClose" step="5"></label>
         <label class="row range" title="Opacity of loot, containers and locks on another floor than the player. All the way left: hidden."><span>Other floors <small id="otherLootText"></small></span><input type="range" id="optOtherLoot" min="0" max="100" step="5"></label>
@@ -285,7 +286,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" title="A red flash on whoever a bullet hits."><input type="checkbox" id="optHitFlash"><span>Hit flashes</span></label>
         <label class="row" title="Power switches and levers on the map, green once switched."><input type="checkbox" id="optSwitches"><span>Switches</span></label>
         <label class="row" title="A burst where a grenade goes off, and an arc to it from whoever threw it."><input type="checkbox" id="optGrenades"><span>Grenades</span></label>
-        <label class="row" title="By each player and PMC who came in with others: their team's number, in the team's colour."><input type="checkbox" id="optSquadMarks"><span>Team numbers</span></label>
+        <label class="row" title="By each player and PMC who came in with others: their team's number, in the team's colour."><input type="checkbox" id="optSquadMarks"><span>Team number on markers</span></label>
         <label class="row" title="Each PMC who came in with others drawn in their team's colour (the colour of their team number), so who's with whom shows at a glance. Off: every PMC in the PMC colour."><input type="checkbox" id="optSquadCols"><span>Team colours</span></label>
         <label class="row" title="After the name of each player and PMC who came in with others, on the map and in the Raid list: their team's number (#2), as on their team badge."><input type="checkbox" id="optTeamNames"><span>Team number by names</span></label>
         <label class="row" title="Doors opened, shut and unlocked: said on the map where the door is, with who did it (the one nearest it), and listed with the raid's events. Needs Satellite 1.1.0's game plugin."><input type="checkbox" id="optDoorEvents"><span>Doors on the map</span></label>
@@ -375,6 +376,10 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <details class="group" data-group="labels" open>
         <summary>Markers and names</summary>
         <label class="row range"><span>Marker size <small id="scaleText"></small></span><input type="range" id="optScale" min="0.6" max="2.4" step="0.1"></label>
+        <label class="row range" title="How every bot is drawn on the map: PMCs, scavs, bosses and the rest. Each one but the dot shows which way they face."><span>Bots' markers</span><select id="optBotShape">
+        <option value="arrow">Arrow</option><option value="disc">Circle with a pointer</option><option value="chevron">Chevron</option><option value="cone">Dot with a view cone</option><option value="dot">Dot</option></select></label>
+        <label class="row range" title="How you and your friends in a Fika raid are drawn on the map, so you can tell yourselves apart from the bots."><span>My and friends' markers</span><select id="optMeShape">
+        <option value="arrow">Arrow</option><option value="disc">Circle with a pointer</option><option value="chevron">Chevron</option><option value="cone">Dot with a view cone</option><option value="dot">Dot</option></select></label>
         <label class="row range" title="How big the names and words on the map are, apart from the markers."><span>Text size <small id="textScaleText"></small></span><input type="range" id="optTextScale" min="0.6" max="2.4" step="0.1"></label>
         <label class="row range" title="Whose name is written under their marker. Bosses include their guards and the Goons. Pointing at a marker always names it."><span>Names under</span><select id="optNames">
         <option value="some">Bosses and friends</option><option value="players">PMCs, bosses and friends</option><option value="all">Everyone</option></select></label>

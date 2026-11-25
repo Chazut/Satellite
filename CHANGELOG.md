@@ -13,7 +13,16 @@
 - The bar at the top is one slim row across the screen, not a line of separate buttons over the map: Satellite's logo, whose game and the map, the search, the Raid list and Follow, then Whole map, Buildings and Full screen as icons (named when pointed at), the language and the menu. The Raid list and the menu start under it. Its boxes keep their size while the page loads and the game connects.
 - The map's own pointer shows from the moment the page opens, not the computer's busy pointer while it loads: its pictures are part of the page.
 - REC in the top bar of the live map: blinking while the raid shown is being recorded, grey ("REC off") when recording is stopped, and not there otherwise. When a recorded raid ends, a note says it's in Raid history; pressed, it opens it. Pressed, it stops recording, the raid going on and every one after, until pressed again; a server restart keeps it stopped. The raid history says so, with a way to start it again (also under Manage recordings, which is where it is on a phone).
-- The replay's timeline is red over each fight, from its first shot to the kill, with a line down the bar at each kill (gold for your own). Along its foot, loot sprees: somebody picking up five things or more in a short while (a bot clearing a marked room), pointed at for who and how much, pressed to go there following them (cog > Loot sprees).
+- The replay's timeline is red over each fight, from its first shot to the kill, with a line down the bar at each kill (gold for your own). Along its foot, loot sprees: somebody picking up five things or more in a short while (a bot clearing a marked room), pointed at for who and how much, pressed to go there following them (cog > Loot sprees). Sprees at the same time sit one over another, so none hides another.
+- The panel beside a replay's map has four tabs, Events, Bots, Loot and Settings, instead of one long column of folds. Settings has the live map's settings that change what a replay shows, in groups: markers and names, people and bots, what's drawn on the map, ORBIT, floors, loot, the kill feed, the screen and colours. The raid's events take the panel's whole height, and Switches is only there in a raid that recorded some.
+- Zooming in from the whole map is smooth: the map no longer jumps aside on the first step in, where it got bigger than the room between the menus.
+- Zooming in bursts (stop, then zoom again) doesn't stutter, and zooming while following somebody doesn't shake. The map turns sharp sooner after a zoom: its close-up pictures are fetched while it zooms, then put in a few at a time.
+- The replay's legend sets out each team as a block: its number down the left in the team's colour, its members one under another.
+- Pressing a kill zooms out far enough to show the killer and the one killed together, following the killer.
+- A kill's mark on the map is smaller and lies under the markers. Its "who ← by whom" sits above the killer when the two are close, clear of the killer's marker and name.
+- A replay's trails are dotted and fainter, so they stay behind the markers.
+- Markers: Settings > Markers and names > Bots' markers, and My and friends' markers. Arrow, Circle with a pointer, Chevron, Dot with a view cone, or Dot.
+- Map > People and bots > Team numbers is now called Team number on markers, beside Team number by names. Both are in the replay's Settings too.
 - On the replay's timeline, kills close together share a pin only when one killer made them near each other; other kills that close each keep their own pin, side by side.
 - Dragging along a replay's timeline shows the pick-ups of the moments before where it stops, rising and fading as when it plays.
 - ORBIT's zones (Raid > ORBIT field) are drawn where ORBIT has them, each at its own size: they were all in one spot near the middle of the map.
@@ -28,7 +37,7 @@
 - Grey round a floor: while a floor of a building is shown, the rest of the map and the building's other floors are grey as well as darker, so the floor shown, in colour, stands out. Map > View > Grey round a floor.
 - COMET's grenade suppression (one throws, the rest hold angles) and siege (the squad watches the ways out of the building the enemy is in) are shown like its other squad tactics: in the Raid list, the raid's events, the bot's card and over the bot. Only with a COMET that has them; without COMET, or with an older one, nothing changes.
 - A floor of a building shows only where it is: on Labs, the basement no longer has the glass roof over its halls. What isn't the floor shown is dimmed like the other floors, and Map > View > Hide other floors leaves only the floor shown drawn.
-- Along a replay's bar: Performance, Normal or Debug. Performance draws the same replay at most 15 times a second (markers a moment behind, far less of the computer); Debug shows what's going on under the timeline. Debug moved there from the cog.
+- Along a replay's bar: Performance, Normal or Debug. Performance draws the same replay at most 15 times a second (markers a moment behind, far less of the computer); Debug shows what's going on under the timeline (on a phone, cut short to fit, so the bar keeps still). Debug moved there from the cog.
 - A bot's level is only said where it means something: a player's, a PMC's, or a bot above level 1 (a mod such as PBT can level bots). Scavs, bosses and the rest are all level 1, so it's left out for them.
 - The floor shown has one colour however it was picked; the Auto button is lit while Auto picks the floor.
 - A raid's outcome fits its tile on the raid history's Overview ("Ended abruptly" was cut short).
@@ -87,6 +96,11 @@
 - One of PBT's cheaters says what PBT made of it (its personality and its cheats) when pointed at, and in the Raid list.
 - COMET squad moves that were declined, cut short or had no role assigned say so.
 - Loose loot a quest wants found in raid is a hexagon with a tick (as the game marks found-in-raid items), not an F. In a container's list it has a FIR tag beside its name, and its worth stays in line with the others.
+- Floors are named from where you walk in, as intended: on Lighthouse, the water treatment plant's ground floor is the Ground floor, not the Basement.
+- The raid's events open on All, not Tactic (Tactic and Squads need COMET).
+- The top bar fits a narrower window (a monitor on its side, a window half the screen wide): it takes a second row instead of running off the screen, and the map's buttons show only their icons.
+- My keys: a locked door's whole icon shows whether you have its key (green with you, gold in your stash, grey not had), not only the small picture in it, so it can be told at any zoom.
+- Item names that a mod dresses in the game's rich text (colours, bold, as ODT's Item Info does) show on the page as their plain text, without the `<color>` tags, on the map, in the lists and in raids recorded before. Loot > More > Mods' name colours (off to begin with) shows the name at the top of an item's tooltip in that mod's colour.
 
 ## 1.0.3
 

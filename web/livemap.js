@@ -304,13 +304,13 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, lootSprees: true, edgeExits: true, doorEvents: true, teamNames: true, squadCols: false, actionIcons: true, tacticWords: true, floorGrey: true, keyStates: false,
-    myQuests: true, otherLoot: 30, floorDim: 70, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'tactic', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, modTints: false, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, lootSprees: true, edgeExits: true, doorEvents: true, teamNames: true, squadCols: false, actionIcons: true, tacticWords: true, floorGrey: true, keyStates: false,
+    myQuests: true, otherLoot: 30, floorDim: 70, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'all', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
-    latin: true,
+    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events',
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
       rosterMore: true, who: true, layout: true, spawnKinds: false, rosterRows: true, bots: true, orbitMap: false, feed: true, areas: false, boxKinds: true,
@@ -318,6 +318,8 @@
   // lootOff: the kinds of loot left off (see LOOT_KINDS). peek: what's in containers, bodies, airdrops and on bots is
   // shown. rosterFog: the Raid list names everyone seen this raid but not who's still alive. latin: names written in
   // Cyrillic are shown in Latin letters (bosses by their English names)
+  // botShape, meShape: how bots, and you and your friends, are drawn (see MARKER_SHAPES)
+  for (const k of ['botShape', 'meShape']) if (!['arrow', 'disc', 'chevron', 'cone', 'dot'].includes(prefs[k])) prefs[k] = 'arrow';
   if (!Array.isArray(prefs.lootOff)) prefs.lootOff = [];
   // boxOff: the sorts of container left off the map (see BOX_GLYPH)
   if (!Array.isArray(prefs.boxOff)) prefs.boxOff = [];
@@ -335,6 +337,8 @@
   if (!prefs.botKillsOff) { prefs.botKills = false; prefs.botKillsOff = true; }
   // (once: a replay's Raid events list the whole raid to begin with, not only what had happened by the moment shown)
   if (!prefs.eventsAllOnce) { prefs.hpEventsAll = true; prefs.eventsAllOnce = true; }
+  // (once: the raid's events used to open on Tactic, which only COMET has; All now, until another is picked)
+  if (!prefs.eventsAllFirst) { prefs.eventsKind = 'all'; prefs.eventsAllFirst = true; }
   // (once: a preset of the day before put ORBIT's and Phobos's fields, hearing circles and the rest on; off again)
   if (!prefs.modsOnOnce) { prefs.botSAIN = true; prefs.botORBIT = true; prefs.botCOMET = true; prefs.modsOnOnce = true; }
   if (!prefs.debugOffOnce) { Object.assign(prefs, { orbitField: false, phobosField: false, orbitLines: false, orbitNames: false, orbitHear: false, orbitFights: false }); prefs.debugOffOnce = true; }
@@ -517,7 +521,11 @@
   const HIST_KEYS = ['heat', 'trails', 'killLines', 'floorOnly', 'hitFlash', 'switches', 'orbitMain', 'orbitRush', 'orbitField', 'phobosField',
     'orbitHear', 'minimap', 'killKeep', 'trailMs', 'lootFloats', 'grenades', 'squadMarks', 'turns', 'lang', 'hpOpen', 'hpSpeed', 'hpSettings',
     'shots', 'mapDoing', 'cols', 'hpNoPeople', 'hpNoEvents', 'hpNoFacing', 'hpDebug', 'hpLoot', 'hpLootMap', 'hpSideOff', 'hpRecWho',
-    'lootSprees', 'lowPower', 'hpEventsAll', 'eventsAllOnce', 'debugOffOnce', 'squadCols', 'actionIcons', 'tacticWords', 'teamNames', 'doorEvents', 'floorGrey', 'floorHide', 'floorDim'];
+    'lootSprees', 'lowPower', 'hpEventsAll', 'eventsAllOnce', 'debugOffOnce', 'squadCols', 'actionIcons', 'tacticWords', 'teamNames', 'doorEvents', 'floorGrey', 'floorHide', 'floorDim',
+    // (the settings the panel beside a replay's map has: see sideSettings)
+    'hpTab', 'eventsKind', 'eventsAllFirst', 'botShape', 'meShape', 'health', 'healthAll', 'names', 'myName', 'latin', 'scale', 'textScale', 'squadParts', 'orbitLines', 'orbitNames', 'orbitFights',
+    'mapLight', 'feed', 'feedMine', 'feedPmc', 'feedBoss', 'feedAi', 'feedNames', 'feedRows', 'feedKeep', 'feedBox', 'feedBg', 'worth', 'itemNames', 'modTints',
+    'peek', 'roofLoot', 'roofTotals', 'roofTotalsUnder', 'otherLoot', 'corpseKind'];
   // (the history page's switches as it read them: it writes back only what it changed itself, so a page left open
   // doesn't put back what the live map changed since, a preset's switches say)
   let histRead = null;
@@ -747,11 +755,15 @@
     // But it can be dragged on until its edge is clear of what's laid over it (the menu, the Raid list, the bar along
     // the top, a phone's sheet), so no part of it is stuck underneath.
     const { left, right, top, bottom } = overMap();
-    const wide = (v.max.x - v.min.x) * zoom, tall = (v.max.y - v.min.y) * zoom;
-    if (wide + 2 * slack <= vw - left - right) panX = -zoom * (v.min.x + v.max.x) / 2;
-    else panX = Math.min(Math.max(panX, vw / 2 - slack - right - zoom * v.max.x), slack - vw / 2 + left - zoom * v.min.x);
-    if (tall + 2 * slack <= vh - top - bottom) panY = zoom * (v.min.y + v.max.y) / 2;
-    else panY = Math.min(Math.max(panY, vh / 2 - slack - bottom + zoom * v.min.y), slack - vh / 2 + top + zoom * v.max.y);
+    // Along each way: smaller than the room between them, it's held between the middle of the screen and the middle
+    // of that room; bigger, its edges are kept clear of them, the middle of the screen always allowed too. The two
+    // meet where the map is just as big as the room, so zooming across that size never makes it jump (it did: from
+    // the screen's middle to the room's, half the difference of what's laid over each side).
+    const keep = (p, mid, lo, hi) => lo >= hi
+      ? Math.min(Math.max(p, Math.min(mid, (lo + hi) / 2)), Math.max(mid, (lo + hi) / 2))
+      : Math.min(Math.max(p, Math.min(lo, mid)), Math.max(hi, mid));
+    panX = keep(panX, -zoom * (v.min.x + v.max.x) / 2, vw / 2 - slack - right - zoom * v.max.x, slack - vw / 2 + left - zoom * v.min.x);
+    panY = keep(panY, zoom * (v.min.y + v.max.y) / 2, vh / 2 - slack - bottom + zoom * v.min.y, slack - vh / 2 + top + zoom * v.max.y);
   }
   // how far in from each side of the screen what's laid over the map reaches (pixels); measured at most four times a
   // second, as measuring makes the page lay itself out
@@ -801,7 +813,9 @@
   }
   function zoomBy(times, sx, sy) {
     zoomTarget = Math.min(Math.max(zoomTarget * times, zoomMin), zoomMax);
-    zoomAt = following() && inRaidHere() ? null : [sx, sy];
+    // (about the middle while somebody is followed: held at the pointer, the zoom moved the map one way and keeping
+    // them in the middle the other, frame by frame, and it shook)
+    zoomAt = (following() && inRaidHere()) || chased !== null ? null : [sx, sy];
     // with auto zoom on, zooming by hand while the player is followed says how close "indoors" or "outdoors" is;
     // zooming while looking about doesn't
     if (autoZooming() && zoomState !== null && chased === null) {
@@ -809,7 +823,10 @@
       prefs[key] = clampSpan(Math.min(vw, vh) / zoomTarget, zoomState ? SPAN_IN : SPAN_OUT, prefs[key]);
       showSpans();
     } else prefs.zoom = (zoomTarget - zoomMin) / (zoomMax - zoomMin);
-    save();
+    // (kept once the wheel has stopped, not at every turn of it: each save writes every setting, and a zoom going on
+    // stuttered)
+    clearTimeout(zoomBy.saving);
+    zoomBy.saving = setTimeout(save, 400);
   }
   // the zoom sliders: closer to the right
   function showSpans() {
@@ -959,7 +976,9 @@
         const pl = loops(p && p.l);
         if (pl.length && p.n > 0 && Number.isFinite(p.h)) parts.push({ n: p.n | 0, h: p.h, t: Number.isFinite(p.t) ? p.t : p.h + 3, a: +p.a || 0, l: pl, box: boxOf(pl) });
       }
-      if (l.length && parts.length) out.push({ l, parts, box: boxOf(l), size: loopsArea(l), floors: [...new Set(parts.map(p => p.n))].sort((a, b) => a - b) });
+      // (with the ground round it and the floor one walks into from there, as the capture measured them: see floorName)
+      if (l.length && parts.length) out.push({ l, parts, box: boxOf(l), size: loopsArea(l), floors: [...new Set(parts.map(p => p.n))].sort((a, b) => a - b),
+        g: Number.isFinite(b.g) ? b.g : undefined, gn: Number.isFinite(b.gn) && b.gn > 0 ? b.gn | 0 : undefined });
     }
     return out.length ? out : null;
   }
@@ -1217,18 +1236,31 @@
     const lap = lapShown || lapNow();
     img.style.transform = 'translate(' + (img.bx - lap / 2) + 'px,' + (img.by - lap / 2) + 'px) scale(' + (map.tile + lap) / TILE_BOX + ')';
   }
-  // laid again once the zoom has changed enough to tell
+  // laid again once the zoom has changed enough to tell. While it zooms, only once it has doubled or halved: laying
+  // every tile again makes the browser draw the whole map again, and mid-zoom (every fifth more or less) it stuttered;
+  // the zoom settled, it's laid again as it should be, when the map is drawn sharp anyway.
   function layTiles() {
     const lap = lapNow();
-    if (lapShown && Math.abs(lap - lapShown) < lapShown * 0.2) return;
+    if (lapShown && (layersEl.classList.contains('zooming') ? lap < lapShown * 2 && lap > lapShown / 2 : Math.abs(lap - lapShown) < lapShown * 0.2)) return;
     lapShown = lap;
     for (const t of tiles) layTile(t.img);
     for (const t of floorTiles) layTile(t.img);
   }
+  // the pictures fetched ahead while the map zooms (see refreshTiles), by their address, and what they were for
+  let tilesAhead = '';
+  // big pictures arrived, waiting to be swapped in: six a frame
+  const swapsDue = [];
+  function swapSome() { for (const f of swapsDue.splice(0, 6)) f(); if (swapsDue.length) requestAnimationFrame(swapSome); }
+  const aheadImgs = new Map();
   // Every tile shows its small picture; the ones in view show the big one once the map is close enough to tell.
   // A picture is swapped once the new one has arrived, so nothing flickers.
   function refreshTiles() {
     if (!map) return;
+    // (not swapped in while it zooms: a picture swapped in makes the browser draw the map again, and mid-zoom it
+    // stuttered. The small pictures stretch meanwhile, and the big ones the zoom is heading for are fetched and
+    // unpacked, not shown; once it has settled they're swapped in at once, as it's drawn sharp, with nothing left
+    // to wait for. A map just opened has none yet: those are put in at once.)
+    const moving = !!tilesPrint && layersEl.classList.contains('zooming');
     const big = !map.small || zoom * map.tile * (pixelRatio()) > 330;
     // the ground the screen's corners show, whichever way the map is turned
     const corners = [toMap(0, 0), toMap(vw, 0), toMap(0, vh), toMap(vw, vh)];
@@ -1238,8 +1270,24 @@
     const row0 = Math.floor((a[1] - map.min.y) / map.tile - 0.5), row1 = Math.floor((b[1] - map.min.y) / map.tile + 0.5);
     const print = [map.loc, map.v, big, col0, col1, row0, row1, floorShown.place, floorShown.n].join();
     if (print === tilesPrint) return;
-    tilesPrint = print;
     const all = tiles.map(t => [t, 0]).concat(floorTiles.map(t => [t, t.n || floorShown.n]));
+    if (moving) {
+      if (print === tilesAhead) return;
+      tilesAhead = print;
+      for (const [t, n] of all) {
+        const near = t.col >= col0 && t.col <= col1 && t.row >= row0 && t.row <= row1;
+        const want = tileSrc(t, !map.small || (big && near), n);
+        if (t.want === want || aheadImgs.has(want)) continue;
+        // (kept a while, so the picture stays unpacked till it's wanted; the oldest let go past a few screens' worth)
+        const pre = new Image();
+        pre.src = want;
+        if (pre.decode) pre.decode().catch(() => {});
+        aheadImgs.set(want, pre);
+        if (aheadImgs.size > 160) aheadImgs.delete(aheadImgs.keys().next().value);
+      }
+      return;
+    }
+    tilesPrint = print;
     for (const [t, n] of all) {
       const near = t.col >= col0 && t.col <= col1 && t.row >= row0 && t.row <= row1;
       const want = tileSrc(t, !map.small || (big && near), n);
@@ -1247,9 +1295,13 @@
       const first = !t.want;
       t.want = want;
       if (first) { t.img.src = want; continue; }
+      // (unpacked before it's swapped in, away from the page's drawing: swapped in packed, it was unpacked as the map
+      // was drawn, and a zoom going on stuttered)
       const next = new Image();
-      next.onload = () => { if (t.want === want) t.img.src = want; };
       next.src = want;
+      // (a few a frame: dozens swapped in at once as a zoom settled held the page up for a sixth of a second)
+      const swap = () => { swapsDue.push(() => { if (t.want === want) t.img.src = want; }); if (swapsDue.length === 1) requestAnimationFrame(swapSome); };
+      if (next.decode) next.decode().then(swap, swap); else next.onload = swap;
     }
   }
 
@@ -1374,7 +1426,8 @@
     spawnsOf = { loc: places.loc, h: hs.length ? hs[hs.length >> 1] : NaN };
     return spawnsOf.h;
   }
-  const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+  // (2nd, 3rd in English; in another language only the number, which its own words for "{n} floor" put in place)
+  const ordinal = n => window.fumsLangs && fumsLangs.code !== 'en' ? String(n) : n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
   let groundOf = { loc: '', h: NaN };
   // the height of the map's ground: where its extracts are (the middle one), else the lowest floor of most places
   function mapGround() {
@@ -2768,22 +2821,45 @@
       have: Array.isArray(raw.have) ? new Set(raw.have) : null, more };
   }
   // The raid's own containers and quest places, added to the map's places when they're of the same map: each once.
+  // The raid's own say goes over places.json's: some of a location's containers have other ids from raid to raid
+  // (about 150 of Streets'), so one of places.json's ids can be another container in this raid. The server sends the
+  // ones that are somewhere else (things.more), and a replay has all of its raid's (replay.spots, recorded as it
+  // loaded): each is moved to where the raid had it, and moved back once another raid's are what's shown.
   function addMore() {
-    const more = things && things.more;
-    if (!more || !places || !sameMap(places.loc, things.loc)) return;
-    if (!places.moreIds) places.moreIds = new Set(places.boxes.map(b => b.id).concat(places.zones.map(z => z.id)));
-    const ids = places.moreIds;
-    for (const b of more.boxes) {
-      if (ids.has(b.id)) continue;
-      ids.add(b.id);
-      places.boxes.push(b);
-      if (!places.names[b.tpl] && things.names[b.tpl]) places.names[b.tpl] = things.names[b.tpl];
+    if (!places) return;
+    const more = things && things.more && sameMap(places.loc, things.loc) ? things.more : null;
+    const spots = replay && replay.spots && sameMap(places.loc, replay.spots.loc) ? replay.spots : null;
+    if (places.moreFrom === more && places.spotsFrom === spots) return;
+    if (!places.byId) {
+      places.byId = new Map();
+      for (const b of places.boxes) places.byId.set(b.id, b);
+      for (const z of places.zones) places.byId.set(z.id, z);
+      places.moved = [];
     }
-    for (const z of more.zones) {
-      if (ids.has(z.id)) continue;
-      ids.add(z.id);
-      places.zones.push(z);
+    // (another replay's, or an earlier report's: back where places.json has them first)
+    for (let i = places.moved.length - 1; i >= 0; i--) places.moved[i][0].p = places.moved[i][1];
+    places.moved = [];
+    places.moreFrom = more;
+    places.spotsFrom = spots;
+    const ids = places.byId, names = things ? things.names : {};
+    const put = (b, list) => {
+      if (!b || !b.id || !at3(b.p)) return;
+      const had = ids.get(b.id);
+      if (!had) {
+        ids.set(b.id, b);
+        list.push(b);
+        if (b.tpl && !places.names[b.tpl] && names[b.tpl]) places.names[b.tpl] = names[b.tpl];
+      } else if (had.p !== b.p && had.p.some((v, i) => Math.abs(v - b.p[i]) > 0.5)) {
+        places.moved.push([had, had.p]);
+        had.p = b.p;
+      }
+    };
+    for (const b of spots ? spots.boxes : []) put(b, places.boxes);
+    if (more) {
+      for (const b of more.boxes || []) put(b, places.boxes);
+      for (const z of more.zones || []) put(z, places.zones);
     }
+    dirty = true;
   }
 
   // A small picture, drawn once and kept: a glyph (an emoji, a letter or one of our pictures) on a badge, round,
@@ -2888,6 +2964,8 @@
     if (!shown && !loot) return tell();
     const names = Object.assign({}, quests ? quests.names : {}, shown ? shown.names : {}, loot ? loot.names : {});
     const nameOf = tpl => (names[tpl] || {}).n || tpl;
+    // the colour another mod gives an item's name in the game, for its tooltip's title (Mods' name colours)
+    const tintOf = tpl => prefs.modTints && (names[tpl] || {}).t || '';
     const worthOf = (tpl, n) => ((names[tpl] || {}).p || 0) * (n || 1);
     const hits = findHits;
     // what a kind of container can hold that's searched for, by name (kept while the search stays as it is)
@@ -3077,10 +3155,11 @@
         const s = onScreen(l.p[0], l.p[1]);
         if (!s) continue;
         const open = loot && loot.open.has(l.id);
-        const rim = open ? '#3ddc5a' : LAYERS.locks.col;
-        // its key: with the player (bright), in their stash (gold), or not had (dim); off (the default): one colour
+        // its key: with the player (bright), in their stash (gold), or not had (dim); off (the default): one colour.
+        // The whole badge says it, its edge as well as its picture, so it shows at any zoom
         const has = prefs.keyStates === true && quests ? myKeys[l.key] || 0 : -1;
         const ink = has === 1 ? KEY_WITH : has === 2 ? KEY_STASH : has === 0 ? KEY_NONE : SPAWN_INK;
+        const rim = open ? '#3ddc5a' : has === 1 ? KEY_WITH : has === 2 ? KEY_STASH : has === 0 ? '#7c7f8f' : LAYERS.locks.col;
         put(s, l.p, badge(open ? 'i:unlocked' : LOCK_GLYPH[l.kind] || 'i:lock', '#1a1a24', rim, ink, 'hex', size));
         if (match) ring(s, size * 0.85);
         const keyLine = has === 1 ? T('You have the key with you') : has === 2 ? T('The key is in your stash') : has === 0 ? T("You don't have the key") : '';
@@ -3160,7 +3239,7 @@
           }
           return lines;
         };
-        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: nameOf(b.tpl) + (total ? ' · ' + roubles(total) : ''), get lines() { return listed(); } } });
+        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: nameOf(b.tpl) + (total ? ' · ' + roubles(total) : ''), tint: tintOf(b.tpl), get lines() { return listed(); } } });
       }
 
       // Where loose loot can spawn: a hollow ring each, in the colour of the dearest thing it can spawn of the kinds
@@ -3349,7 +3428,7 @@
         const whose = w => w && w[2] ? T("{who}'s quest", { who: w[2] }) : '';
         const why = want ? want[0].name + (want[1].text ? ': ' + want[1].text : '') : it.q ? T('Quest item') : '';
         const firWhy = fir ? T('Wanted found in raid for {quest}', { quest: fir[0].name }) + (fir[1].text ? ': ' + fir[1].text : '') : '';
-        thingsDrawn.push({ x: s[0], y: s[1], r: marked ? size / 2 : r * 1.2, tip: { title: nameOf(it.tpl) + (it.n > 1 ? ' ×' + it.n : '') + (why ? '' : ' · ' + roubles(it.worth)), lines: [why, whose(want), firWhy, whose(fir)] } });
+        thingsDrawn.push({ x: s[0], y: s[1], r: marked ? size / 2 : r * 1.2, tip: { title: nameOf(it.tpl) + (it.n > 1 ? ' ×' + it.n : '') + (why ? '' : ' · ' + roubles(it.worth)), tint: tintOf(it.tpl), lines: [why, whose(want), firWhy, whose(fir)] } });
       }
       for (const cell of cells.values()) {
         const s = toScreen(cell.x, cell.y), across = LOOT_CELL * 0.62 * zoom;
@@ -3432,7 +3511,8 @@
       const tagFirst = parts => parts.filter(p => p === 'quest' || p === 'fir').concat(parts.filter(p => p !== 'quest' && p !== 'fir'));
       const head = found.tip.title.split(' · ');
       const title = el('div', 'tipHead');
-      title.appendChild(el('strong', '', head[0]));
+      const named = title.appendChild(el('strong', '', head[0]));
+      if (found.tip.tint) named.style.color = found.tip.tint;
       cells(title, head.slice(1));
       tip.appendChild(title);
       let list = null;
@@ -3561,8 +3641,8 @@
     return m.t ? m.t + (levelShown(m.lv, m.c) ? ' · ' + T('Lv {n}', { n: m.lv }) : '') + teamText(m) : '';
   }
   // by the name of somebody who came in with others: their team's number (Settings > Team number by names)
-  const teamOn = m => prefs.teamNames !== false && m.dyn && m.g && m.c !== 'Corpse' && squadOf(m);
-  const teamText = m => teamOn(m) ? ' · #' + squadNo(m.g) : '';
+  const teamOn = m => prefs.teamNames !== false && m.dyn && teamKey(m) && m.c !== 'Corpse' && squadOf(m);
+  const teamText = m => teamOn(m) ? ' · #' + squadNo(teamKey(m)) : '';
 
   // What a bot is like and is up to, as the game's plugin tells it (when the server lets it): how hard it is, the
   // personality SAIN gave it, and who is deciding for it now: SAIN (it's in a fight), COMET (the move it's making in
@@ -3814,7 +3894,7 @@
       : m.c === 'Transit' && m.st === 0 ? EXIT_COL[0]
       : m.c === 'Corpse' && prefs.corpseKind && m.was && KINDS[m.was] ? KINDS[m.was].col
       // (a PMC who came in with others: their team's colour, Settings > Team colours)
-      : m.c === 'Enemy Player' && prefs.squadCols && m.g && squadOf(m) ? squadCol(squadNo(m.g)) : kind.col;
+      : m.c === 'Enemy Player' && prefs.squadCols && teamKey(m) && squadOf(m) ? squadCol(squadNo(teamKey(m))) : kind.col;
     // on another floor than the player: fainter, with an arrow up or down (an extract or a transit too, as loot is, and
     // the floor it's on named under it: an elevator's on the 3rd floor)
     const apart = m.c !== 'Main Player' && m.c !== 'BTR' && m.c !== 'Airdrop' ? otherFloor(m.cx, m.cy, m.cz) : 0;
@@ -3868,13 +3948,64 @@
 
       // headings are from the game's north, which the map may have turned
       ctx.rotate(((m.cr || 0) - turn) * RAD);
-      ctx.moveTo(0, -r * 1.25);
-      ctx.lineTo(r * 0.85, r * 0.9);
-      ctx.lineTo(0, r * 0.4);
-      ctx.lineTo(-r * 0.85, r * 0.9);
-      ctx.closePath();
-      ctx.stroke();
-      ctx.fill();
+      // the shape picked (Settings > Markers): one for bots, one for you and your friends; each within the arrow's
+      // reach (r × 1.25), where the health bar, team badge and name are put
+      const shape = m.c === 'Main Player' || m.c === 'Friendly Player' ? prefs.meShape : prefs.botShape;
+      if (shape === 'disc') {
+        // a disc with a small pointer on its rim, the way it faces
+        ctx.moveTo(0, -r * 1.28);
+        ctx.lineTo(r * 0.42, -r * 0.6);
+        ctx.lineTo(-r * 0.42, -r * 0.6);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fill();
+        // (the pointer's foot, under the disc's rim, filled over again so the two read as one)
+        ctx.beginPath();
+        ctx.moveTo(r * 0.36, -r * 0.62);
+        ctx.lineTo(0, -r * 0.95);
+        ctx.lineTo(-r * 0.36, -r * 0.62);
+        ctx.closePath();
+        ctx.fill();
+      } else if (shape === 'chevron') {
+        ctx.moveTo(0, -r * 1.2);
+        ctx.lineTo(r * 1.0, r * 0.55);
+        ctx.lineTo(r * 0.5, r * 0.9);
+        ctx.lineTo(0, r * 0.05);
+        ctx.lineTo(-r * 0.5, r * 0.9);
+        ctx.lineTo(-r * 1.0, r * 0.55);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+      } else if (shape === 'cone') {
+        // a dot, and a pale cone the way it faces
+        ctx.save();
+        ctx.globalAlpha *= 0.4;
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r * 1.25, -Math.PI / 2 - 0.6, -Math.PI / 2 + 0.6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fill();
+      } else if (shape === 'dot') {
+        ctx.arc(0, 0, r * 0.75, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fill();
+      } else {
+        ctx.moveTo(0, -r * 1.25);
+        ctx.lineTo(r * 0.85, r * 0.9);
+        ctx.lineTo(0, r * 0.4);
+        ctx.lineTo(-r * 0.85, r * 0.9);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+      }
     } else if (kind.shape === 'cross') {
       ctx.lineCap = 'round';
       ctx.moveTo(-r * 0.7, -r * 0.7); ctx.lineTo(r * 0.7, r * 0.7);
@@ -4871,7 +5002,7 @@
       // (over, as this game says, and long enough for the server to keep it: 45 s)
       const kept = performance.now() - recLiveSince > 45000 && !off && !!report && report.raid === false;
       recLiveSince = 0;
-      if (kept) toast(T('Raid recorded: in Raid history (Left Alt + H in the game)'), '#ff4b3e', () => window.open(ROOT + 'raids/', '_blank'));
+      if (kept) toast(T('Raid recorded: in Raid history'), '#ff4b3e', () => window.open(ROOT + 'raids/', '_blank'));
     }
     btn.hidden = !shown;
     btn.classList.toggle('off', off);
@@ -4966,6 +5097,8 @@
         }
       }
     }
+    // kills: under the living, so a killer stood by the one they killed isn't covered by its mark
+    if (!(HIST && prefs.hpNoEvents)) drawKills(scale);
     for (const m of live) {
       if (m.c === 'Corpse' || isHidden(m.c || 'None')) continue;
       // an extract that isn't there this raid (a car that never came), when only the ones to be had are wanted
@@ -4988,7 +5121,6 @@
       drawHits(scale);
       drawBlasts(scale);
       drawMags(scale);
-      drawKills(scale);
       drawFloats(scale);
     }
     drawPlane(scale);
@@ -6244,7 +6376,7 @@
     // after the name: the team's number in its colour, as on the map
     const teamDot = (row, m) => {
       if (!teamOn(m)) return;
-      const n = squadNo(m.g), dot = mk('i', 'squadDot', String(n));
+      const n = squadNo(teamKey(m)), dot = mk('i', 'squadDot', String(n));
       dot.style.background = squadCol(n);
       dot.title = T('Team {n}', { n });
       row.children[1].after(dot);
@@ -6554,7 +6686,7 @@
   // the last dozen, the newest first, shut until asked for; pressing one goes to that bot, when it's still on the map
   // what's picked up, and what ORBIT's ghosts do: the other events the panel lists
   let otherEvents = [];
-  const EVENT_KINDS = [['tactic', 'Tactic', 'What each squad is doing together (COMET). Press one, or a bot in one, to see its members.'], ['all', 'All'], ['squad', 'Squads'], ['loot', 'Loot'], ['door', 'Doors', 'Doors opened, shut and unlocked, and by whom (the one nearest the door).'], ['orbit', 'ORBIT']];
+  const EVENT_KINDS = [['all', 'All'], ['tactic', 'Tactic', 'What each squad is doing together (COMET). Press one, or a bot in one, to see its members.'], ['squad', 'Squads'], ['loot', 'Loot'], ['door', 'Doors', 'Doors opened, shut and unlocked, and by whom (the one nearest the door).'], ['orbit', 'ORBIT']];
   const eventKind = e => e.k === 'comet.squad' ? 'squad' : e.k === 'loot' ? 'loot' : e.k === 'door' ? 'door' : 'orbit';
   // a door opened, shut or unlocked (the game's plugin says by whom: the one nearest it)
   const doorSaid = d => d.was === 'Locked' ? T('Unlocked a door') : d.st === 'Open' ? T('Opened a door') : T('Shut a door');
@@ -7876,7 +8008,9 @@
         zoomState = null;
       }
 
-      const zooming = Math.abs(zoomTarget - zoom) > zoom * 0.0005;
+      // (done within a fifth of a percent: what's left moves the map less than a pixel or two, and waiting out the
+      // last of it kept the map soft for longer)
+      const zooming = Math.abs(zoomTarget - zoom) > zoom * 0.002;
       if (zooming) {
         const hold = zoomAt || [vw / 2, vh / 2];
         const under = toMap(hold[0], hold[1]);
@@ -7886,7 +8020,13 @@
         panY += hold[1] - moved[1];
         dirty = true;
       } else if (zoom !== zoomTarget) {
+        // (the last of it about the same spot, so it doesn't jump)
+        const hold = zoomAt || [vw / 2, vh / 2];
+        const under = toMap(hold[0], hold[1]);
         zoom = zoomTarget;
+        const moved = toScreen(under[0], under[1]);
+        panX += hold[0] - moved[0];
+        panY += hold[1] - moved[1];
         dirty = true;
       }
 
@@ -7915,10 +8055,13 @@
       layersEl.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')' + (turn ? ' rotate(' + -turn + 'deg)' : '');
       // While it zooms, the pictures as drawn are only stretched (smooth, a little soft); a moment after it stops,
       // drawn again sharp at the size it settled on. (Drawn again at every step of a zoom, the browser stuttered.)
+      // That moment is long enough for a zoom stopped and started again (a wheel turned in bursts) to go on as one;
+      // and the big pictures are ready by then (fetched while it zoomed, see refreshTiles), so being drawn sharp is
+      // all there is to it.
       if (zooming) {
         layersEl.classList.add('zooming');
         clearTimeout(zoomSettle);
-        zoomSettle = setTimeout(() => layersEl.classList.remove('zooming'), 250);
+        zoomSettle = setTimeout(() => layersEl.classList.remove('zooming'), 350);
       }
     }
 
@@ -8420,6 +8563,10 @@
     save();
     setTurn(turnFor(map.loc));
   };
+  for (const [id, key] of [['optBotShape', 'botShape'], ['optMeShape', 'meShape']]) {
+    $(id).value = prefs[key];
+    $(id).onchange = e => { prefs[key] = e.target.value; save(); dirty = true; };
+  }
   $('optNames').value = prefs.names;
   $('optNames').onchange = e => { prefs.names = e.target.value; save(); dirty = true; };
   // the slider runs from far to near, like the zoom ones
@@ -8527,7 +8674,7 @@
       requestAnimationFrame(() => { again = false; findSettings(); });
     }).observe($('panelBody'), { childList: true, subtree: true });
   }
-  for (const [id, key] of [['optItemNames', 'itemNames'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optSquadCols', 'squadCols'], ['optTeamNames', 'teamNames'], ['optDoorEvents', 'doorEvents'], ['optActionIcons', 'actionIcons'], ['optTacticWords', 'tacticWords'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
+  for (const [id, key] of [['optItemNames', 'itemNames'], ['optModTints', 'modTints'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optSquadCols', 'squadCols'], ['optTeamNames', 'teamNames'], ['optDoorEvents', 'doorEvents'], ['optActionIcons', 'actionIcons'], ['optTacticWords', 'tacticWords'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
     ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optEdgeExits', 'edgeExits'], ['optMyName', 'myName'], ['optRecSign', 'recSign'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optLowPower', 'lowPower'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],
@@ -8957,6 +9104,13 @@
     }
   }
 
+  // A recording's text without the game's rich text that some mods put in item names ("<color=#ff8000>M4A1</color>"),
+  // as JSON has it ("<" may be written <): the server and the game's plugin leave it out now, but a raid recorded
+  // before kept it. Only the tags the game knows go (a name can hold a "<" of its own).
+  const RICH_TAGS = new RegExp('(?:<|\\\\u003[cC])/?(?:(?:b|i|u|s|size|colou?r|alpha|mark|sup|sub|font|material|noparse|sprite|nobr|lowercase|uppercase|smallcaps|style|link|cspace|mspace|voffset|indent|line-height|pos|rotate|margin|gradient|width)'
+    + '(?:\\s*=\\s*(?:\\\\"[^"<>\\\\]*\\\\"|\'[^\'"<>\\\\]*\'|[^<>\\s"\'\\\\]*)|\\s+(?:[^<>\\\\"]|\\\\")*)?|#[0-9a-fA-F]{3,8})(?:>|\\\\u003[eE])', 'gi');
+  const untagged = text => text.indexOf('<') < 0 && !/\\u003[cC]/.test(text) ? text : text.replace(RICH_TAGS, '');
+
   // A raid recorded, loaded to be looked into on the history page: paused at its start (see hpRoute for what's shown).
   // True once it's loaded.
   async function startReplay(about) {
@@ -8969,11 +9123,13 @@
     try {
       const answer = await fetch('api/history/rec?id=' + encodeURIComponent(about.id));
       if (!answer.ok) throw new Error('gone');
-      text = await answer.text();
+      text = untagged(await answer.text());
     } catch (e) { historyBusy = false; hpFailed = about.id; hpShow(); return false; }
     historyBusy = false;
     if (replay) leaveReplay();
     const times = [], lines = [], full = [], events = [], loot = [];
+    // (where each of the raid's containers stood, as it loaded: see addMore; an older recording has none)
+    let spots = null;
     for (let from = 0; from < text.length;) {
       let end = text.indexOf('\n', from);
       if (end < 0) end = text.length;
@@ -8981,6 +9137,9 @@
       if (tab > from && tab < end) {
         const t = +text.slice(from, tab), line = text.slice(tab + 1, end);
         if (Number.isFinite(t) && line.startsWith('{"t":"th"')) loot.push([t, line]);
+        else if (!spots && line.startsWith('{"t":"pl"')) {
+          try { const d = JSON.parse(line).d; if (d && Array.isArray(d.boxes)) spots = { loc: shownLoc(d.loc), boxes: d.boxes }; } catch (err) { /* without them */ }
+        }
         else if (Number.isFinite(t) && line.startsWith('{"t":"f')) {
           const whole = line.startsWith('{"t":"full"');
           let fine = true;
@@ -9010,7 +9169,7 @@
     // (a replay's clock is the recording's own: what the kill feed and the lists say goes by it)
     for (const e of events) e.t = e.rt;
     const r = replay = { about, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
-      next: 0, scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null };
+      next: 0, scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
     // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
@@ -9123,6 +9282,7 @@
       if (!base) { r.lootBase = at < 0 ? null : readThings(JSON.parse(r.loot[at][1]).d); r.lootBaseAt = at; }
       things = r.lootBase ? takenAway(r.lootBase, r.picks.slice(0, taken).filter(e => e.rt > since)) : null;
     } catch (e) { things = null; }
+    addMore();
     bestPrint = rosterPrint = null;
     tipFor = null;
     dirty = true;
@@ -9249,6 +9409,8 @@
   function leaveReplay() {
     if (!replay) return;
     replay = null;
+    // (its containers back where places.json has them)
+    addMore();
     replayShown = '';
     hpPrint = '';
     showBotLine();
@@ -9531,18 +9693,32 @@
     if (!prefs.lootSprees) return;
     // (the player's own sprees green)
     const mainKey = (raidPeople(r).find(p => p.kind === 'Main Player') || {}).key;
-    for (const run of spreesOf(r)) {
-      const first = run[0], last = run[run.length - 1];
+    // the marker a spree's picker is (its loot says their profile), to follow them; none known: the place instead
+    const trackOf = pid => { if (pid !== undefined && r.scan && r.scan.tracks) for (const [id, t] of r.scan.tracks) if (t.pid === pid) return id; return null; };
+    // Sprees at the same time (two bots clearing rooms at once) one over another, a row each, so none hides another:
+    // each in the lowest row that's free by then (marks are 5 px at the least, and a little apart). Three rows at most.
+    const ROWS = 3, wide = $('replayTrack').clientWidth || 900, least = r.total * 9 / wide, rowEnds = [];
+    const runs = spreesOf(r).slice().sort((x, y) => x[0].rt - y[0].rt);
+    let rows = 1;
+    for (const run of runs) {
+      const first = run[0], last = run[run.length - 1], end = Math.max(last.rt, first.rt + least);
+      let row = rowEnds.findIndex(e => e <= first.rt);
+      if (row < 0) row = rowEnds.length < ROWS ? rowEnds.length : rowEnds.indexOf(Math.min(...rowEnds));
+      rowEnds[row] = end;
+      rows = Math.max(rows, row + 1);
       const who = first.nm ? latin(first.nm) : T('Somebody');
       const worth = run.reduce((sum, e) => sum + (Number.isFinite(lootWorth(e.d)) ? lootWorth(e.d) : 0), 0);
       const mark = mk('i', mainKey !== undefined && first.p === mainKey ? 'mine' : '');
       mark.style.left = (100 * first.rt / r.total) + '%';
       mark.style.width = (100 * Math.max(0, last.rt - first.rt) / r.total) + '%';
+      mark.style.bottom = (1 + row * 9) + 'px';
       mark.title = T('{who} picked up {n} things in {t}', { who, n: run.length, t: clockText(last.rt - first.rt) }) + (worth > 0 ? ' · ' + roubles(worth) : '')
         + ' · ' + clockText(first.rt);
-      mark.onclick = ev => { ev.stopPropagation(); rvGo(first.rt, first.d.at, first.p === undefined ? null : first.p); };
+      mark.onclick = ev => { ev.stopPropagation(); rvGo(first.rt, first.d.at, trackOf(first.p)); };
       lane.appendChild(mark);
     }
+    // the lane as tall as its rows, and what sits over it moved up to match
+    $('replayTrack').style.setProperty('--spree-h', (1 + rows * 9) + 'px');
   }
   let ticksWide = 0;
   if (window.ResizeObserver) new ResizeObserver(() => {
@@ -9582,7 +9758,8 @@
   (() => {
     const track = $('replayTrack'), frac = e => { const b = track.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)); };
     const seekTo = e => { if (!replay) return; seekReplay(replay.total * frac(e)); replayShown = ''; showReplay(); };
-    track.addEventListener('pointerdown', e => { if (e.button || e.target.closest('.skull')) return; track.setPointerCapture(e.pointerId); replayDragging = true; seekTo(e); });
+    // (a kill's pin and a loot spree's mark are pressed, not dragged from: theirs is the press)
+    track.addEventListener('pointerdown', e => { if (e.button || e.target.closest('.skull, #replaySprees i')) return; track.setPointerCapture(e.pointerId); replayDragging = true; seekTo(e); });
     track.addEventListener('pointermove', e => {
       if (!replay) return;
       if (replayDragging && e.buttons) seekTo(e);
@@ -9604,6 +9781,13 @@
     // following the killer (the one killed, when nobody killed them or the killer wasn't recorded)
     const who = fight ? (fight.k !== undefined ? fight.k : fight.v) : null;
     rvGo(fight ? fight.a + 2500 : e.rt, e.d.at, who === undefined ? null : who);
+    // far enough out that the one killed is on the screen too, with the killer in the middle (where each stood at
+    // the kill: "ka" and "at"); never closer than going there would have been
+    const ka = e.d.ka, at = e.d.at;
+    if (Array.isArray(ka) && Array.isArray(at)) {
+      const apart = Math.hypot(ka[0] - at[0], ka[1] - at[1]);
+      if (apart > 1) { zoom = zoomTarget = Math.max(zoomMin, Math.min(zoomTarget, 0.36 * Math.min(vw, vh) / apart)); zoomAt = null; dirty = true; }
+    }
   }
 
   // The heat map: how long people spent where, over the whole raid. Each one's path is filled in between the places
@@ -9725,9 +9909,18 @@
     const d = Math.hypot(track.x[i] - track.x[i - 1], track.y[i] - track.y[i - 1]);
     return d > 30 && d * 1000 / Math.max(1, track.t[i] - track.t[i - 1]) > 25;
   };
+  // how far along a track (in metres, from its first place) its point i is: worked out once for each point, and on
+  // from there as a raid still being recorded adds to the track
+  function trailFrom(track, i) {
+    const far = track.far || (track.far = []);
+    for (let k = far.length; k < track.t.length; k++) far.push(k ? far[k - 1] + Math.hypot(track.x[k] - track.x[k - 1], track.y[k] - track.y[k - 1]) : 0);
+    return far[i] || 0;
+  }
   function drawTrails(scale) {
     if (!replay || prefs.trails === false) return;
     const s = scanReplay(replay), at = replay.at, span = prefs.trailMs === 0 ? Infinity : prefs.trailMs || TRAIL_MS;
+    // (a dot every 6 px or so: round caps on a dash next to nothing)
+    const dots = [0.01, 6 * scale];
     ctx.save();
     ctx.lineJoin = ctx.lineCap = 'round';
     for (const [id, track] of s.tracks) {
@@ -9748,12 +9941,16 @@
       for (let i = from; i <= hi; i++) { const p = toScreen(track.x[i], track.y[i]); if (i === from) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]); }
       const now = liveById.get(id);
       if (now && Number.isFinite(now.cx)) { const p = toScreen(now.cx, now.cy); ctx.lineTo(p[0], p[1]); }
-      ctx.globalAlpha = 0.4;
-      ctx.lineWidth = 4 * scale;
+      // dotted and faint, so it stays behind the markers. The dots are laid from the track's start (how far along it
+      // the trail begins), so they stay put on the ground as the trail's tail moves on, instead of crawling.
+      ctx.setLineDash(dots);
+      ctx.lineDashOffset = trailFrom(track, from) * zoom;
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 4.2 * scale;
       ctx.strokeStyle = '#000';
       ctx.stroke();
-      ctx.globalAlpha = 0.75;
-      ctx.lineWidth = 2 * scale;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 2.4 * scale;
       ctx.strokeStyle = (KINDS[track.c] || OTHER).col;
       ctx.stroke();
     }
@@ -9783,7 +9980,7 @@
       const byUs = d.kk === 'Main Player' || (d.kk === 'Friendly Player' && seen(d.kk));
       const killerSeen = d.kk === 'Main Player' || seen(d.kk);
       if (!Array.isArray(d.at) || offFloor(d.at[0], d.at[1], d.at[2]) || !(seen(d.vk || 'None') || byUs)) continue;
-      const age = replay ? replay.at - e.rt : now - e.at, old = age >= KILL_MS, s = toScreen(d.at[0], d.at[1]), r = (old ? 4.5 : 7) * scale;
+      const age = replay ? replay.at - e.rt : now - e.at, old = age >= KILL_MS, s = toScreen(d.at[0], d.at[1]), r = (old ? 4 : 5.5) * scale;
       ctx.globalAlpha = old ? 0.6 : Math.min(1, (KILL_MS - age) / 2500);
       if (!old) fresh = true;
       if (killerSeen && Array.isArray(d.ka) && !old) {
@@ -9810,33 +10007,39 @@
         ctx.strokeStyle = '#000';
         ctx.stroke();
       } else {
-        // a red disc with a white cross: somebody died here
+        // a small red disc with a white cross: somebody died here
         ctx.beginPath();
-        ctx.arc(s[0], s[1], r * 1.5, 0, Math.PI * 2);
+        ctx.arc(s[0], s[1], r * 1.3, 0, Math.PI * 2);
         ctx.fillStyle = '#c8322c';
         ctx.fill();
-        ctx.lineWidth = 2 * scale;
-        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5 * scale;
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(s[0] - r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] + r * 0.6, s[1] + r * 0.6);
-        ctx.moveTo(s[0] + r * 0.6, s[1] - r * 0.6); ctx.lineTo(s[0] - r * 0.6, s[1] + r * 0.6);
-        ctx.lineWidth = 2.4 * scale;
+        ctx.moveTo(s[0] - r * 0.55, s[1] - r * 0.55); ctx.lineTo(s[0] + r * 0.55, s[1] + r * 0.55);
+        ctx.moveTo(s[0] + r * 0.55, s[1] - r * 0.55); ctx.lineTo(s[0] - r * 0.55, s[1] + r * 0.55);
+        ctx.lineWidth = 1.8 * scale;
         ctx.strokeStyle = '#fff';
         ctx.stroke();
       }
       const text = old ? '' : (e.nm ? latin(e.nm) : ONE[d.vk] || '') + (d.kn && killerSeen ? '  ←  ' + latin(d.kn) : d.gas ? '  ·  ' + T('Gas explosion') : '');
       if (text) {
-        // above the mark: under it is where the body's own name goes
-        ctx.font = '600 ' + Math.round(11.5 * scale) + 'px ' + FONT;
+        // above the mark (under it is where the body's own name goes); with the killer close by, above the two of
+        // them, clear of the killer's marker and its badges, so it never lies over a marker or the killer's name
+        let top = s[1] - r * 1.3;
+        if (killerSeen && Array.isArray(d.ka)) {
+          const k = toScreen(d.ka[0], d.ka[1]);
+          if (Math.abs(k[0] - s[0]) < 90 * scale && Math.abs(k[1] - s[1]) < 50 * scale && k[1] - 22 * scale < top) top = k[1] - 12 * scale;
+        }
+        ctx.font = '600 ' + Math.round(10.5 * scale) + 'px ' + FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-        ctx.strokeText(text, s[0], s[1] - r * 1.9);
+        ctx.strokeText(text, s[0], top - 5 * scale);
         ctx.fillStyle = '#ffd9d6';
-        ctx.fillText(text, s[0], s[1] - r * 1.9);
+        ctx.fillText(text, s[0], top - 5 * scale);
       }
     }
     ctx.restore();
@@ -10034,8 +10237,18 @@
   const squadCol = n => SQUAD_COLS[(n - 1) % SQUAD_COLS.length];
   // who has been seen of each squad: one that came in alone is no team, and gets no number
   const squadSeen = new Map();
-  const squadOf = m => { let set = squadSeen.get(m.g); if (!set) squadSeen.set(m.g, set = new Set()); set.add(m.id); return set.size > 1; };
-  const forgetSquads = () => { squadNos.clear(); squadSeen.clear(); };
+  // the team somebody came in with: a person's or PMC's group, else (a PMC bot, whose group the game leaves empty)
+  // the band of bots it goes about with, keyed as the Raid window keys it
+  // (kept for each once seen: a bot left the last of its band has none any more, and is still of that team)
+  const teamOfId = new Map();
+  const teamKey = m => {
+    const pmc = m.c === 'Enemy Player' || m.c === 'Friendly Player';
+    const key = m.g || (m.bg && pmc ? 'b' + m.bg : '');
+    if (key) { if (pmc) teamOfId.set(m.id, key); return key; }
+    return pmc && teamOfId.get(m.id) || '';
+  };
+  const squadOf = m => { const key = teamKey(m); let set = squadSeen.get(key); if (!set) squadSeen.set(key, set = new Set()); set.add(m.id); return set.size > 1; };
+  const forgetSquads = () => { squadNos.clear(); squadSeen.clear(); teamOfId.clear(); };
 
   // What a bot is doing, as one of a few sorts (the Behaviour tab's colours): from what it has decided ("dc": SAIN's
   // decision or the game's), else from the layer deciding for it and where a mod is sending it.
@@ -10157,11 +10370,11 @@
   // somebody who is down and can be got up again.
   function drawBadges(scale) {
     const squads = prefs.squadMarks !== false;
-    for (const m of live) if (m.dyn && m.g && m.c !== 'Corpse') squadOf(m);
+    for (const m of live) if (m.dyn && teamKey(m) && m.c !== 'Corpse') squadOf(m);
     ctx.save();
     for (const m of live) {
       if (!m.dyn || m.c === 'Corpse' || isHidden(m.c) || inArea(m) || !Number.isFinite(m.cx)) continue;
-      if (!m.dn && !(squads && m.g && squadOf(m))) continue;
+      if (!m.dn && !(squads && teamKey(m) && squadOf(m))) continue;
       if (m.c !== 'Main Player' && offFloor(m.cx, m.cy, m.cz)) continue;
       const s = toScreen(m.cx, m.cy), r = 8 * scale * (KINDS[m.c] || OTHER).size;
       if (s[0] < -40 || s[1] < -40 || s[0] > vw + 40 || s[1] > vh + 40) continue;
@@ -10176,8 +10389,8 @@
         ctx.setLineDash([]);
         dirty = true;
       }
-      if (squads && m.g && squadOf(m)) {
-        const n = squadNo(m.g), x = s[0] + r * 1.05, y = s[1] - r * 1.05, d = 5.6 * scale;
+      if (squads && teamKey(m) && squadOf(m)) {
+        const n = squadNo(teamKey(m)), x = s[0] + r * 1.05, y = s[1] - r * 1.05, d = 5.6 * scale;
         ctx.beginPath();
         ctx.arc(x, y, d, 0, Math.PI * 2);
         ctx.fillStyle = squadCol(n);
@@ -11562,31 +11775,41 @@
   }
 
   // ---- beside the replay's map, on the right: what was going on at the moment shown -------------------------------
-  // As Raid Review's: a fold for each sort of thing, open or shut as it was left (prefs.hpOpen), each with what it
-  // draws on the map switched on or off (the live map's own settings), and its list as of the moment the replay is at.
-  // Worked out again as the replay goes, about once a second while it plays; never the fold being typed in.
-  // [key, title, fill, open to begin with]
+  // In four tabs, so nothing is a long scroll away: the raid's events, the bots (what they carry, where they're sent,
+  // ORBIT's plans), the loot, and every setting of what a replay shows. Within a tab, a fold for each sort of thing, open
+  // or shut as it was left (prefs.hpOpen); a tab with one fold has it open, without its title. Only the tab shown is
+  // worked out again as the replay goes, about once a second while it plays; never the fold being typed in.
+  const SIDE_TABS = [['events', T('Events')], ['bots', T('Bots')], ['loot', T('Loot')], ['settings', T('Settings')]];
+  // [key, title, fill, open to begin with, tab]
   const HP_SECTIONS = [
-    ['events', T('Raid events'), sideEvents, true],
-    ['inv', T('Bot inventory'), sideInv, true],
-    ['loot', T('Loot'), sideLoot, false],
-    ['quests', T('Bot quests'), sideQuests, true],
-    ['sent', T('Bot objectives'), sideSent, true],
-    ['orbit', T('ORBIT main objectives'), sideOrbit, true],
-    ['drops', T('Airdrops'), sideDrops, true],
-    ['switches', T('Switches'), sideSwitches, false],
-    ['hear', T('Ghost hearing'), sideHear, false],
-    ['fields', T('Fields'), sideFields, false],
-    ['anim', T('Animations'), sideAnim, false],
-    ['settings', T('Settings'), sideSettings, false]];
+    ['events', T('Raid events'), sideEvents, true, 'events'],
+    ['drops', T('Airdrops'), sideDrops, true, 'events'],
+    ['switches', T('Switches'), sideSwitches, false, 'events'],
+    ['inv', T('Bot inventory'), sideInv, true, 'bots'],
+    ['quests', T('Bot quests'), sideQuests, true, 'bots'],
+    ['sent', T('Bot objectives'), sideSent, false, 'bots'],
+    ['orbit', T('ORBIT main objectives'), sideOrbit, false, 'bots'],
+    ['hear', T('Ghost hearing'), sideHear, false, 'bots'],
+    ['fields', T('Fields'), sideFields, false, 'bots'],
+    ['loot', T('Loot'), sideLoot, true, 'loot'],
+    ['settings', T('Settings'), sideSettings, true, 'settings']];
   if (!prefs.hpOpen || typeof prefs.hpOpen !== 'object' || Array.isArray(prefs.hpOpen)) prefs.hpOpen = {};
+  if (!SIDE_TABS.some(x => x[0] === prefs.hpTab)) prefs.hpTab = 'events';
   // its head: what it is, and a way to put it away (the map then has the width; a tab on the edge brings it back)
   const hpSideHead = mk('div', 'hpSideHead');
-  hpSideHead.append(mk('b', '', T('At this moment')));
   const hpSideHide = mk('button', '', '»');
   hpSideHide.type = 'button';
   hpSideHide.title = T('Put this panel away');
-  hpSideHead.appendChild(hpSideHide);
+  // the tabs, in the head: they stay at the top as the tab's folds scroll under them
+  const hpTabs = mk('nav', 'hpTabs');
+  for (const [key, title] of SIDE_TABS) {
+    const b = mk('button', '', title);
+    b.type = 'button';
+    b.dataset.k = key;
+    b.onclick = () => { if (prefs.hpTab === key) return; prefs.hpTab = key; save(); hpSide.scrollTop = 0; hpSideShow(); };
+    hpTabs.appendChild(b);
+  }
+  hpSideHead.append(hpTabs, hpSideHide);
   hpSide.appendChild(hpSideHead);
   const hpSideTab = mk('button', 'ui', '« ' + T('Details'));
   hpSideTab.id = 'hpSideTab';
@@ -11597,14 +11820,16 @@
   const hpSideSet = off => { prefs.hpSideOff = off; save(); hpShow(); };
   hpSideHide.onclick = () => hpSideSet(true);
   hpSideTab.onclick = () => hpSideSet(false);
-  for (const [key, title, , open] of HP_SECTIONS) {
+  for (const [key, title, , open, tab] of HP_SECTIONS) {
     const fold = mk('details', 'hpSec');
     fold.dataset.k = key;
+    fold.dataset.tab = tab;
     fold.open = key in prefs.hpOpen ? !!prefs.hpOpen[key] : open;
     const sum = mk('summary', '', title);
     sum.appendChild(mk('small', 'hpSecCount', ''));
     fold.append(sum, mk('div', 'hpSecBody'));
-    fold.ontoggle = () => { prefs.hpOpen[key] = fold.open; save(); if (fold.open) hpSideShow(); };
+    // (a tab's only fold is opened by the page, not by a press: not kept)
+    fold.ontoggle = () => { if (fold.classList.contains('solo')) return; prefs.hpOpen[key] = fold.open; save(); if (fold.open) hpSideShow(); };
     hpSide.appendChild(fold);
   }
   // a fold with nothing in it this raid: says so, plainly
@@ -11616,17 +11841,26 @@
     if (!HIST || !r || hpSide.hidden) return;
     hpSideAt = performance.now();
     const s = scanReplay(r), orbit = (s.mods || []).includes('ORBIT') || r.events.some(e => String(e.k).startsWith('orbit.'));
-    for (const fold of hpSide.querySelectorAll('.hpSec')) {
+    for (const b of hpTabs.children) b.classList.toggle('on', b.dataset.k === prefs.hpTab);
+    const folds = [...hpSide.querySelectorAll('.hpSec')];
+    // (one with nothing in this raid isn't there at all)
+    const hasOf = k => k === 'hear' || k === 'orbit' ? orbit
+      : k === 'switches' ? (r.hasSwitch !== undefined ? r.hasSwitch : (r.hasSwitch = r.events.some(e => e.k === 'switch')))
+      : k === 'fields' ? r.events.some(e => e.k === 'orbit.field' || e.k === 'phobos.field')
+      : k === 'quests' ? s.sentBy.has('QuestingBots') : k === 'drops' ? s.drops.size > 0 : true;
+    const shown = folds.filter(f => f.dataset.tab === prefs.hpTab && hasOf(f.dataset.k));
+    for (const fold of folds) {
+      fold.hidden = !shown.includes(fold);
+      const solo = shown.length === 1 && shown[0] === fold;
+      fold.classList.toggle('solo', solo);
+      if (solo && !fold.open) fold.open = true;
+    }
+    for (const fold of shown) {
       const section = HP_SECTIONS.find(x => x[0] === fold.dataset.k);
-      // (one with nothing in this raid isn't there at all)
-      const has = section[0] === 'hear' || section[0] === 'orbit' ? orbit
-        : section[0] === 'fields' ? r.events.some(e => e.k === 'orbit.field' || e.k === 'phobos.field')
-        : section[0] === 'quests' ? s.sentBy.has('QuestingBots') : section[0] === 'drops' ? s.drops.size > 0 : true;
-      fold.hidden = !has;
       // (not while something in it is being typed in or slid; its name pressed to open it is no reason to wait)
       const busy = document.activeElement && fold.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)
         && !['checkbox', 'button', 'color'].includes(document.activeElement.type);
-      if (!has || !fold.open || busy) continue;
+      if (!fold.open || busy) continue;
       section[2](fold.lastChild, r, s);
     }
   }
@@ -11649,61 +11883,82 @@
     const pane = $('squadPane');
     if (pane && pane.parentNode !== box) box.appendChild(pane);
   }
-  // The settings that change what a replay shows, here as well as in the live map's menu (which this page hasn't):
-  // prices, the map's switches for people and floors, and every colour. Each is the menu's own setting, changed
-  // through it, so both pages keep the same. Made once.
-  function sideSettings(box) {
-    if (box.childElementCount) return;
-    // prices: the server's, for every page (the page is loaded again once changed)
-    const prices = mk('label', 'row range'), pick = mk('select');
-    prices.title = $('optPrices').closest('label').title;
-    for (const [v, text] of [['flea', T('Flea market')], ['handbook', T('Handbook')]]) { const o = mk('option', '', text); o.value = v; pick.appendChild(o); }
-    pick.value = $('optPrices').value;
-    pick.onchange = () => { $('optPrices').value = pick.value; $('optPrices').dispatchEvent(new Event('change')); };
-    prices.append(mk('span', '', T('Prices')), pick);
-    box.appendChild(prices);
-    // a switch of the menu's, mirrored
-    const mirror = (id, label) => {
-      const own = $(id), row = mk('label', 'row'), tick = mk('input');
-      tick.type = 'checkbox';
-      tick.checked = own.checked;
-      tick.onchange = () => { own.checked = tick.checked; own.dispatchEvent(new Event('change')); };
-      row.title = own.closest('label').title;
-      row.append(tick, mk('span', '', label));
-      box.appendChild(row);
+  // The settings tab: every setting of the live map's menu (which this page hasn't) that changes what a replay shows,
+  // in groups. Each is the menu's own control, mirrored: changed through it, so both pages keep the same, with its
+  // name and its explanation as the menu has them. Made once; brought up to date each time it's shown.
+  const SIDE_SETTINGS = [
+    ['markers', T('Markers and names'), ['optBotShape', 'optMeShape', 'optScale', 'optTextScale', 'optNames', 'optMyName', 'optLatin', 'optHealth', 'optHealthAll']],
+    ['people', T('People and bots'), ['optSquadMarks', 'optTeamNames', 'optSquadCols', 'optMapDoing', 'optActionIcons', 'optTacticWords', 'optSquadParts', 'optDoorEvents']],
+    ['onMap', T('On the map'), ['optShots', 'optLootFloats', 'optHitFlash', 'optKillLines', 'optGrenades', 'optSwitches', 'optKillKeep', 'optTrailMs', 'optMinimap']],
+    ['orbit', T('ORBIT on the map'), ['optOrbitMain', 'optOrbitRush', 'optOrbitLines', 'optOrbitNames', 'optOrbitFights', 'optOrbitHear', 'optOrbitField', 'optPhobosField']],
+    ['floors', T('Floors'), ['optFloorOnly', 'optFloorDim', 'optFloorGrey', 'optFloorHide', 'optOtherLoot']],
+    ['loot', T('Loot'), ['optPrices', 'optWorth', 'optPeek', 'optItemNames', 'optModTints', 'optRoofLoot', 'optRoofTotals', 'optRoofTotalsUnder']],
+    ['feed', T('Kill feed'), ['optFeed', 'optFeedMine', 'optFeedPmc', 'optFeedBoss', 'optFeedAi', 'optFeedNames', 'optFeedRows', 'optFeedKeep', 'optFeedBox', 'optFeedBg']],
+    ['screen', T('Screen'), ['optMapLight', 'optTurn', 'optLowPower']],
+    ['colours', T('Colours'), []]];
+  const sideTwins = [];
+  // one of the menu's controls, mirrored: a switch, a list to pick from or a slider, named as in the menu
+  function sideTwin(id) {
+    const own = $(id), home = own && own.closest('label');
+    if (!home) return null;
+    const name = home.querySelector('span'), said = name && name.querySelector('small');
+    const row = mk('label', own.type === 'checkbox' ? 'row' : 'row range');
+    row.title = home.dataset.tip !== undefined ? home.dataset.tip : home.title;
+    if (home.classList.contains('sub')) row.classList.add('sub');
+    let twin, text = null;
+    if (own.tagName === 'SELECT') twin = own.cloneNode(true);
+    else { twin = mk('input'); twin.type = own.type; for (const k of ['min', 'max', 'step']) if (own[k] !== '') twin[k] = own[k]; }
+    twin.removeAttribute('id');
+    const word = mk('span', '', (name ? (name.firstChild && name.firstChild.nodeType === 3 ? name.firstChild.textContent : name.textContent) : '').trim());
+    if (said) { text = mk('small'); word.append(' ', text); }
+    if (own.type === 'checkbox') row.append(twin, word); else row.append(word, twin);
+    const sync = () => {
+      if (own.type === 'checkbox') twin.checked = own.checked; else if (document.activeElement !== twin) twin.value = own.value;
+      twin.disabled = own.disabled;
+      row.classList.toggle('unavailable', home.classList.contains('unavailable'));
+      if (home.classList.contains('unavailable')) row.title = home.title;
+      if (text) text.textContent = said.textContent;
     };
-    box.appendChild(mk('div', 'filterHead', T('People and bots')));
-    mirror('optTeamNames', T('Team number by names'));
-    mirror('optSquadCols', T('Team colours'));
-    mirror('optActionIcons', T('Action icons'));
-    mirror('optTacticWords', T('Squad tactic words'));
-    mirror('optDoorEvents', T('Doors on the map'));
-    box.appendChild(mk('div', 'filterHead', T('Floors')));
-    // how dark round a floor: the menu's slider, mirrored
-    const dim = mk('label', 'row range'), slide = mk('input'), said = mk('small');
-    slide.type = 'range';
-    slide.min = 0; slide.max = 90; slide.step = 5;
-    slide.value = $('optFloorDim').value;
-    said.textContent = $('floorDimText').textContent;
-    slide.oninput = () => { $('optFloorDim').value = slide.value; $('optFloorDim').dispatchEvent(new Event('input')); said.textContent = $('floorDimText').textContent; };
-    const dimName = mk('span', '', T('Map round a floor') + ' ');
-    dimName.appendChild(said);
-    dim.append(dimName, slide);
-    box.appendChild(dim);
-    mirror('optFloorGrey', T('Grey round a floor'));
-    mirror('optFloorHide', T('Hide other floors'));
-    // every colour: the menu's own list, brought here
-    box.appendChild(mk('div', 'filterHead', T('Colours')));
-    const cols = $('colorList');
-    if (cols) { box.appendChild(cols); listColors(); }
+    const pass = kind => () => {
+      if (own.type === 'checkbox') own.checked = twin.checked; else own.value = twin.value;
+      own.dispatchEvent(new Event(kind, { bubbles: true }));
+      replayShown = '';
+      showReplay();
+      dirty = true;
+      for (const t of sideTwins) t();
+    };
+    if (own.type === 'range') twin.oninput = pass('input'); else twin.onchange = pass('change');
+    sync();
+    sideTwins.push(sync);
+    return row;
   }
-  // (a fold's switches only: made once)
-  function sideAnim(box) {
-    if (box.childElementCount) return;
-    sideCheck(box, 'lootFloats', T('Loot pick-ups'), true, T('What somebody picks up or drops is written where they stood, rising and fading.'));
-    sideCheck(box, 'hitFlash', T('Hit impacts'), true, T('A red flash on whoever a bullet hits.'));
-    sideCheck(box, 'killLines', T('Kill lines'), true, T('For a few seconds after each kill: a line from the killer to the one killed.'));
-    sideCheck(box, 'grenades', T('Grenades'), true, T('Where each grenade went off.'));
+  function sideSettings(box) {
+    if (!box.childElementCount) {
+      for (const [key, title, ids] of SIDE_SETTINGS) {
+        const group = mk('details', 'setGroup');
+        group.dataset.k = key;
+        group.open = prefs.hpOpen['set:' + key] !== false;
+        group.ontoggle = () => { prefs.hpOpen['set:' + key] = group.open; save(); };
+        group.appendChild(mk('summary', '', title));
+        for (const id of ids) { const row = sideTwin(id); if (row) group.appendChild(row); }
+        if (key === 'colours') {
+          // every colour: the menu's own list, brought here, and its way back to the usual ones
+          const cols = $('colorList');
+          if (cols) group.appendChild(cols);
+          const back = mk('button', 'linkBtn', $('colorReset').textContent);
+          back.type = 'button';
+          back.onclick = () => { $('colorReset').click(); listColors(); dirty = true; };
+          group.appendChild(back);
+        }
+        box.appendChild(group);
+      }
+      // (filled once it's on the page: it finds its list by its id)
+      if ($('colorList')) listColors();
+    }
+    for (const t of sideTwins) t();
+    // (ORBIT's group only where ORBIT or Phobos was in the raid: every switch in it greyed otherwise)
+    const orbitGroup = box.querySelector('.setGroup[data-k="orbit"]');
+    if (orbitGroup) orbitGroup.hidden = [...orbitGroup.querySelectorAll('input')].every(i => i.disabled);
   }
 
   // what lies about and in containers at the moment shown, the best first
@@ -11724,7 +11979,14 @@
     if (!loot) { sideCount(box, 0); sideNone(box, T('This recording has no loot (it was made before loot was kept, or loot is switched off on the server).')); return; }
     const nameOf = tpl => (loot.names[tpl] || {}).s || (loot.names[tpl] || {}).n || tpl, priceOf = tpl => (loot.names[tpl] || {}).p || 0;
     const rows = loot.loose.map(i => ({ name: nameOf(i.tpl), n: i.n, worth: i.worth, where: 'ground', at: [i.x, i.y] }));
-    for (const key of Object.keys(loot.inside)) for (const i of loot.inside[key] || []) rows.push({ name: nameOf(i[0]), n: i[1] || 1, worth: priceOf(i[0]) * (i[1] || 1), where: 'box', at: null });
+    // (what's in a container or on a body: where that container or body is, so it can be gone to as well)
+    const spotOf = new Map();
+    for (const b of (places && places.boxes) || []) if (b.id && Array.isArray(b.p)) spotOf.set(b.id, b.p);
+    for (const b of loot.bodies) spotOf.set(b.id, b.p);
+    for (const key of Object.keys(loot.inside)) {
+      const p = spotOf.get(key);
+      for (const i of loot.inside[key] || []) rows.push({ name: nameOf(i[0]), n: i[1] || 1, worth: priceOf(i[0]) * (i[1] || 1), where: 'box', at: p ? [p[0], p[1]] : null });
+    }
     const tools = mk('div', 'winTools'), text = mk('input'), min = mk('input'), pick = mk('select'), count = mk('small');
     text.type = 'search';
     text.placeholder = T('Filter by name…');
@@ -12084,18 +12346,21 @@
       box.appendChild(row);
     }
     const squads = new Map();
-    for (const m of here) if (m.g && squadOf(m)) { const n = squadNo(m.g); if (!squads.has(n)) squads.set(n, []); squads.get(n).push(m); }
+    for (const m of here) if (teamKey(m) && squadOf(m)) { const n = squadNo(teamKey(m)); if (!squads.has(n)) squads.set(n, []); squads.get(n).push(m); }
     if (squads.size) box.appendChild(mk('h4', '', T('Teams')));
     for (const [n, members] of [...squads].sort((x, y) => x[0] - y[0])) {
-      const row = mk('div', 'keyRow team'), badge = mk('i', 'squadDot', String(n));
+      // (a block each: the team's number down its left, in its colour, and its members one under another beside it)
+      const row = mk('div', 'keyTeam'), badge = mk('i', 'squadDot', String(n)), names = mk('div', 'keyTeamNames');
       badge.style.background = squadCol(n);
-      row.appendChild(badge);
+      row.style.borderLeftColor = squadCol(n);
+      row.append(badge, names);
       for (const m of members) {
         const b = mk('button', 'linkBtn', m.t || ONE[m.c] || m.c);
         b.type = 'button';
         b.style.color = (KINDS[m.c] || OTHER).col;
+        b.title = T('Follow on the map');
         b.onclick = () => watch(m);
-        row.appendChild(b);
+        names.appendChild(b);
       }
       box.appendChild(row);
     }
@@ -12474,6 +12739,11 @@
   }
   // the sheet is as tall as what's in it: measured again whenever that changes
   if (window.ResizeObserver) new ResizeObserver(measureCover).observe($('panel'));
+  // what sits under the bar starts under it, however many rows the bar takes in a narrow window (--bar-b)
+  const fitBar = () => document.documentElement.style.setProperty('--bar-b', Math.round($('bar').getBoundingClientRect().bottom + 10) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(fitBar).observe($('bar'));
+  addEventListener('resize', fitBar);
+  fitBar();
   // full screen can't be had on some phones (an iPhone's browser): no button for it there
   if (!document.documentElement.requestFullscreen) $('full').hidden = true;
   loadMaps();

@@ -40,10 +40,14 @@ for name in ['LOOT_MODES', 'INTEL', 'EX_FROM']:
     for row in re.finditer(r"\[\s*" + STR + r",\s*" + STR + r",\s*" + STR + r"\s*\]", block):
         keys.setdefault(unquote(row.group(2)), 'button')
         keys.setdefault(unquote(row.group(3)), 'button tooltip')
-# the events panel's row of buttons: [value, words]
-block = re.search(r"const EVENT_KINDS = \[(.*?)\];", js, re.S).group(1)
-for row in re.finditer(r"\[\s*" + STR + r",\s*" + STR + r"\s*\]", block):
-    keys.setdefault(unquote(row.group(2)), 'button')
+# the events panel's row of buttons, and rows of buttons written out where they're made: [value, words, tooltip?]
+blocks = [re.search(r"const EVENT_KINDS = \[(.*?)\];", js, re.S).group(1)]
+blocks += [m.group(1) for m in re.finditer(r"segment\(\$\('\w+'\), \[(\[.*?\])\]", js, re.S)]
+for block in blocks:
+    for row in re.finditer(r"\[\s*" + STR + r",\s*" + STR + r"(?:,\s*" + STR + r")?\s*\]", block):
+        keys.setdefault(unquote(row.group(2)), 'button')
+        if row.group(3):
+            keys.setdefault(unquote(row.group(3)), 'button tooltip')
 block = re.search(r"const BOT_MODS = \{(.*?)\};", js, re.S).group(1)
 for v in re.findall(r"\w+:\s*" + STR, block):
     keys.setdefault(unquote(v), 'tooltip')
