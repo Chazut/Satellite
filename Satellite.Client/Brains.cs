@@ -18,6 +18,8 @@ namespace Satellite.Client
         private static MethodInfo _objective;
         private static FieldInfo _category;
         private static FieldInfo _status;
+        // why ORBIT has the bot (or its squad) leaving the raid: "loot ≥ 400k₽", "raid time low (300s left)" (a newer ORBIT)
+        private static FieldInfo _extractReason;
         // where ORBIT has the bot heading
         private static FieldInfo _headingX;
         private static FieldInfo _headingY;
@@ -72,6 +74,7 @@ namespace Satellite.Client
                         var objective = assembly.GetType("Orbit.Api.OrbitBotObjective");
                         _category = objective?.GetField("Category");
                         _status = objective?.GetField("Status");
+                        _extractReason = objective?.GetField("ExtractReason");
                         _headingX = objective?.GetField("ObjectiveX");
                         _headingY = objective?.GetField("ObjectiveY");
                         _headingZ = objective?.GetField("ObjectiveZ");
@@ -754,6 +757,26 @@ namespace Satellite.Client
         }
 
         // what ORBIT has it heading for ("Loot", "AirdropLoot", a rush plan's step), and how far along it is
+        // why ORBIT has it leaving the raid, when it does: "" or null otherwise (and with an ORBIT that doesn't say)
+        internal static string Leaving(string profileId)
+        {
+            Look();
+            if (_objective == null || _extractReason == null || string.IsNullOrEmpty(profileId))
+            {
+                return null;
+            }
+
+            try
+            {
+                var objective = _objectiveOf != null ? _objectiveOf(profileId) : _objective.Invoke(null, new object[] { profileId });
+                return objective != null ? _extractReason.GetValue(objective) as string : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         internal static string Objective(string profileId)
         {
             Look();

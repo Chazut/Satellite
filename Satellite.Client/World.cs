@@ -58,6 +58,8 @@ namespace Satellite.Client
             public string Decision;
             public bool Ghost;
             public string Objective;
+            // why ORBIT has it leaving the raid ("loot ≥ 400k₽"): null while it isn't
+            public string Leaving;
             public string Tactic;
             public Brains.Squad Squad;
             public int Band;
@@ -287,6 +289,21 @@ namespace Satellite.Client
                 dot.Decision = Brains.Decision(player, bot);
                 dot.Ghost = Brains.Ghost(player.ProfileId);
                 dot.Objective = Brains.Objective(player.ProfileId);
+                dot.Leaving = string.IsNullOrEmpty(dot.Objective) ? null : Brains.Leaving(player.ProfileId);
+                // the moment ORBIT has it leave, and why: an event ("orbit.leave", {"why":...}), once for each reason
+                if (!string.IsNullOrEmpty(dot.Leaving) && (!LeftFor.TryGetValue(player.ProfileId, out var leftWas) || leftWas != dot.Leaving))
+                {
+                    LeftFor[player.ProfileId] = dot.Leaving;
+                    var why = dot.Leaving;
+                    Names.TryGetValue(player.ProfileId, out var leaver);
+                    Events.Add("orbit.leave", player.ProfileId, leaver, Time.realtimeSinceStartup, to =>
+                    {
+                        to.Append("{\"why\":");
+                        Text(to, why);
+                        to.Append('}');
+                    });
+                }
+
                 dot.Tactic = Brains.Tactic(player.ProfileId);
                 dot.Squad = Brains.SquadOf(player.ProfileId);
                 dot.HasHeading = Brains.Heading(player.ProfileId, out dot.HeadingX, out dot.HeadingY, out dot.HeadingZ);
@@ -368,6 +385,7 @@ namespace Satellite.Client
                 Players.Clear();
                 Still.Clear();
                 Names.Clear();
+                LeftFor.Clear();
                 Kinds.Clear();
                 Ids.Clear();
                 Born.Clear();
@@ -488,6 +506,8 @@ namespace Satellite.Client
 
         // the name of everyone seen this raid, by their profile id (a body is named by it)
         internal static readonly Dictionary<string, string> Names = new Dictionary<string, string>();
+        // why ORBIT has each bot leaving, as last told (see the "orbit.leave" event)
+        internal static readonly Dictionary<string, string> LeftFor = new Dictionary<string, string>();
 
         // and the kind each was ("Scav", "Boss"), so a body can say what it was
         internal static readonly Dictionary<string, string> Kinds = new Dictionary<string, string>();
@@ -1580,6 +1600,13 @@ namespace Satellite.Client
                 {
                     to.Append(",\"ob\":");
                     Text(to, dot.Objective);
+                }
+
+                // why ORBIT has it leaving ("xr"), while it is
+                if (!string.IsNullOrEmpty(dot.Leaving))
+                {
+                    to.Append(",\"xr\":");
+                    Text(to, dot.Leaving);
                 }
 
                 if (!string.IsNullOrEmpty(dot.Tactic))

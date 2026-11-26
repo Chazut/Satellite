@@ -215,7 +215,7 @@ namespace Satellite.Client
             var i = from;
             for (; i < lines.Count && to.Length < MostMessage; i++)
             {
-                var line = Line(lines[i], began, full);
+                var line = Line(lines[i], raid, began, full);
                 if (line == null)
                 {
                     continue;
@@ -256,10 +256,63 @@ namespace Satellite.Client
             }
         }
 
-        // One decision as {"t":<ms on the raid's clock>,"p":whose (profile id),"f":feature,"s":stage,"d":{...}}, without
-        // its settings unless full; null: unreadable
-        private static string Line(string json, float began, bool full)
+        // What the replay's Why panel reads, kept when not everything is asked for (about a twentieth of what COMET
+        // says): its moves (A01-A13) as chosen, begun and let go, with each option weighed; its squads' plans
+        // (S01-S11); what a move taught it, when it went well or badly (E04); its medical choices (H01); giving up a
+        // search (P09); quick reloads (W04); and who's in control of the bot (T04), only when that changes.
+        // Told by a look at the line's start, so the rest are never read.
+        private static bool Wanted(string feature, string stage)
         {
+            if (feature.Length != 3 || !char.IsDigit(feature[1]) || !char.IsDigit(feature[2]))
+            {
+                return false;
+            }
+
+            switch (feature[0])
+            {
+                case 'A':
+                    return stage == "selected" || stage == "started" || stage == "released";
+                case 'S':
+                    return stage == "evaluated";
+                default:
+                    return stage == "evaluated" && (feature == "E04" || feature == "H01" || feature == "P09" || feature == "T04" || feature == "W04");
+            }
+        }
+
+        // a text field's value, found without reading the line ("feature", "stage": near its start)
+        private static string Peek(string json, string name)
+        {
+            var key = "\"" + name + "\":\"";
+            var at = json.IndexOf(key, StringComparison.Ordinal);
+            if (at < 0)
+            {
+                return "";
+            }
+
+            at += key.Length;
+            var end = json.IndexOf('"', at);
+            return end > at && end - at <= 64 ? json.Substring(at, end - at) : "";
+        }
+
+        // who was in control of each bot as last kept (T04), and of which raid
+        private static readonly Dictionary<string, string> Control = new Dictionary<string, string>();
+        private static string _controlRaid = "";
+
+        // One decision as {"t":<ms on the raid's clock>,"p":whose (profile id),"f":feature,"s":stage,"d":{...}}: unless
+        // full, only what the replay's Why tab shows (Wanted, Kept); null: left out
+        private static string Line(string json, string raid, float began, bool full)
+        {
+            string feature = null, stage = null;
+            if (!full)
+            {
+                feature = Peek(json, "feature");
+                stage = Peek(json, "stage");
+                if (!Wanted(feature, stage))
+                {
+                    return null;
+                }
+            }
+
             JObject said;
             try
             {
@@ -274,29 +327,127 @@ namespace Satellite.Client
             var t = realtime.HasValue ? Math.Max(0L, (long)((realtime.Value - began) * 1000.0)) : 0L;
             var head = "{\"t\":" + t + ",\"p\":" + JsonConvert.ToString(Word(said, "profileId")) + ",\"f\":" + JsonConvert.ToString(Word(said, "feature"))
                 + ",\"s\":" + JsonConvert.ToString(Word(said, "stage")) + ",\"d\":";
-            if (!full)
+            if (full)
             {
-                List<string> settings = null;
-                foreach (var part in said.Properties())
-                {
-                    if (part.Name.EndsWith("Config", StringComparison.Ordinal) && part.Value is JObject)
-                    {
-                        (settings ?? (settings = new List<string>())).Add(part.Name);
-                    }
-                }
-
-                if (settings != null)
-                {
-                    foreach (var name in settings)
-                    {
-                        said.Remove(name);
-                    }
-                }
-
-                return head + said.ToString(Formatting.None) + "}";
+                return head + json + "}";
             }
 
-            return head + json + "}";
+            if (feature == "E04")
+            {
+                // (only a move that went well or badly: most come to nothing either way)
+                var result = said["tacticalOutcome"]?["result"]?.ToString();
+                if (result == null || result == "pending" || result == "neutral")
+                {
+                    return null;
+                }
+            }
+            else if (feature == "T04")
+            {
+                // (who's in control, only when that changes)
+                if (raid != _controlRaid)
+                {
+                    Control.Clear();
+                    _controlRaid = raid;
+                }
+
+                var owner = said["controlJournal"]?["owner"]?.ToString() ?? "";
+                var layer = said["controlJournal"]?["layer"]?.ToString() ?? "";
+                var who = Word(said, "profileId");
+                if (Control.TryGetValue(who, out var was) && was == owner + "|" + layer)
+                {
+                    return null;
+                }
+
+                Control[who] = owner + "|" + layer;
+                return head + "{\"feature\":\"T04\",\"stage\":\"evaluated\",\"controlJournal\":{\"owner\":" + JsonConvert.ToString(owner)
+                    + ",\"layer\":" + JsonConvert.ToString(layer) + "}}}";
+            }
+
+            return head + Kept(feature, stage, said).ToString(Formatting.None) + "}";
+        }
+
+        // Of a decision, only what the replay's Why tab shows (all the rest is COMET's own working: 20 times the size)
+        private static JObject Kept(string feature, string stage, JObject said)
+        {
+            var kept = new JObject { ["feature"] = feature, ["stage"] = stage };
+            Copy(said, kept, "decision", "reason");
+            if (feature[0] == 'A')
+            {
+                // its options as weighed, once (when chosen; begun and let go say only what and why)
+                if (stage == "selected" && said["candidates"] is JArray options && options.Count > 0)
+                {
+                    var list = new JArray();
+                    foreach (var option in options)
+                    {
+                        if (option is JObject one)
+                        {
+                            var each = new JObject();
+                            Copy(one, each, "decision", "score", "eligible", "reason");
+                            list.Add(each);
+                        }
+                    }
+
+                    kept["candidates"] = list;
+                }
+
+                // (a worse option picked on purpose, as its personality allows: which was best)
+                var mistake = said["mixing"]?["mistake"] as JObject;
+                if (stage == "selected" && mistake != null && mistake.Value<string>("state") == "mistake-selected")
+                {
+                    var why = new JObject();
+                    Copy(mistake, why, "state", "best");
+                    kept["mixing"] = new JObject { ["mistake"] = why };
+                }
+            }
+            else if (feature[0] == 'S')
+            {
+                // its squad's plan: how far along it is
+                foreach (var part in said.Properties())
+                {
+                    if (part.Value is JObject plan && (plan["state"] != null || plan["execution"] != null))
+                    {
+                        var each = new JObject();
+                        Copy(plan, each, "state", "execution");
+                        kept[part.Name] = each;
+                    }
+                }
+            }
+            else
+            {
+                string part = null;
+                string[] fields = null;
+                switch (feature)
+                {
+                    case "H01": part = "medicalChoice"; fields = new[] { "choice", "reason" }; break;
+                    case "W04": part = "quickReload"; fields = new[] { "choice", "reason" }; break;
+                    case "P09": part = "searchAbandonment"; fields = new[] { "state", "reason" }; break;
+                    case "E04": part = "tacticalOutcome"; fields = new[] { "action", "result" }; break;
+                }
+
+                if (part != null && said[part] is JObject from)
+                {
+                    var each = new JObject();
+                    Copy(from, each, fields);
+                    kept[part] = each;
+                }
+            }
+
+            return kept;
+        }
+
+        // the fields named that it has, and that say something (nothing, "" and false left out; a score of 0 kept)
+        private static void Copy(JObject from, JObject to, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var v = from[name];
+                if (v == null || v.Type == JTokenType.Null || v.Type == JTokenType.String && ((string)v).Length == 0 || v.Type == JTokenType.Boolean && !(bool)v)
+                {
+                    continue;
+                }
+
+                to[name] = v.Type == JTokenType.Float ? new JValue(Math.Round((double)v, 2)) : v.DeepClone();
+            }
         }
 
         // a text field of it, without tabs or line ends (the server writes these as columns)

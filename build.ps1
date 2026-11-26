@@ -108,11 +108,9 @@ if (-not $addonsOnly) {
         if (-not $text.Contains($flag)) { throw "livemap.js has no '$flag' to turn recording off with." }
         [IO.File]::WriteAllText($page, $text.Replace($flag, '  const RECORDING = false;'), (New-Object System.Text.UTF8Encoding $false))
     }
-    Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $mod
     # config.jsonc isn't packed: the server writes the default the first time it starts, so an update never overwrites
     # the owner's own
     Copy-Item -LiteralPath (Join-Path $root 'LICENSE.md') -Destination $mod
-    Copy-Item -LiteralPath (Join-Path $root 'LICENSE-MAPS.md') -Destination $mod
     $plugin = Join-Path $stage "BepInEx\plugins\$name"
     New-Item -ItemType Directory -Force $plugin | Out-Null
     Copy-Item -LiteralPath $clientDll -Destination $plugin

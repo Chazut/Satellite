@@ -15,8 +15,8 @@ namespace Satellite.Server;
 // packed as one piece of the file (pieces one after another are one gzip file to read), so nothing is held here
 // meanwhile. Never sent to the pages as they come: a replay asks for one bot's (api/history/comet?id=&p=).
 //
-// config.jsonc's "history": "comet" (false as it ships: on once tested in raids) records them, without COMET's settings in each (its
-// "...Config" parts); "cometDebug" (false) records all of it, and COMET's reports of the whole raid (T01-T04), with
+// config.jsonc's "history": "comet" (true as it ships) records what the replay's Why tab reads, slimmed by the
+// plugin (a few percent of a raid's size); "cometDebug" (false) records all of it, and COMET's reports of the whole raid (T01-T04), with
 // each of the settings written once (a line c<tab><n><tab>{...}, and {"$c":n} where it was); "cometMb" (100): the most
 // a raid's file may take, after which the rest of its decisions are left out (the raid is recorded as before).
 public partial class LiveMapRoute
@@ -29,6 +29,9 @@ public partial class LiveMapRoute
     }
 
     private readonly ConcurrentDictionary<string, CometFile> _cometFiles = new(StringComparer.Ordinal);
+    // how long after a raid's end its COMET decisions are packed as one (the game plugin sends what's left of them for
+    // up to two minutes after)
+    private const int CometLate = 150_000;
     private (bool On, bool Debug, long Most)? _cometSettings;
 
     private (bool On, bool Debug, long Most) CometSettings()
@@ -38,7 +41,7 @@ public partial class LiveMapRoute
             return read;
         }
 
-        var on = false;
+        var on = true;
         var debug = false;
         var mb = 100;
         try
@@ -221,6 +224,45 @@ public partial class LiveMapRoute
         }
 
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
+    }
+
+    // A raid's COMET decisions, written a second's worth at a time as they came (each piece packed quickly, on its
+    // own), packed again as one, as well as it can be: a third or less of the size. Nothing is lost if it can't be.
+    private void PackComet(string id)
+    {
+        var file = Path.Combine(HistoryFolder, id + ".comet.gz");
+        if (!RaidId().IsMatch(id) || !File.Exists(file))
+        {
+            return;
+        }
+
+        var keep = _cometFiles.GetOrAdd(id, _ => new CometFile());
+        var part = file + ".part";
+        lock (keep.Lock)
+        {
+            try
+            {
+                using (var from = new GZipStream(File.OpenRead(file), CompressionMode.Decompress))
+                using (var to = new GZipStream(File.Create(part), CompressionLevel.SmallestSize))
+                {
+                    from.CopyTo(to);
+                }
+
+                File.Move(part, file, true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                logger.Debug($"[Satellite] Raid {id}: COMET's decisions not packed again: {ex.Message}");
+                try
+                {
+                    File.Delete(part);
+                }
+                catch (Exception gone) when (gone is IOException or UnauthorizedAccessException)
+                {
+                    // left for the temporary files' tidy
+                }
+            }
+        }
     }
 
     // GET api/history/comet?id=<raid>&p=<profile id>: that one's decisions, {"ev":[{"t":ms,"d":{...}},..]}, oldest

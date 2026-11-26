@@ -5,10 +5,18 @@ Satellite (its code and its map scans) is licensed under Creative Commons
 Attribution-NonCommercial 4.0 International (CC BY-NC 4.0):
 https://creativecommons.org/licenses/by-nc/4.0/
 
+In short: you may use, share and change it (the map scans too: everything under maps/, in your own mod, site or
+tool) as long as you give credit, and say so when you changed it. You may not sell it or use it for anything
+commercial. Credit for the map scans, shown where they are shown or listed (a page footer, a readme, a mod page):
+
+    Map scans by Fums (Satellite), CC BY-NC 4.0
+
 Not covered by this licence:
 - web/qrcode.js: qrcode-generator by Kazuhiko Arase, MIT (its licence is at the top of the file).
 - web/cursors: Cursor Pack by Kenney, CC0 (web/cursors/License.txt).
-- Escape from Tarkov and its assets belong to Battlestate Games.
+- Escape from Tarkov and its assets belong to Battlestate Games: the map scans are pictures of its locations, and
+  this licence covers only the work of capturing and preparing them. Locations a mod adds or changes belong to that
+  mod's authors. Satellite is a fan mod, not affiliated with or backed by Battlestate Games.
 
 The licence text follows.
 

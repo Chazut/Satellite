@@ -2,6 +2,26 @@
 
 ## 1.1.0
 
+- Why (a replay's Bots tab, while a bot is followed): who's in control of it (COMET in a fight, ORBIT, asleep as ORBIT's ghost, getting unstuck), ORBIT's goal and why it's leaving the raid, COMET's move with every option it weighed (each one's score, and why it could or couldn't), what else COMET has it doing (medical, reloads, searching, its squad's plan), and its moves before, each pressed to go there. A line over the replay's bar, by the followed bot's name, says COMET's move now and why. COMET's decisions are recorded with each raid for this (`history.comet`, on): what the Why panel shows, a few percent of a raid's size. `history.cometDebug` records all of what COMET says.
+- Why a squad leaves the raid: ORBIT's reason ("all mains done", "loot ≥ 400k₽", "raid time low") is in the bot's card, and a "Heading out" event in the raid's events, on the live map and in replays.
+- The replay's timeline, as Raid Review's: a skull on the bar's top edge for every kill (gold-ringed for your own, black for your death), a thin line down at each, and the fight it ended a faint red band behind it, as long as the fight lasted: from the first shot either fired, the first time either was hurt, or the start of the fighting either was in. Pressing a skull or a fight plays it from its start, following the killer. A kill ORBIT settled away from the player, with no fight recorded, is only its line. Loot sprees are gold. The playhead's dot can be dragged.
+- An event pressed in a replay plays the raid from a moment before it.
+- The Behaviour tab has COMET's moves as sorts of their own (pushing, holding, crossfire, taking cover, searching, reloading or healing, after the fight).
+- Raid history shows everybody, whatever the live map shows: who the live map has switched off or shown as a rough area is still in the replay, its Raid list and its heat map.
+- Replays always name everyone, and a body's loot is said by the pointer (what its owner last carried, before the body is recorded).
+- Pick-ups worth at least (Loot): pick-ups on the map by their own worth, apart from Worth at least, to see everything bots pick up without every cheap thing lying about.
+- What bots put in their secure container: listed in the bot's card as "Put in its secure container (can't be looted)", and never counted in what it's worth. Loot > Bot loot > Secure container lists all of its secure container.
+- A bot's card by the pointer is two columns: what it is and its health beside what it wears and carries. Gear in full and What it carries in full (Bot loot) fold either into one line.
+- Mark wishlist items (Loot, on): loot on your wishlist, and the containers and bodies holding it, with a blue star and ring, whatever it's worth.
+- Manage recordings: every raid with its size, sortable by any column, and Trim recordings: delete every raid where you got no kills, you died, a run-through, one that ended abruptly, one shorter than 5 minutes or a map scanner run (a raid holding a record kept unless asked).
+- Mod soldiers' teams (People and bots, on): ISB, Black Division, RUAF, UNTAR and mercenaries numbered by squad as PMCs are.
+- Trails are in team colours with Team colours on.
+- Ring round the one followed (Markers and names): the blue ring can be switched off. Names and What they're doing have their own sizes under Text size.
+- Doors say Unlocked, Opened or Shut as they happened. A bot reloading isn't a pick-up or a drop, and a grenade thrown isn't a drop.
+- Room light switches aren't recorded; the raid's Switches fold and the timeline's switch rows show only switches somebody flipped.
+- Every search box has an ✕ to clear it.
+- The server adds the options a newer Satellite brings to `config.jsonc` when it starts, with their comments, keeping your own settings.
+- `LICENSE.md` covers the map scans too (`LICENSE-MAPS.md` is merged into it).
 - Raid history: the server records every raid, whether the page is open or not, and keeps it. **Live map | Raid history** at the top of the page leads to it, at `/satellite/raids/`, laid out as Raid Review's. Raid Review (by ekky and Chazut) is merged into Satellite: everything it showed of a raid is here.
   - **Recent raids**: every raid as a table (player, type, map, how it went, time in raid, when, kills), with Refresh and Import raid. Records at the top (raids, time in raid, survived, kills, what was looted, the most played map, best loot, most kills and more), for all players together or one at a time: each game with Satellite records its own raids.
   - **A raid**: Overview (the raid at a glance, every kill in order, teams and a leaderboard), Stats (charts over the raid, your health among them), Timeline (every kill, pick-up, drop, grenade, extraction and switch, filtered by sort), Behaviour (what every bot was doing, a bar each) and Map. Every view has its own address, so it can be bookmarked or opened in another tab. Export raid and Delete raid in its head.

@@ -850,12 +850,15 @@ public partial class LiveMapRoute
                 {
                     File.Delete(rec);
                     File.Delete(Path.Combine(HistoryFolder, of.Id + ".json"));
+                    File.Delete(Path.Combine(HistoryFolder, of.Id + ".comet.gz"));
                     return;
                 }
 
                 SaveAbout(of, false);
                 Pack(rec);
                 Trim();
+                // COMET's decisions, packed as one once the last of them are in (they can come a while after the raid)
+                _ = Task.Delay(CometLate).ContinueWith(_ => PackComet(of.Id), TaskScheduler.Default);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -1034,6 +1037,22 @@ public partial class LiveMapRoute
         }
     }
 
+    // what one raid's files take on the disk together, in bytes
+    private long RaidBytes(string id)
+    {
+        long sum = 0;
+        foreach (var end in new[] { ".json", ".rec", ".rec.gz", ".comet.gz" })
+        {
+            var file = new FileInfo(Path.Combine(HistoryFolder, id + end));
+            if (file.Exists)
+            {
+                sum += file.Length;
+            }
+        }
+
+        return sum;
+    }
+
     private void Forget(string id)
     {
         foreach (var end in new[] { ".json", ".rec", ".rec.gz", ".comet.gz" })
@@ -1138,6 +1157,9 @@ public partial class LiveMapRoute
                         {
                             about["exitTitle"] = exitTitle;
                         }
+
+                        // what it takes on the disk, all its files together (not kept: it changes while it's recorded)
+                        about["size"] = RaidBytes(id);
 
                         // (and one recorded before its numbers were kept: counted in the background, listed next time)
                         if (going == null && !about.ContainsKey("st"))

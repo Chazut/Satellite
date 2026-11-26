@@ -193,7 +193,7 @@ body.floorHide #floorLayer .floorPart.other img { visibility: hidden; }
 /* what's pointed at: a container's contents, a lock's key, an item's worth */
 #tip {
   position: fixed;
-  z-index: 3;
+  z-index: 7;
   max-width: min(320px, calc(100vw - 16px));
   padding: 7px 10px;
   border: 1px solid var(--line);
@@ -224,6 +224,7 @@ body.floorHide #floorLayer .floorPart.other img { visibility: hidden; }
 .tipRow .chance { min-width: 3.2em; color: var(--dim); }
 .tipRow .more { flex: none; color: var(--dim); }
 #tip .tag.fir { background: #f5a3ff; }
+#tip .tag.wish { background: #6ec6ff; font-size: 11px; }
 #tip .tag { flex: none; padding: 0 5px; border-radius: 999px; background: #ffe14d; color: var(--ink); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 15px; }
 /* a heading inside it ("Can hold"), and plain lines (its key, "Empty", "and 4 more") */
 .tipSub { padding: 6px 10px 2px; border-top: 1px solid var(--line); color: var(--accent); font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
@@ -1983,47 +1984,50 @@ html.hist #replayBar { left: max(8px, var(--menu-l, 0px)); right: max(8px, var(-
 html.hist #replayBar[hidden] { display: none; }
 /* (nothing in it wider than it: the Debug line, its numbers changing as it plays, made the bar jump on a phone) */
 html.hist #replayBar > * { min-width: 0; max-width: 100%; }
-/* The timeline, as Raid Review's: a tall bar the width of the map, pressed or dragged anywhere to go there. In it a
-   faint line each minute, a red band over each fight, what's been played lit, and the playhead; along its top, inside
-   it, a skull for every kill, a stem down to its foot. */
-html.hist #replayTrack { flex: none; height: calc(56px + var(--spree-h, 10px)); margin-top: 2px; border: 1px solid rgba(200, 205, 255, 0.14); border-radius: 8px; background: rgba(255, 255, 255, 0.025);
+/* The timeline, as Raid Review's: a bar the width of the map, pressed or dragged anywhere to go there. In it a faint
+   line each minute, what's been played lit, and the playhead; on its top edge a skull for every kill, a thin line
+   straight down from each, the fight it ended faint behind it; along its foot, the loot sprees. */
+html.hist #replayTrack { flex: none; height: calc(40px + var(--spree-h, 10px)); margin-top: 12px; border: 1px solid rgba(200, 205, 255, 0.14); border-radius: 8px; background: rgba(255, 255, 255, 0.025);
   cursor: var(--cur-hand); touch-action: none; }
 html.hist #replaySeek { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 #replayGrid, #replayFights, #replayFill { position: absolute; inset: 0; pointer-events: none; border-radius: 7px; overflow: hidden; }
 #replayGrid i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(200, 205, 255, 0.07); }
-#replayGrid i::after { content: attr(data-t); position: absolute; left: 4px; bottom: 3px; color: rgba(200, 205, 255, 0.28); font-size: 10px; font-variant-numeric: tabular-nums; }
-#replayFights i { position: absolute; top: 0; bottom: 0; min-width: 4px; background: linear-gradient(180deg, rgba(216, 80, 74, 0.28), rgba(216, 80, 74, 0.55)); border-left: 1px solid rgba(255, 110, 100, 0.7); }
-/* each kill's moment: a red line down the whole bar */
-#replayFights b { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(255, 90, 80, 0.9); }
-#replayFights b.mine { background: #ffc94d; }
+#replayGrid i::after { content: attr(data-t); position: absolute; left: 4px; bottom: calc(var(--spree-h, 10px) + 2px); color: rgba(200, 205, 255, 0.28); font-size: 10px; font-variant-numeric: tabular-nums; }
 /* loot sprees: a lane along the bar's foot, amber where somebody picked up a lot in a short while */
 #replaySprees { position: absolute; left: 0; right: 0; bottom: 0; height: var(--spree-h, 10px); z-index: 1; pointer-events: none; }
 #replaySprees[hidden] { display: none; }
-#replaySprees i { position: absolute; bottom: 1px; height: 8px; min-width: 5px; border-radius: 3px; background: rgba(255, 190, 70, 0.75); pointer-events: auto; cursor: var(--cur-hand); }
+#replaySprees i { position: absolute; bottom: 1px; height: 6px; min-width: 5px; border-radius: 3px; background: rgba(230, 175, 60, 0.6); pointer-events: auto; cursor: var(--cur-hand); }
 #replaySprees i:hover { background: #ffd27a; }
-#replaySprees i.mine { background: rgba(110, 220, 120, 0.85); }
+#replaySprees i.mine { background: #f0b93c; box-shadow: 0 0 0 1px rgba(255, 220, 140, 0.6); }
 #replayFill { right: auto; width: 0; border-radius: 7px 0 0 7px; background: linear-gradient(180deg, rgba(123, 156, 255, 0.05), rgba(123, 156, 255, 0.16)); }
 #replayHead { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--accent); box-shadow: 0 0 8px rgba(123, 156, 255, 0.8); pointer-events: none; }
-#replayHead::after { content: ''; position: absolute; left: -5px; bottom: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid #0c0c12; }
+/* (its dot: grabbed and dragged like the bar itself; sized with its rim inside, so it sits right on the line) */
+#replayHead::after { content: ''; position: absolute; left: 50%; bottom: -7px; box-sizing: border-box; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--accent);
+  border: 2px solid #0c0c12; pointer-events: auto; cursor: var(--cur-grab, grab); }
 #replayHover { position: absolute; top: auto; bottom: 3px; transform: translateX(-50%); padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, 0.75); color: var(--bright); font-size: 11px;
   font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
 #replayHover[hidden] { display: none; }
-/* the kills: a row of their own along the bar's top, a little darker, a pin each; the player's own kills ringed in
-   white, a player's death black, a gas death an orange burst; kills close together share a pin with their count */
-html.hist #replayTicks { z-index: 1; left: 0; right: 0; top: 0; height: 26px; pointer-events: none; border-bottom: 1px solid rgba(200, 205, 255, 0.1);
-  border-radius: 7px 7px 0 0; background: rgba(0, 0, 0, 0.22); }
-html.hist #replayTicks[hidden], #replayFights[hidden] { display: none; }
-html.hist #replayGrid, html.hist #replayFights, html.hist #replayFill { top: 27px; border-radius: 0 0 7px 7px; }
-#replayTicks b.skull { position: absolute; top: 4px; width: 18px; height: 18px; margin-left: -9px; border: 1.5px solid rgba(0, 0, 0, 0.55); border-radius: 50%;
-  background: #c8463f; color: #fff; font-size: 11.5px; line-height: 15px; text-align: center; pointer-events: auto; cursor: var(--cur-hand);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); transition: transform 0.1s; }
-#replayTicks b.skull.mine { top: 2px; width: 22px; height: 22px; margin-left: -11px; border: 2px solid #fff; background: #e0483f; font-size: 13px; line-height: 18px; z-index: 2;
-  box-shadow: 0 0 0 2px rgba(224, 72, 63, 0.35), 0 1px 4px rgba(0, 0, 0, 0.6); }
-#replayTicks b.skull.died { background: #111; border-color: #ff4d43; z-index: 2; }
+/* the kills: a skull each on the bar's top edge (half over it), a thin red line straight down at each kill's moment,
+   and the fight it ended a faint red behind; the player's own kills ringed in gold, the player's death black, a gas
+   death an orange burst; kills too close to tell apart share a skull with their count */
+html.hist #replayFights { top: 0; bottom: calc(var(--spree-h, 10px) + 2px); overflow: visible; border-radius: 7px 7px 0 0; z-index: 2; }
+html.hist #replayFights[hidden], html.hist #replayTicks[hidden] { display: none; }
+#replayFights .fightBand { position: absolute; top: 0; bottom: 0; min-width: 3px; border-left: 1px dashed rgba(255, 150, 140, 0.55); background: rgba(230, 80, 70, 0.12);
+  pointer-events: auto; cursor: var(--cur-hand); }
+#replayFights .fightBand:hover { border-left: 1px solid #ff8a80; background: rgba(230, 80, 70, 0.32); }
+#replayFights b { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(240, 90, 80, 0.85); pointer-events: none; }
+#replayFights b.mine { background: #ffc94d; }
+html.hist #replayTicks { position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 3; pointer-events: none; }
+#replayTicks b.skull { position: absolute; top: -11px; width: 22px; height: 22px; margin-left: -11px; border: 1.5px solid rgba(0, 0, 0, 0.6); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; background: #c8463f; color: #fff; pointer-events: auto; cursor: var(--cur-hand);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55); transition: transform 0.1s; }
+#replayTicks b.skull svg { display: block; width: 14px; height: 14px; }
+#replayTicks b.skull.mine { border: 2px solid #ffc94d; }
+#replayTicks b.skull.died { background: #151515; border-color: #ff4d43; }
 #replayTicks b.skull.gas { background: #ff8a1c; color: #2a1200; }
-#replayTicks b.skull i.n { position: absolute; right: -7px; top: -3px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 7px; background: #f2f3f7; color: #15161d;
-  font-size: 9px; font-style: normal; font-weight: 700; line-height: 13px; text-align: center; }
-#replayTicks b.skull:hover { transform: scale(1.18); z-index: 3; }
+#replayTicks b.skull i.n { position: absolute; right: -7px; top: -4px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: #f2f3f7; color: #15161d;
+  font-size: 9px; font-style: normal; font-weight: 700; line-height: 14px; text-align: center; }
+#replayTicks b.skull:hover { transform: scale(1.15); z-index: 3; }
 #replayTip .kcSep { height: 1px; margin: 7px 0; background: var(--line); }
 /* the card over a skull */
 #replayTip { position: absolute; z-index: 6; min-width: 200px; max-width: 320px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-small);
@@ -2097,7 +2101,7 @@ html.hist body.hpMap #squadPane { margin-top: 58px; }
   .tlAxis { margin-left: 76px; }
   .behWrap { grid-template-columns: 120px 1fr; }
   #hp .behNames button small { display: none; }
-  html.hist #replayTrack { height: calc(48px + var(--spree-h, 10px)); }
+  html.hist #replayTrack { height: calc(34px + var(--spree-h, 10px)); }
   #replaySpeeds { margin: 0 2px; gap: 2px; }
   #replaySpeeds button { min-width: 30px; padding: 0 4px; }
   #replayModes { margin: 0 2px; padding-left: 4px; gap: 2px; }
@@ -2355,8 +2359,59 @@ html.oneBar body.hpMap #hpMapBar #floorBadge { border-radius: var(--radius-small
 @keyframes hoverTipIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 
 /* the replay's timeline: the fights' red stops over the loot sprees' lane, and the time pointed at is over both */
-html.hist #replayTrack:has(#replaySprees:not([hidden])) #replayFights { bottom: calc(var(--spree-h, 10px) + 2px); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 #replayHover { z-index: 3; }
 html.hist #replayTrack:has(#replaySprees:not([hidden])) #replayHover { bottom: calc(var(--spree-h, 10px) + 4px); }
 #squadSpan { flex: none; margin: 4px 6px 2px; }
 #squadSpan[hidden] { display: none; }
+html.hist #replayHead { z-index: 3; }
+/* Manage recordings: trimming them, and every raid with its size */
+.trimForm { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px 12px; margin: 4px 0; }
+.trimForm .keepHeld { grid-column: 1 / -1; color: var(--dim); }
+table.board.sizes td.num, table.board.sizes th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.board.sizes td.out.good { color: #6fdc8c; }
+table.board.sizes td.out.bad { color: #ff7a70; }
+table.board.sizes th .sortBtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: var(--cur-hand); }
+table.board.sizes th .sortBtn:hover, table.board.sizes th .sortBtn.on { color: var(--bright); }
+/* the replay's Why tab: what the bot followed is doing and why */
+.whyHead { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 6px; }
+.whyHead b { font-size: 14px; }
+.whyHead small { color: var(--dim); }
+.whyLine { display: grid; grid-template-columns: 78px 1fr; gap: 8px; padding: 2px 0; font-size: 12.5px; }
+.whyLine i { color: var(--dim); font-style: normal; }
+.whyLine.hot span { color: #9fd8ff; }
+.whyMove { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2px 0 4px; }
+.whyMove b { font-size: 14px; color: #ffc56e; }
+.whyMove.over b { color: var(--dim); }
+.whyMove small { color: var(--dim); font-variant-numeric: tabular-nums; }
+table.whyOptions { width: 100%; margin: 6px 0 2px; border-collapse: collapse; font-size: 12px; }
+table.whyOptions th { color: var(--dim); font-weight: 600; text-align: left; padding: 2px 4px; }
+table.whyOptions td { padding: 3px 4px; border-top: 1px solid var(--line); }
+table.whyOptions .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.whyOptions tr.on td { color: #ffc56e; font-weight: 600; }
+table.whyOptions tr.no td { color: var(--dim); }
+.whyBefore { display: flex; flex-direction: column; gap: 2px; }
+.whyBefore button { display: grid; grid-template-columns: 52px 1fr auto; gap: 8px; padding: 3px 6px; border: 0; border-radius: 5px; background: none; color: var(--text); font: inherit; font-size: 12px;
+  text-align: left; cursor: var(--cur-hand); }
+.whyBefore button:hover { background: var(--hover); }
+.whyBefore i { color: var(--dim); font-style: normal; font-variant-numeric: tabular-nums; }
+.whyBefore small { color: var(--dim); font-variant-numeric: tabular-nums; }
+/* by the followed bot's name over the replay's bar: COMET's move now and why */
+#replayBotWhy { margin-left: 8px; overflow: hidden; color: #ffc56e; font-size: 11.5px; white-space: nowrap; text-overflow: ellipsis; }
+#replayBotWhy:empty { display: none; }
+/* a bot's card by the pointer: what it is and its health on the left, its gear and what it carries on the right */
+#tip.cols { max-width: min(600px, calc(100vw - 16px)); }
+#tip .tipCols { display: grid; grid-template-columns: minmax(170px, auto) minmax(220px, 1fr); }
+#tip .tipCol { min-width: 0; }
+#tip .tipCol + .tipCol { border-left: 1px solid var(--line); }
+@media (max-width: 560px) {
+  #tip .tipCols { grid-template-columns: minmax(0, 1fr); }
+  #tip .tipCol + .tipCol { border-left: 0; border-top: 1px solid var(--line); }
+}
+/* a search box's ✕, inside it at the right, while something's typed */
+.clearable { position: relative; display: inline-flex; flex: 1 1 auto; min-width: 0; align-items: center; }
+.clearable > input { flex: 1 1 auto; min-width: 0; width: 100%; padding-right: 26px; }
+.clearable > input::-webkit-search-cancel-button { display: none; }
+.clearable > button.clearX, #hp .clearable > button.clearX { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: auto; min-width: 0; height: auto; min-height: 0; margin: 0; padding: 2px 6px;
+  border: 0; border-radius: 4px; background: none; box-shadow: none; color: var(--dim); font-size: 12px; line-height: 1; cursor: var(--cur-hand); }
+.clearable > button.clearX:hover, #hp .clearable > button.clearX:hover { color: var(--bright); background: var(--hover); }
+.clearable > button.clearX[hidden], #hp .clearable > button.clearX[hidden] { display: none; }

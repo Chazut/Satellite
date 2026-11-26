@@ -261,6 +261,15 @@ namespace Satellite.Client
         }
 
         private static readonly Dictionary<string, Gone> Out = new Dictionary<string, Gone>();
+        // how long a thing taken out may be gone and still be one's own put back, not dropped and picked up (a
+        // reload's magazine is out for two or three seconds): a drop is told this long after
+        private const float BackWithin = 6f;
+
+        // rounds (not a box or pack of them): what a gun's magazines are filled with
+        private static bool IsRounds(Item item)
+        {
+            return item is EFT.InventoryLogic.Ammo;
+        }
         private static readonly List<string> Due = new List<string>();
         // the last one told, so a thing the game tells twice (Fika's copy of a player does) is told once
         private static string _lastKey;
@@ -284,6 +293,13 @@ namespace Satellite.Client
                 }
 
                 if (Hooks.Text(Hooks.Get(location, "Container"), "ID") == "cartridges")
+                {
+                    return;
+                }
+
+                // A bot's rounds come and go as it reloads and as the game tops its ammo up: not a pick-up or a drop
+                // (rounds a bot takes off a body or out of a box come with what it takes, the rest isn't news)
+                if (IsRounds(item) && World.IsBot(__instance))
                 {
                     return;
                 }
@@ -314,10 +330,12 @@ namespace Satellite.Client
                     return;
                 }
 
+                // its own thing put back (a magazine into the gun or back into the rig as it reloads, a thing moved from
+                // a pocket to a bag): not a pick-up, nor was taking it out a drop
                 if (Out.TryGetValue(key, out var left))
                 {
                     Out.Remove(key);
-                    if (now - left.At <= 0.1f)
+                    if (now - left.At <= BackWithin)
                     {
                         return;
                     }
@@ -330,6 +348,7 @@ namespace Satellite.Client
                 var count = item.StackObjectsCount;
                 var quest = item.QuestItem;
                 var where = __instance.Position;
+                var into = SlotOf(location);
                 Events.Add("loot", who, name, now, to =>
                 {
                     to.Append("{\"tpl\":");
@@ -352,6 +371,13 @@ namespace Satellite.Client
                         World.Text(to, kind);
                     }
 
+                    // what it went into: the slot it's worn in, or the one holding the bag, rig or pocket it was put in
+                    if (!string.IsNullOrEmpty(into))
+                    {
+                        to.Append(",\"in\":");
+                        World.Text(to, into);
+                    }
+
                     // where they stood
                     World.Spot(to, "at", where);
                     to.Append('}');
@@ -361,6 +387,44 @@ namespace Satellite.Client
             {
                 // not told
             }
+        }
+
+        // the slots of somebody's gear
+        private static readonly HashSet<string> GearSlots = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "FirstPrimaryWeapon", "SecondPrimaryWeapon", "Holster", "Scabbard", "Headwear", "Earpiece", "FaceCover", "Eyewear", "ArmorVest",
+            "TacticalVest", "Backpack", "Pockets", "SecuredContainer", "ArmBand", "SpecialSlot1", "SpecialSlot2", "SpecialSlot3", "Dogtag"
+        };
+
+        // The slot of somebody's gear a thing went into, however deep: "Backpack", "TacticalVest", "Pockets",
+        // "SecuredContainer", "FirstPrimaryWeapon" (a part on a gun)... Up from where it was put, container by
+        // container (a grid's or slot's item, and where that item is), the last of them that's a slot of the gear.
+        // Null when it can't be told.
+        private static string SlotOf(object location)
+        {
+            string found = null;
+            try
+            {
+                var container = Hooks.Get(location, "Container");
+                for (var i = 0; i < 10 && container != null; i++)
+                {
+                    var id = Hooks.Text(container, "ID");
+                    if (id != null && GearSlots.Contains(id))
+                    {
+                        found = id;
+                    }
+
+                    var parent = Hooks.Get(container, "ParentItem");
+                    var address = parent != null ? Hooks.Get(parent, "CurrentAddress") : null;
+                    container = address != null ? Hooks.Get(address, "Container") : null;
+                }
+            }
+            catch (Exception)
+            {
+                // as far as it got
+            }
+
+            return found;
         }
 
         // with every report: what was taken out and hasn't come back is a drop
@@ -377,7 +441,7 @@ namespace Satellite.Client
                 Due.Clear();
                 foreach (var pair in Out)
                 {
-                    if (now - pair.Value.At > 0.25f)
+                    if (now - pair.Value.At > BackWithin)
                     {
                         Due.Add(pair.Key);
                     }

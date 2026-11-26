@@ -1,4 +1,6 @@
 {
+  // Which version of this file it is: the server adds what a newer Satellite brings, keeping your own settings
+  "configVersion": 3,
   // What the web map may show, for everyone who opens the page. The game always reports these. The page starts
   // with enemy PMCs, scavs, guards and bosses turned off, and each viewer can turn them on for their own page.
   // false: the server never passes that kind on, so no page can show it. Restart the server after a change.
@@ -72,8 +74,8 @@
     "record": true,
     // how many raids are kept: the oldest are deleted beyond this
     "keep": 30,
-    // with COMET: what each bot decided and why, kept with the raid for its replay (not yet shown in a replay). false: not recorded
-    "comet": false,
+    // with COMET: what each bot chose and why, for the replay's Why tab (a few percent more per raid). false: not recorded
+    "comet": true,
     // true: all of what COMET says, its settings and its reports of the whole raid too, for its debug views
     // (several times the size)
     "cometDebug": false,

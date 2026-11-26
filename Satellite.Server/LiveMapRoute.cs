@@ -580,6 +580,9 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
     // written from the default kept in this DLL (a config.json from before 1.0.0 is taken over as it is).
     private static readonly object ConfigLock = new();
 
+    // (the owner's config brought up to date once each time the server starts: see AddMissing)
+    private static bool _configChecked;
+
     public static string ConfigFile(string folder, Action<string> info, Action<string> warn)
     {
         var file = Path.Combine(folder, "config.jsonc");
@@ -587,6 +590,16 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         {
             if (File.Exists(file))
             {
+                if (!_configChecked)
+                {
+                    _configChecked = true;
+                    var shipped = DefaultConfig();
+                    if (shipped != null)
+                    {
+                        AddMissing(file, shipped, info, warn);
+                    }
+                }
+
                 return file;
             }
 
@@ -600,15 +613,10 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
                     return file;
                 }
 
-                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Satellite.config.jsonc");
-                if (stream != null)
+                var text = DefaultConfig();
+                if (text != null)
                 {
-                    using var reader = new StreamReader(stream);
-                    var text = reader.ReadToEnd();
-#if !RECORDING
-                    // without raid recording in this build, its settings aren't offered
-                    text = Regex.Replace(text, @"\r?\n  // Raid history:[^\n]*\r?\n  ""history"": \{.*?\r?\n  \},", "", RegexOptions.Singleline);
-#endif
+                    _configChecked = true;
                     File.WriteAllText(file, text);
                     info("[Satellite] Wrote config.jsonc with every kind of marker on. Edit it to keep some off the page.");
                 }
@@ -620,6 +628,251 @@ public partial class LiveMapRoute(ISptLogger<LiveMapRoute> logger, ModHelper mod
         }
 
         return file;
+    }
+
+    // the config as it ships, kept in this DLL (without raid recording in this build, its settings aren't offered)
+    private static string? DefaultConfig()
+    {
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Satellite.config.jsonc");
+        if (stream == null)
+        {
+            return null;
+        }
+
+        using var reader = new StreamReader(stream);
+        var text = reader.ReadToEnd();
+#if !RECORDING
+        text = Regex.Replace(text, @"\r?\n  // Raid history:[^\n]*\r?\n  ""history"": \{.*?\r?\n  \},", "", RegexOptions.Singleline);
+#endif
+        return text;
+    }
+
+    // An update never overwrites the owner's config, so what a newer version adds would never be in it. Each option (and
+    // each section) the shipped config has and theirs hasn't is written into theirs, with its comment, where it belongs;
+    // nothing of theirs is changed. Once, for a config from before configVersion 3: "history": "comet" false is made
+    // true (it shipped false in 1.1.0 beta 2 only until it was tried in raids).
+    private static void AddMissing(string file, string shipped, Action<string> info, Action<string> warn)
+    {
+        try
+        {
+            var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+            var text = File.ReadAllText(file);
+            if (JsonNode.Parse(text, null, options) is not JsonObject theirs || JsonNode.Parse(shipped, null, options) is not JsonObject ours)
+            {
+                return;
+            }
+
+            var nl = text.Contains("\r\n") ? "\r\n" : "\n";
+            var added = new List<string>();
+            var old = !theirs.ContainsKey("configVersion");
+            foreach (var (name, value) in ours)
+            {
+                if (!theirs.ContainsKey(name))
+                {
+                    // a whole section (or an option of its own at the top), at the end
+                    var block = Block(shipped, 0, shipped.Length, name, 2);
+                    if (block != null && Insert(ref text, Close(text, text.IndexOf('{')), block, nl))
+                    {
+                        added.Add(name);
+                    }
+
+                    continue;
+                }
+
+                if (value is not JsonObject section || theirs[name] is not JsonObject mine)
+                {
+                    continue;
+                }
+
+                foreach (var (key, _) in section)
+                {
+                    if (mine.ContainsKey(key))
+                    {
+                        continue;
+                    }
+
+                    // in their section, at its end
+                    var (from, to) = Section(shipped, name);
+                    var block = from >= 0 ? Block(shipped, from, to, key, 4) : null;
+                    var (start, end) = Section(text, name);
+                    if (block != null && start >= 0 && Insert(ref text, end, block, nl))
+                    {
+                        added.Add(name + "." + key);
+                    }
+                }
+            }
+
+            var comet = false;
+            if (old)
+            {
+                var (start, end) = Section(text, "history");
+                if (start >= 0)
+                {
+                    var part = text.Substring(start, end - start);
+                    var turned = Regex.Replace(part, @"(""comet""\s*:\s*)false", "${1}true");
+                    if (turned != part)
+                    {
+                        text = text.Substring(0, start) + turned + text.Substring(end);
+                        comet = true;
+                    }
+                }
+            }
+
+            if (added.Count == 0 && !comet)
+            {
+                return;
+            }
+
+            File.WriteAllText(file, text);
+            if (added.Count > 0)
+            {
+                info("[Satellite] Added the new options of this version to config.jsonc (your own settings are kept): " + string.Join(", ", added) + ".");
+            }
+
+            if (comet)
+            {
+                info("[Satellite] COMET's decisions are now recorded with each raid for its replay (config.jsonc: history.comet). Set it to false to stop.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        {
+            warn($"[Satellite] Couldn't add this version's new options to config.jsonc (it's used as it is): {ex.Message}");
+        }
+    }
+
+    // where a top-level section's braces are in a config's text: its "{" and its "}"; (-1, -1) when it isn't there
+    private static (int Open, int End) Section(string text, string name)
+    {
+        var at = Regex.Match(text, "(?m)^\\s*\"" + Regex.Escape(name) + "\"\\s*:\\s*\\{");
+        if (!at.Success)
+        {
+            return (-1, -1);
+        }
+
+        var open = at.Index + at.Length - 1;
+        var end = Close(text, open);
+        return end < 0 ? (-1, -1) : (open, end);
+    }
+
+    // the "}" that closes the "{" at open, past strings and // comments; -1 when there's none
+    private static int Close(string text, int open)
+    {
+        if (open < 0)
+        {
+            return -1;
+        }
+
+        var depth = 0;
+        var quoted = false;
+        for (var i = open; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (quoted)
+            {
+                if (c == '\\')
+                {
+                    i++;
+                }
+                else if (c == '"')
+                {
+                    quoted = false;
+                }
+
+                continue;
+            }
+
+            if (c == '"')
+            {
+                quoted = true;
+            }
+            else if (c == '/' && i + 1 < text.Length && text[i + 1] == '/')
+            {
+                var line = text.IndexOf('\n', i);
+                if (line < 0)
+                {
+                    return -1;
+                }
+
+                i = line;
+            }
+            else if (c == '{')
+            {
+                depth++;
+            }
+            else if (c == '}' && --depth == 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    // An option of the shipped config (indented so, between from and to), with the comment over it, as lines without
+    // a comma at the end; a section's whole. Null when it can't be found.
+    private static string? Block(string text, int from, int to, string name, int indent)
+    {
+        var lines = text.Substring(from, to - from).Replace("\r\n", "\n").Split('\n');
+        var head = new string(' ', indent) + "\"" + name + "\"";
+        var at = Array.FindIndex(lines, l => l.StartsWith(head, StringComparison.Ordinal) && l.Substring(head.Length).TrimStart().StartsWith(':'));
+        if (at < 0)
+        {
+            return null;
+        }
+
+        var first = at;
+        while (first > 0 && lines[first - 1].TrimStart().StartsWith("//", StringComparison.Ordinal))
+        {
+            first--;
+        }
+
+        var last = at;
+        if (lines[at].TrimEnd().EndsWith('{'))
+        {
+            // a section: down to its closing brace, at the same indent
+            var close = new string(' ', indent) + "}";
+            while (last + 1 < lines.Length && !lines[last].StartsWith(close, StringComparison.Ordinal))
+            {
+                last++;
+            }
+        }
+
+        var block = string.Join("\n", lines, first, last - first + 1).TrimEnd();
+        return block.EndsWith(',') ? block.Substring(0, block.Length - 1) : block;
+    }
+
+    // block written on lines of its own just before the "}" at end, a comma after what was last before it
+    private static bool Insert(ref string text, int end, string block, string nl)
+    {
+        if (end < 0)
+        {
+            return false;
+        }
+
+        var lineStart = text.LastIndexOf('\n', end - 1) + 1;
+        // the last line with a value on it before then: a comma after it, unless it has one or opens the section
+        var scan = lineStart - 1;
+        while (scan > 0)
+        {
+            var from = text.LastIndexOf('\n', scan - 1) + 1;
+            var line = text.Substring(from, scan - from).TrimEnd('\r').Trim();
+            if (line.Length > 0 && !line.StartsWith("//", StringComparison.Ordinal))
+            {
+                if (!line.EndsWith(',') && !line.EndsWith('{'))
+                {
+                    var after = from + text.Substring(from, scan - from).TrimEnd('\r').TrimEnd().Length;
+                    text = text.Insert(after, ",");
+                    lineStart++;
+                }
+
+                break;
+            }
+
+            scan = from - 1;
+        }
+
+        text = text.Insert(lineStart, block.Replace("\n", nl) + nl);
+        return true;
     }
 
     // config.jsonc's server.quietLogs: on unless it says false

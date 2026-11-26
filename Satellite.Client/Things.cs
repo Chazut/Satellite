@@ -607,7 +607,7 @@ namespace Satellite.Client
 
                     Carried.Clear();
                     CarriedSlot.Clear();
-                    Carry(worn, 0);
+                    Carry(worn, 0, true);
                     if (Carried.Count == 0)
                     {
                         continue;
@@ -707,8 +707,10 @@ namespace Satellite.Client
         private static readonly List<string> CarriedSlot = new List<string>();
 
         // What a body (or a bag on it) holds: whatever is worn in its slots, and what lies in its pockets, rig and bags,
-        // a few bags deep. Not the secure container, which can't be looted.
-        private static void Carry(CompoundItem holder, int depth)
+        // a few bags deep. Not the secure container, which can't be looted, except on a living bot (secure): what's in
+        // it is told too, each in the slot "SecuredContainer", so the page can say it's there and that it can't be looted
+        // (a bot that puts what it finds in there no longer seems to have lost it).
+        private static void Carry(CompoundItem holder, int depth, bool secure = false)
         {
             if (depth > 3 || Carried.Count > 200)
             {
@@ -720,8 +722,30 @@ namespace Satellite.Client
                 foreach (var slot in holder.Slots)
                 {
                     var worn = slot != null ? slot.ContainedItem : null;
-                    if (worn == null || slot.ID == "SecuredContainer")
+                    if (worn == null)
                     {
+                        continue;
+                    }
+
+                    if (slot.ID == "SecuredContainer")
+                    {
+                        if (secure && worn is CompoundItem kept && kept.Grids != null)
+                        {
+                            foreach (var grid in kept.Grids)
+                            {
+                                foreach (var item in grid.Items)
+                                {
+                                    if (Carried.Count > 200)
+                                    {
+                                        return;
+                                    }
+
+                                    Carried.Add(item);
+                                    CarriedSlot.Add("SecuredContainer");
+                                }
+                            }
+                        }
+
                         continue;
                     }
 

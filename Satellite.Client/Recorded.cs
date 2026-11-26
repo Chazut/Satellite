@@ -31,6 +31,9 @@ namespace Satellite.Client
         private static readonly Dictionary<WorldInteractiveObject, string> Switches = new Dictionary<WorldInteractiveObject, string>();
         private static bool _switchesFailed;
         private static readonly Dictionary<WorldInteractiveObject, string> Doors = new Dictionary<WorldInteractiveObject, string>();
+        // how each door last stood still (Locked, Shut or Open): what it was before a change, as the game's own "before"
+        // is only the moment in between (Interacting), so an unlock would look like a door shut
+        private static readonly Dictionary<WorldInteractiveObject, EDoorState> DoorStood = new Dictionary<WorldInteractiveObject, EDoorState>();
         private const float DoorReach = 4f;
 
         // called with every report of a raid that's watched or recorded
@@ -243,6 +246,7 @@ namespace Satellite.Client
             }
 
             Doors.Clear();
+            DoorStood.Clear();
             _world = null;
             _mainRevision = int.MinValue;
             _fieldAt = -1000f;
@@ -261,15 +265,14 @@ namespace Satellite.Client
 
             try
             {
-                // (asked for by the type the game keeps them under: asked for as Switch, nothing comes back). At most
-                // 150 rooms' light switches (Customs has about that many): they don't keep the others out.
-                var lights = 0;
+                // (asked for by the type the game keeps them under: asked for as Switch, nothing comes back)
                 foreach (var one in LocationScene.GetAllObjects<WorldInteractiveObject>(true))
                 {
                     // a door: told only when somebody opens, shuts or unlocks it (at most 1500 a map)
                     if (one is Door && !Doors.ContainsKey(one) && Doors.Count < 1500)
                     {
                         Doors[one] = string.IsNullOrEmpty(one.Id) ? "i" + one.GetInstanceID() : one.Id;
+                        DoorStood[one] = one.DoorState;
                         one.OnDoorStateChanged += DoorChanged;
                         continue;
                     }
@@ -279,17 +282,10 @@ namespace Satellite.Client
                         continue;
                     }
 
+                    // (a room's light switch isn't one anybody looks for: Customs alone has 76. Only power switches, levers,
+                    // extract and door switches, alarms and buttons, 150 at most)
                     var id = string.IsNullOrEmpty(one.Id) ? "i" + one.GetInstanceID() : one.Id;
-                    if (LightSwitch.IsMatch(id) || LightSwitch.IsMatch(one.name ?? ""))
-                    {
-                        if (lights >= 150)
-                        {
-                            continue;
-                        }
-
-                        lights++;
-                    }
-                    else if (Switches.Count - lights >= 150)
+                    if (LightSwitch.IsMatch(id) || LightSwitch.IsMatch(one.name ?? "") || Switches.Count >= 150)
                     {
                         continue;
                     }
@@ -325,12 +321,32 @@ namespace Satellite.Client
         {
             try
             {
-                // (the moments in between, interacting and being breached, aren't told: only where it ends up)
-                if (one == null || before == after || !Doors.TryGetValue(one, out var id) || _world == null
-                    || !(after == EDoorState.Open || after == EDoorState.Shut))
+                // (the moments in between, interacting and being breached, aren't told: only where it ends up, against
+                // where it last stood: Locked to Shut or Open is an unlock)
+                if (one == null || !Doors.TryGetValue(one, out var id) || _world == null)
                 {
                     return;
                 }
+
+                if (after == EDoorState.Locked)
+                {
+                    DoorStood[one] = after;
+                    return;
+                }
+
+                if (!(after == EDoorState.Open || after == EDoorState.Shut))
+                {
+                    return;
+                }
+
+                var stood = DoorStood.TryGetValue(one, out var last) ? last : before;
+                DoorStood[one] = after;
+                if (stood == after)
+                {
+                    return;
+                }
+
+                before = stood;
 
                 var at = one.transform.position;
                 string who = null;

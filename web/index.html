@@ -32,7 +32,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
 <!-- a replay's timeline, under the map (as Raid Review's): the kills along it, the time, then play, stop, how fast,
      and more switches behind the cog -->
 <div id="replayBar" data-rec class="ui" hidden>
-  <div id="replayBot" hidden><b id="replayBotName"></b><div id="replayBotStrip" title="What this one was doing over the raid. Press to go to a moment."></div></div>
+  <div id="replayBot" hidden><b id="replayBotName"></b><span id="replayBotWhy" title="Why it does it: more in the Bots tab beside the map"></span><div id="replayBotStrip" title="What this one was doing over the raid. Press to go to a moment."></div></div>
   <div id="replayTrack"><div id="replayGrid"></div><div id="replayFights"></div><div id="replaySprees"></div><div id="replayFill"></div><div id="replayHead"></div><div id="replayHover" hidden></div><div id="replayTicks"></div><input type="range" id="replaySeek" min="0" max="1000" step="1" value="0" aria-label="Time in the raid"></div>
   <div id="replayTip" hidden></div>
   <div id="replayTimes"><span id="replayClock"></span><span id="replayDebug" hidden></span><span id="replayTotal"></span></div>
@@ -70,7 +70,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
 <div id="toasts"></div>
 
 <header id="bar" class="ui">
-  <button id="brand" type="button" title="Satellite 1.1.0, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.1.0</span></button>
+  <button id="brand" type="button" title="Satellite 1.1.0, made by Fums. Press for the credits and the map licence"><img src="icon.svg" alt="" width="30" height="30"><b class="word">Satellite</b><span class="ver">1.1.0 b3</span></button>
   <!-- the two sides of Satellite, one lit: the live map of the raid being played, and the raids played before -->
   <nav id="modeNav" data-rec aria-label="Live map or raid history"><a id="modeLive" href="./" title="The live map of the raid being played">Live map</a><a id="histRaids" href="raids/" title="The raids played before: to watch again and look into">Raid history</a></nav>
   <div id="status" title=""><span id="dot"></span><span id="statusText">Connecting…</span></div>
@@ -133,6 +133,9 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" id="optBotORBITRow"><input type="checkbox" id="optBotORBIT"><span>ORBIT details</span></label>
         <label class="row" id="optBotCOMETRow"><input type="checkbox" id="optBotCOMET"><span>COMET details</span></label>
         <label class="row" title="What each living bot wears and carries, and what it's worth: in the Raid list and by the pointer. Off unless you turn it on."><input type="checkbox" id="optBotLoot"><span>Bot loot</span></label>
+        <label class="row sub" title="By the pointer, over a bot: its guns and what it has on, each on a line. Off: folded into one line with how many and their worth."><input type="checkbox" id="optTipGear"><span>Gear in full</span></label>
+        <label class="row sub" title="By the pointer, over a bot: what it carries in its pockets, rig and bags, each on a line. Off: folded into one line with how many and their worth."><input type="checkbox" id="optTipCarry"><span>What it carries in full</span></label>
+        <label class="row sub" title="What each bot has in its secure container, listed after what it carries. It can't be looted, so it's never counted in what the bot is worth. Off: left out."><input type="checkbox" id="optSecureShown"><span>Secure container</span></label>
         <label class="row" title="The Raid list names everyone seen in the raid, but not who's still alive: a ? by each, Dead only for those a player killed or whose body you've been close to. Where they are, how far and what they're doing aren't shown."><input type="checkbox" id="optFog"><span>Raid list: hide who's alive</span></label>
         <details class="group sub" data-group="rosterRows" open>
           <summary>Rows of the list</summary>
@@ -166,6 +169,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <label class="row range" title="What things are worth on the map, in the Raid list and in replays. Raids already recorded keep their totals and records as priced when they were played. Flea market: its prices (Better Flea's, when it's in). Handbook: the handbook's price of each, for a game played without the flea. Set for this server: every page showing it changes too."><span>Prices</span><select id="optPrices">
         <option value="flea">Flea market</option><option value="handbook">Handbook</option></select></label>
       <label class="row" title="Only loot on your wishlist: lying about, in containers, on bodies and where it can spawn, whatever it's worth and whatever its kind. Quest items still show. Add to the wishlist in the game; the map catches up within half a minute."><input type="checkbox" id="optWishOnly"><span>Only my wishlist</span></label>
+      <label class="row" title="Loot on your wishlist marked on the map with a blue star and ring, whatever it's worth: lying about, and the containers and bodies holding it. Its card says it's on your wishlist. Add to the wishlist in the game; the map catches up within half a minute."><input type="checkbox" id="optWishMarks"><span>Mark wishlist items</span></label>
       <details class="group" data-group="lootKinds" open>
         <summary>Kinds of loot</summary>
         <div class="filterHead">Switch <button type="button" class="linkBtn" id="lootKindsAll">All on</button> <button type="button" class="linkBtn" id="lootKindsNone">All off</button></div>
@@ -182,6 +186,10 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" title="The short name of each piece of loose loot, once zoomed in close enough"><input type="checkbox" id="optItemNames"><span>Item names</span></label>
         <label class="row" title="The name at the top of an item's tooltip in the colour another mod gives it in the game (ODT's Item Info, for one). Worth keeps its own colours."><input type="checkbox" id="optModTints"><span>Mods' name colours</span></label>
         <label class="row" title="What somebody picks up is written on the map where they stood, for a few seconds. For the kinds of people shown, and loot worth showing."><input type="checkbox" id="optLootFloats"><span>Pick-ups on the map</span></label>
+        <label class="row range sub" title="What a pick-up must be worth to be written on the map. Set apart from Worth at least, so you can see everything bots pick up without every cheap thing lying about on the map. Quest items always show."><span>Pick-ups worth at least</span><select id="optFloatWorth">
+        <option value="-1">As Worth at least</option><option value="0">Anything</option><option value="5000">5,000 ₽</option><option value="10000">10,000 ₽</option>
+        <option value="20000">20,000 ₽</option><option value="50000">50,000 ₽</option><option value="100000">100,000 ₽</option>
+        <option value="200000">200,000 ₽</option></select></label>
         <label class="row range" title="Containers and bodies worth less than that only show once you've zoomed in this close (the screen's short side this many metres across or fewer). Item names show from there too. Further right: from further out."><span>Show all within <small id="closeText"></small></span><input type="range" id="optClose" step="5"></label>
         <label class="row range" title="Opacity of loot, containers and locks on another floor than the player. All the way left: hidden."><span>Other floors <small id="otherLootText"></small></span><input type="range" id="optOtherLoot" min="0" max="100" step="5"></label>
         <label class="row range" title="With Rough areas only on, under Loose loot: how big each area is. Its worth is rounded (394,000 is shown as ~400k)."><span>Rough area size <small id="lootCellText"></small></span><input type="range" id="optLootCell" min="20" max="150" step="10"></label>
@@ -287,6 +295,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" title="Power switches and levers on the map, green once switched."><input type="checkbox" id="optSwitches"><span>Switches</span></label>
         <label class="row" title="A burst where a grenade goes off, and an arc to it from whoever threw it."><input type="checkbox" id="optGrenades"><span>Grenades</span></label>
         <label class="row" title="By each player and PMC who came in with others: their team's number, in the team's colour."><input type="checkbox" id="optSquadMarks"><span>Team number on markers</span></label>
+        <label class="row sub" title="Mods' soldiers who go about in squads (ISB, Black Division, RUAF, UNTAR, mercenaries) numbered by their squad too, as PMCs are: on their markers, by their names and in the Raid list."><input type="checkbox" id="optModTeams"><span>Mod soldiers' teams</span></label>
         <label class="row" title="Each PMC who came in with others drawn in their team's colour (the colour of their team number), so who's with whom shows at a glance. Off: every PMC in the PMC colour."><input type="checkbox" id="optSquadCols"><span>Team colours</span></label>
         <label class="row" title="After the name of each player and PMC who came in with others, on the map and in the Raid list: their team's number (#2), as on their team badge."><input type="checkbox" id="optTeamNames"><span>Team number by names</span></label>
         <label class="row" title="Doors opened, shut and unlocked: said on the map where the door is, with who did it (the one nearest it), and listed with the raid's events. Needs Satellite 1.1.0's game plugin."><input type="checkbox" id="optDoorEvents"><span>Doors on the map</span></label>
@@ -381,6 +390,9 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row range" title="How you and your friends in a Fika raid are drawn on the map, so you can tell yourselves apart from the bots."><span>My and friends' markers</span><select id="optMeShape">
         <option value="arrow">Arrow</option><option value="disc">Circle with a pointer</option><option value="chevron">Chevron</option><option value="cone">Dot with a view cone</option><option value="dot">Dot</option></select></label>
         <label class="row range" title="How big the names and words on the map are, apart from the markers."><span>Text size <small id="textScaleText"></small></span><input type="range" id="optTextScale" min="0.6" max="2.4" step="0.1"></label>
+        <label class="row range sub" title="How big the names under the markers are, on top of Text size."><span>Names <small id="nameScaleText"></small></span><input type="range" id="optNameScale" min="0.5" max="2" step="0.1"></label>
+        <label class="row range sub" title="How big the words under a bot's name saying what it's doing are, and its part in its squad's tactic, on top of Text size."><span>What they're doing <small id="doingScaleText"></small></span><input type="range" id="optDoingScale" min="0.5" max="2" step="0.1"></label>
+        <label class="row" title="A blue ring round the one you follow (pressed in the Raid list or on the map). Off: no ring; the one the pointer is over in the Raid list is still ringed in white."><input type="checkbox" id="optChaseRing"><span>Ring round the one followed</span></label>
         <label class="row range" title="Whose name is written under their marker. Bosses include their guards and the Goons. Pointing at a marker always names it."><span>Names under</span><select id="optNames">
         <option value="some">Bosses and friends</option><option value="players">PMCs, bosses and friends</option><option value="all">Everyone</option></select></label>
         <label class="row" title="Your name under your own marker. It shows by itself while friends are in the raid with you; this shows it always."><input type="checkbox" id="optMyName"><span>Always show my name</span></label>
@@ -432,7 +444,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       </details>
       <div id="about">
         <img src="icon.svg" alt="" width="32" height="32">
-        <div><b>Satellite</b> <span class="ver">1.1.0</span><br><small>by <b>Fums</b></small></div>
+        <div><b>Satellite</b> <span class="ver">1.1.0 b3</span><br><small>by <b>Fums</b></small></div>
       </div>
       <p class="credit">Map scans by Fums, <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>.</p>
       <p class="credit">Use, share and change them with credit. Not for sale.</p>
