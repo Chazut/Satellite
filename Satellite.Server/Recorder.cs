@@ -41,8 +41,10 @@ public partial class LiveMapRoute
 {
     // a raid shorter than this isn't kept (a raid left as it loads, a map scan's)
     private const int ShortestRaid = 45_000;
-    // a raid not heard from for this long is over
+    // Once play has begun, a raid not heard from for this long is over.
     private const int RaidGoneAfter = 30_000;
+    // Unity can stop sending reports for minutes while loading the map and spawning bots.
+    private const int LoadingGoneAfter = 10 * 60_000;
 
     private sealed class Recording(string id, string sid, string rid)
     {
@@ -62,6 +64,7 @@ public partial class LiveMapRoute
         public bool Died;
         public int Most;
         public bool Over;
+        public volatile bool Discarded;
         // a Fika headless ran the raid; when what lies about was last kept
         public bool Headless;
         public long ThingsAt;
@@ -489,7 +492,7 @@ public partial class LiveMapRoute
                 {
                     var exit = was.Exit;
                     Counted(was, late);
-                    if (was.Exit != exit && was.LastTick - was.BeganTick >= ShortestRaid && was.Loc.Length > 0)
+                    if (was.Exit != exit && !was.Discarded)
                     {
                         Task.Run(() =>
                         {
@@ -561,18 +564,10 @@ public partial class LiveMapRoute
                 now.ClockLag = Now - now.BeganTick - clk;
             }
 
-            if (root.TryGetProperty("go", out var go) && go.ValueKind == JsonValueKind.Number && go.GetInt32() == 0)
-            {
-                now.Waited = true;
-            }
-            else if (now.Lead < 0)
-            {
-                now.Lead = now.Waited ? Now - now.BeganTick : 0;
-            }
-
+            var loading = root.TryGetProperty("go", out var go) && go.ValueKind == JsonValueKind.Number && go.GetInt32() == 0;
             now.Headless = HostOf(session) is { Headless: true };
             now.Name = session.Name is { } name ? JsonSerializer.Deserialize<string>(name) ?? "" : now.Name;
-            Write(now, report);
+            Write(now, report, loading);
             // what's known of it so far, every half a minute: a server stopped mid-raid leaves a raid that can be read
             if (Now - now.AboutAt > 30_000)
             {
@@ -723,7 +718,7 @@ public partial class LiveMapRoute
         }
     }
 
-    private static void Write(Recording to, string report)
+    private static void Write(Recording to, string report, bool? loading = null)
     {
         lock (to.Lock)
         {
@@ -733,6 +728,17 @@ public partial class LiveMapRoute
             }
 
             to.LastTick = Now;
+            // Only a full report tells us the game has started. Update both clocks together
+            // so the timeout cannot apply the shorter limit to the old loading timestamp.
+            if (loading == true)
+            {
+                to.Waited = true;
+            }
+            else if (loading == false && to.Lead < 0)
+            {
+                to.Lead = to.Waited ? to.LastTick - to.BeganTick : 0;
+            }
+
             to.Out.Write(to.LastTick - to.BeganTick);
             to.Out.Write('\t');
             to.Out.Write(report);
@@ -812,20 +818,25 @@ public partial class LiveMapRoute
 
         Tallied(about, of.Tally);
 
-        if (live)
+        lock (of.Lock)
         {
-            about["live"] = true;
-            lock (of.Lock)
+            if (live)
             {
+                if (of.Over)
+                {
+                    return;
+                }
+
+                about["live"] = true;
                 of.Out?.Flush();
             }
-        }
 
-        File.WriteAllText(Path.Combine(HistoryFolder, of.Id + ".json"), about.ToJsonString());
+            File.WriteAllText(Path.Combine(HistoryFolder, of.Id + ".json"), about.ToJsonString());
+        }
     }
 
     // The raid is over: its reports are packed, and the oldest raids beyond the number kept are deleted.
-    private void End(Recording of)
+    private void End(Recording of, bool loadingTimedOut = false)
     {
         lock (of.Lock)
         {
@@ -834,23 +845,34 @@ public partial class LiveMapRoute
                 return;
             }
 
+            of.Discarded = of.Lead < 0 || of.LastTick - of.BeganTick < ShortestRaid || of.Loc.Length == 0;
             of.Over = true;
             of.Out?.Dispose();
             of.Out = null;
         }
 
-        _ended[of.Sid] = of;
+        // A silent loading screen never confirmed an exit. If that game finally reports
+        // after the loading grace period, allow the same raid ID to start recording again.
+        if (!loadingTimedOut)
+        {
+            _ended[of.Sid] = of;
+        }
 
         Task.Run(() =>
         {
             try
             {
                 var rec = Path.Combine(HistoryFolder, of.Id + ".rec");
-                if (of.LastTick - of.BeganTick < ShortestRaid || of.Loc.Length == 0)
+                if (of.Discarded)
                 {
                     File.Delete(rec);
                     File.Delete(Path.Combine(HistoryFolder, of.Id + ".json"));
-                    File.Delete(Path.Combine(HistoryFolder, of.Id + ".comet.gz"));
+                    _cometFiles.TryRemove(of.Id, out var pending);
+                    lock (pending?.Lock ?? of.Lock)
+                    {
+                        File.Delete(Path.Combine(HistoryFolder, of.Id + ".comet.gz"));
+                    }
+
                     return;
                 }
 
@@ -1068,9 +1090,16 @@ public partial class LiveMapRoute
     {
         foreach (var (sid, of) in _recording)
         {
-            if (Now - of.LastTick > RaidGoneAfter && _recording.TryRemove(new KeyValuePair<string, Recording>(sid, of)))
+            lock (of.Lock)
             {
-                End(of);
+                var loading = of.Lead < 0;
+                var silent = Now - of.LastTick;
+                if (silent > (loading ? LoadingGoneAfter : RaidGoneAfter)
+                    && _recording.TryRemove(new KeyValuePair<string, Recording>(sid, of)))
+                {
+                    End(of, loadingTimedOut: loading);
+                    logger.Debug($"[Satellite] Recording {of.Id} timed out after {silent / 1000}s without reports ({(loading ? "loading" : "in raid")}).");
+                }
             }
         }
     }
