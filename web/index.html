@@ -313,6 +313,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row" title="Under each bot's marker, always: what it is doing now, as SAIN, COMET, ORBIT, QuestingBots or Phobos has it (looting, heading for a quest, in a fight). Off: only by the pointer and in the Raid list."><input type="checkbox" id="optMapDoing"><span>What each bot is doing</span></label>
         <label class="row" title="By each bot of the squad you point at or follow: its part in what COMET has the squad doing (Flanking, Covering a teammate), under its marker."><input type="checkbox" id="optSquadParts"><span>Squad parts on the map</span></label>
         <label class="row" title="A small badge by each bot for what it's doing this moment, as SAIN or COMET has it: pushing (red), falling back (blue), reloading (amber), healing (green), throwing a grenade (orange), getting to cover (grey)."><input type="checkbox" id="optActionIcons"><span>Action icons</span></label>
+        <div id="actionLegend"></div>
         <label class="row" title="Over each bot while its squad carries out a COMET tactic: its part in it in a word (Support, Flank, Crossfire, Storm...), for every squad, not only the one pointed at."><input type="checkbox" id="optTacticWords"><span>Squad tactic words</span></label>
         <details class="group sub" data-group="orbitMap" open>
           <summary>ORBIT on the map</summary>
@@ -393,8 +394,10 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
         <label class="row range sub" title="How big the names under the markers are, on top of Text size."><span>Names <small id="nameScaleText"></small></span><input type="range" id="optNameScale" min="0.5" max="2" step="0.1"></label>
         <label class="row range sub" title="How big the words under a bot's name saying what it's doing are, and its part in its squad's tactic, on top of Text size."><span>What they're doing <small id="doingScaleText"></small></span><input type="range" id="optDoingScale" min="0.5" max="2" step="0.1"></label>
         <label class="row" title="A blue ring round the one you follow (pressed in the Raid list or on the map). Off: no ring; the one the pointer is over in the Raid list is still ringed in white."><input type="checkbox" id="optChaseRing"><span>Ring round the one followed</span></label>
-        <label class="row range" title="Whose name is written under their marker. Bosses include their guards and the Goons. Pointing at a marker always names it."><span>Names under</span><select id="optNames">
-        <option value="some">Bosses and friends</option><option value="players">PMCs, bosses and friends</option><option value="all">Everyone</option></select></label>
+        <label class="row range"><span>Bot names</span><select id="optNames">
+          <option value="none">None</option><option value="pmc">PMCs only</option><option value="other">Non-PMC bots only</option><option value="all">All bots</option></select></label>
+        <label class="row"><input type="checkbox" id="optMapDifficulty"><span>Difficulty under bots</span></label>
+        <label class="row"><input type="checkbox" id="optMapPersonality"><span>SAIN personality under bots</span></label>
         <label class="row" title="Your name under your own marker. It shows by itself while friends are in the raid with you; this shows it always."><input type="checkbox" id="optMyName"><span>Always show my name</span></label>
         <label data-rec class="row" title="REC in the bar at the top, blinking, while the raid shown is being recorded, and grey REC off while recording is stopped. Pressed, it stops or starts recording. When a recorded raid ends, a note says it's in Raid history. Off: not shown (recording can still be stopped under Raid history > Manage recordings)."><input type="checkbox" id="optRecSign"><span>Recording button</span></label>
         <label class="row" title="Names written in Cyrillic (scavs, bosses) are shown in Latin letters; the bosses by the names players know them by (Kollontay, Reshala)."><input type="checkbox" id="optLatin"><span>Names in English letters</span></label>

@@ -1324,5 +1324,14 @@
 "Satellite · © Fums": "page text",
 "H hide controls · M menu · P raid · L loot · Q quests · / find": "page text",
 "The controls are hidden. Press here, or H, to have them back.": "page title",
-"Show controls": "page text"
+"Show controls": "page text",
+"AI player scav": "script",
+"Action icon key": "script",
+"Reloading": "script",
+"Bot names": "page text",
+"PMCs only": "page text",
+"Non-PMC bots only": "page text",
+"All bots": "page text",
+"Difficulty under bots": "page text",
+"SAIN personality under bots": "page text"
 }

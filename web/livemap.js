@@ -334,7 +334,7 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, modTints: false, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, lootSprees: true, edgeExits: true, doorEvents: true, teamNames: true, squadCols: false, actionIcons: true, tacticWords: true, floorGrey: true, keyStates: false,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, modTints: false, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, lootSprees: true, edgeExits: true, doorEvents: true, teamNames: true, squadCols: false, actionIcons: true, mapDifficulty: false, mapPersonality: false, tacticWords: true, floorGrey: true, keyStates: false,
     myQuests: true, otherLoot: 30, floorDim: 70, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'all', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -449,10 +449,11 @@
   if (!Array.isArray(prefs.brains)) prefs.brains = null;
   delete prefs.zin;
   delete prefs.zout;
-  // names: 'some' (friends, the Goons, bosses), 'players' (every PMC too, bots or not) or 'all' (the bots too)
+  // 'some' and 'players' keep their original combinations in existing settings and presets.
+  const botNameModes = ['none', 'pmc', 'other', 'all', 'some', 'players'];
   if (prefs.allNames) prefs.names = 'all';
   delete prefs.allNames;
-  if (!['some', 'players', 'all'].includes(prefs.names)) prefs.names = 'all';
+  if (!botNameModes.includes(prefs.names)) prefs.names = 'all';
   // closeSpan: item names, and every container, show once the screen's short side is this many metres or fewer
   const CLOSE_SPAN = [20, 400];
   prefs.closeSpan = Math.min(CLOSE_SPAN[1], Math.max(CLOSE_SPAN[0], +prefs.closeSpan || 250));
@@ -471,7 +472,7 @@
     prefs.areaKinds = [];
     prefs.rosterFog = false;
     // and everybody named, and what each body has said by the pointer
-    prefs.names = 'all';
+    prefs.names = botNameModes.includes(prefs.hpBotNames) ? prefs.hpBotNames : 'all';
     hidden.delete('Layer bodies');
   }
   // cols: the marker colours picked in Settings, Colours, over the usual ones ({ 'Scav': '#rrggbb', 'Layer quest': ... })
@@ -569,7 +570,7 @@
     'shots', 'mapDoing', 'cols', 'hpNoPeople', 'hpNoEvents', 'hpNoFacing', 'hpDebug', 'hpLoot', 'hpLootMap', 'hpSideOff', 'hpRecWho',
     'lootSprees', 'lowPower', 'hpEventsAll', 'eventsAllOnce', 'debugOffOnce', 'squadCols', 'actionIcons', 'tacticWords', 'teamNames', 'doorEvents', 'floorGrey', 'floorHide', 'floorDim',
     // (the settings the panel beside a replay's map has: see sideSettings)
-    'hpTab', 'eventsKind', 'eventsAllFirst', 'botShape', 'meShape', 'health', 'healthAll', 'myName', 'latin', 'scale', 'textScale', 'squadParts', 'orbitLines', 'orbitNames', 'orbitFights',
+    'hpTab', 'hpBotNames', 'mapDifficulty', 'mapPersonality', 'eventsKind', 'eventsAllFirst', 'botShape', 'meShape', 'health', 'healthAll', 'myName', 'latin', 'scale', 'textScale', 'squadParts', 'orbitLines', 'orbitNames', 'orbitFights',
     'mapLight', 'feed', 'feedMine', 'feedPmc', 'feedBoss', 'feedAi', 'feedNames', 'feedRows', 'feedKeep', 'feedBox', 'feedBg', 'worth', 'itemNames', 'modTints',
     'peek', 'roofLoot', 'roofTotals', 'roofTotalsUnder', 'otherLoot', 'corpseKind', 'floatWorth', 'chaseRing', 'nameScale', 'doingScale', 'tipGear', 'tipCarry', 'secureShown', 'wishMarks', 'modTeams'];
   // (the history page's switches as it read them: it writes back only what it changed itself, so a page left open
@@ -3986,14 +3987,14 @@
   // said by the pointer; made once for each report of a marker
   function botTip(m) {
     const carried = carriedBy(m);
-    if (!hasDetails(m) && !carried) return null;
+    if (!hasDetails(m) && !carried && !m.ch && !m.psc) return null;
     // (made again once a part of it is folded or unfolded)
     const folds = (prefs.tipGear !== false) + '|' + (prefs.tipCarry !== false) + '|' + !!prefs.secureShown;
     if (!m.botTip || m.botTipFolds !== folds) {
       m.botTipFolds = folds;
       const brain = hasDetails(m) ? brainOf(m) : null, like = hasDetails(m) ? likeOf(m) : '';
       m.botTip = { title: (m.t || ONE[m.c] || m.c) + (carried && carried.total ? ' · ' + roubles(carried.total) : ''),
-        lines: [(ONE[m.c] || m.c) + (levelShown(m.bl, m.c) ? ' · ' + T('Lv {n}', { n: m.bl }) : '') + (like ? ' · ' + like : ''), m.dn ? T('Down: can be got up again') : '', brain ? brain.by + ': ' + brain.text : '',
+        lines: [(m.psc ? T('AI player scav') : ONE[m.c] || m.c) + (levelShown(m.bl, m.c) ? ' · ' + T('Lv {n}', { n: m.bl }) : '') + (like ? ' · ' + like : ''), m.dn ? T('Down: can be got up again') : '', brain ? brain.by + ': ' + brain.text : '',
           m.ch ? T('PBT cheater') + (m.chd ? ' · ' + cheatSaid(m.chd) : '') : '', ...(prefs.health && Array.isArray(m.hp) ? hpSaid(m).split('\n') : ['']),
           hasDetails(m) && m.sq ? T('Squad:') + ' ' + squadSaid(m.sq) + (squadFoe(m.sq) ? ' · ' + T('against {who}', { who: squadFoe(m.sq) }) : '') : '',
           hasDetails(m) && orbitGoalOf(m.pid) ? T('ORBIT goal:') + ' ' + orbitGoalOf(m.pid).text : '',
@@ -4012,6 +4013,15 @@
   // a PMC who came in with others: their team's colour (Settings > Team colours), for their marker and trail
   const teamColOf = m => m.c === 'Enemy Player' && prefs.squadCols && teamKey(m) && squadOf(m) ? squadCol(squadNo(teamKey(m))) : null;
   const DOING_COL = { SAIN: '#ff8d84', COMET: '#ffc56e', ORBIT: '#9fd8ff', QuestingBots: '#b7e3a1', Phobos: '#b7e3a1' };
+  // Living bot markers use pid. Human Fika players use u, including player scavs.
+  function isMapBot(m, kind) {
+    return kind.shape === 'arrow' && m.c !== 'Main Player' && (m.c !== 'Friendly Player' || !!m.pid);
+  }
+  function showBotName(mode, m, kind) {
+    const pmc = m.c === 'Enemy Player' || (m.c === 'Friendly Player' && (m.sd === 'Usec' || m.sd === 'Bear'));
+    if (mode === 'some' || mode === 'players') return kind.label || (mode === 'players' && pmc);
+    return mode === 'all' || (mode === 'pmc' && pmc) || (mode === 'other' && !pmc);
+  }
   function drawMarker(m, strong, scale) {
     const kind = KINDS[m.c] || OTHER;
     const at = toScreen(m.cx, m.cy);
@@ -4238,17 +4248,39 @@
     }
     if (away) write(apart > 0 ? '▲' : '▼', 9 * scale, x + r * 1.5, y - r * 0.9, col, strong ? 1 : 0.6);
     const person = m.c === 'Enemy Player' || m.c === 'Friendly Player';
-    const named = kind.label || strong || (prefs.names === 'players' && person)
+    const bot = isMapBot(m, kind);
+    const named = bot ? strong || showBotName(prefs.names, m, kind) : kind.label || strong || (prefs.names === 'players' && person)
       || (m.c === 'Main Player' && (prefs.myName || live.some(o => o.c === 'Friendly Player')))
       || (prefs.names === 'all' && m.c !== 'Corpse' && m.c !== 'Main Player' && m.c !== 'Extract' && m.c !== 'Transit');
     const floorSays = away && (m.c === 'Extract' || m.c === 'Transit') ? floorSaid(m) : '';
     // (names and what they're doing each sized on top of Text size: Settings > Names, What they're doing)
     const namePx = 12 * scale * prefs.nameScale;
     if (named && (m.t || m.c === 'Transit')) label(markerText(m) + (floorSays ? ' · ' + floorSays : ''), namePx, x, y + r * 1.35 + under, y - r * 1.35, col, away && !strong ? 0.6 : 1);
+    let detailY = y + r * 1.35 + under + (named && m.t ? namePx * prefs.textScale * 1.3 : 0);
+    if (bot && (m.psc || prefs.mapDifficulty || prefs.mapPersonality)) {
+      const details = [];
+      if (m.psc) details.push(T('AI player scav'));
+      if (prefs.mapDifficulty && m.df) details.push(DIFFICULTY[m.df] || m.df);
+      if (prefs.mapPersonality && m.ps) details.push(m.ps);
+      if (details.length) {
+        const size = 10 * scale;
+        write(details.join(' · '), size, x, detailY, m.psc ? '#9ff4c8' : '#e1e5ec', away && !strong ? 0.6 : 1);
+        detailY += size * prefs.textScale * 1.35;
+      }
+    }
+    if (bot && m.ch) {
+      const d = Math.max(6, r * 0.72), bx = x + r + d * 0.65, by = y - r * 0.7;
+      const icon = badge('!', '#ffc857', '#221a10', '#221a10', 'diamond', d * 1.85);
+      const size = icon.width / pixelRatio();
+      ctx.globalAlpha = away && !strong ? 0.65 : 1;
+      ctx.drawImage(icon, bx - size / 2, by - size / 2, size, size);
+      ctx.globalAlpha = 1;
+      drawn.push({ m, x: bx, y: by, w: d * 2, h: d * 2 });
+    }
     // what it's doing, under its name ("What each bot is doing"): as a mod has it, not the game's own brain
     if (prefs.mapDoing && brain && !inArea(m)) {
       const said = brain.ghost ? m.ob || '' : brain.by === 'EFT' ? '' : brain.text;
-      if (said) write(said.length > 30 ? said.slice(0, 29) + '…' : said, 9.5 * scale * prefs.doingScale, x, y + r * 1.35 + under + (named && m.t ? namePx * prefs.textScale * 1.3 : 0),
+      if (said) write(said.length > 30 ? said.slice(0, 29) + '…' : said, 9.5 * scale * prefs.doingScale, x, detailY,
         brain.ghost ? '#c2c5ca' : DOING_COL[brain.by] || '#dadcdf', away && !strong ? 0.55 : 0.95);
     }
     drawn.push({ m, x, y, w: r * 2.6, h: r * 2.6 });
@@ -5989,7 +6021,7 @@
   // The player's own presets (prefs.myPresets: [{ name, patch }]): the switches the ready-made ones set, as they were
   // when saved. Kept with the rest of the settings, so Export and Import take them along.
   const MY_MAX = 20;
-  const PRESET_KEYS = [...new Set(PRESETS.flatMap(p => Object.keys(p.patch())))];
+  const PRESET_KEYS = [...new Set([...PRESETS.flatMap(p => Object.keys(p.patch())), 'mapDifficulty', 'mapPersonality'])];
   const myPresets = () => (Array.isArray(prefs.myPresets) ? prefs.myPresets : []).filter(p => p && typeof p.name === 'string' && p.patch && typeof p.patch === 'object' && !Array.isArray(p.patch));
   const asPreset = mine => ({ name: mine.name, says: '', mine: true, patch: () => JSON.parse(JSON.stringify(mine.patch)) });
   function switchesNow() {
@@ -8710,8 +8742,18 @@
     $(id).value = prefs[key];
     $(id).onchange = e => { prefs[key] = e.target.value; save(); dirty = true; };
   }
+  if (prefs.names === 'some' || prefs.names === 'players') {
+    const legacy = new Option(prefs.names === 'some' ? T('Bosses and friends') : T('PMCs, bosses and friends'), prefs.names);
+    legacy.hidden = true;
+    $('optNames').add(legacy);
+  }
   $('optNames').value = prefs.names;
-  $('optNames').onchange = e => { prefs.names = e.target.value; save(); dirty = true; };
+  $('optNames').onchange = e => {
+    prefs.names = e.target.value;
+    if (HIST) prefs.hpBotNames = prefs.names;
+    save();
+    dirty = true;
+  };
   // the slider runs from far to near, like the zoom ones
   $('optClose').min = -CLOSE_SPAN[1];
   $('optClose').max = -CLOSE_SPAN[0];
@@ -8817,7 +8859,7 @@
       requestAnimationFrame(() => { again = false; findSettings(); });
     }).observe($('panelBody'), { childList: true, subtree: true });
   }
-  for (const [id, key] of [['optItemNames', 'itemNames'], ['optModTints', 'modTints'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optSquadCols', 'squadCols'], ['optTeamNames', 'teamNames'], ['optDoorEvents', 'doorEvents'], ['optActionIcons', 'actionIcons'], ['optTacticWords', 'tacticWords'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
+  for (const [id, key] of [['optItemNames', 'itemNames'], ['optModTints', 'modTints'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optSquadCols', 'squadCols'], ['optTeamNames', 'teamNames'], ['optDoorEvents', 'doorEvents'], ['optActionIcons', 'actionIcons'], ['optMapDifficulty', 'mapDifficulty'], ['optMapPersonality', 'mapPersonality'], ['optTacticWords', 'tacticWords'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
     ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optEdgeExits', 'edgeExits'], ['optMyName', 'myName'], ['optRecSign', 'recSign'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optLowPower', 'lowPower'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],
@@ -10711,6 +10753,22 @@
     actionPics.set(key, pic);
     return pic;
   }
+  function actionLegend() {
+    const group = mk('details', 'actionLegend');
+    group.appendChild(mk('summary', '', T('Action icon key')));
+    const keys = mk('div');
+    for (const [kind, word] of [['push', T('Pushing')], ['back', T('Falling back')], ['reload', T('Reloading')],
+      ['heal', T('Healing')], ['grenade', T('Throwing a grenade')], ['cover', T('Taking cover')]]) {
+      const item = mk('span'), icon = document.createElement('canvas'), pic = actionPic(kind, 8);
+      icon.width = icon.height = pic.c.width;
+      icon.getContext('2d').drawImage(pic.c, 0, 0);
+      item.append(icon, word);
+      keys.appendChild(item);
+    }
+    group.appendChild(keys);
+    return group;
+  }
+  $('actionLegend').appendChild(actionLegend());
   // a bot's part in its squad's tactic, in a word or two
   function tacticWord(q) {
     if (q.f === 'S03') return q.r === 'support' ? T('Support') : q.r === 'rear' ? T('Rear') : T('Flank');
@@ -12126,7 +12184,7 @@
   // in groups. Each is the menu's own control, mirrored: changed through it, so both pages keep the same, with its
   // name and its explanation as the menu has them. Made once; brought up to date each time it's shown.
   const SIDE_SETTINGS = [
-    ['markers', T('Markers and names'), ['optBotShape', 'optMeShape', 'optScale', 'optTextScale', 'optNameScale', 'optDoingScale', 'optChaseRing', 'optMyName', 'optLatin', 'optHealth', 'optHealthAll']],
+    ['markers', T('Markers and names'), ['optBotShape', 'optMeShape', 'optScale', 'optTextScale', 'optNameScale', 'optDoingScale', 'optChaseRing', 'optNames', 'optMapDifficulty', 'optMapPersonality', 'optMyName', 'optLatin', 'optHealth', 'optHealthAll']],
     ['people', T('People and bots'), ['optSquadMarks', 'optModTeams', 'optTeamNames', 'optSquadCols', 'optMapDoing', 'optActionIcons', 'optTacticWords', 'optSquadParts', 'optDoorEvents']],
     ['onMap', T('On the map'), ['optShots', 'optLootFloats', 'optFloatWorth', 'optHitFlash', 'optKillLines', 'optGrenades', 'optSwitches', 'optKillKeep', 'optTrailMs', 'optMinimap']],
     ['orbit', T('ORBIT on the map'), ['optOrbitMain', 'optOrbitRush', 'optOrbitLines', 'optOrbitNames', 'optOrbitFights', 'optOrbitHear', 'optOrbitField', 'optPhobosField']],
@@ -12179,7 +12237,11 @@
         group.open = prefs.hpOpen['set:' + key] !== false;
         group.ontoggle = () => { prefs.hpOpen['set:' + key] = group.open; save(); };
         group.appendChild(mk('summary', '', title));
-        for (const id of ids) { const row = sideTwin(id); if (row) group.appendChild(row); }
+        for (const id of ids) {
+          const row = sideTwin(id);
+          if (row) group.appendChild(row);
+          if (id === 'optActionIcons') group.appendChild(actionLegend());
+        }
         if (key === 'colours') {
           // every colour: the menu's own list, brought here, and its way back to the usual ones
           const cols = $('colorList');

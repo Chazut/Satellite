@@ -1,5 +1,14 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"AI player scav": "Scav jugador de IA",
+"Action icon key": "Leyenda de iconos de acción",
+"Reloading": "Recargando",
+"Bot names": "Nombres de bots",
+"PMCs only": "Solo PMC",
+"Non-PMC bots only": "Solo bots que no sean PMC",
+"All bots": "Todos los bots",
+"Difficulty under bots": "Dificultad bajo los bots",
+"SAIN personality under bots": "Personalidad de SAIN bajo los bots",
 "Customs": "Customs",
 "Factory": "Factory",
 "Factory (night)": "Factory (noche)",

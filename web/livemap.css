@@ -2415,3 +2415,9 @@ table.whyOptions tr.no td { color: var(--dim); }
   border: 0; border-radius: 4px; background: none; box-shadow: none; color: var(--dim); font-size: 12px; line-height: 1; cursor: var(--cur-hand); }
 .clearable > button.clearX:hover, #hp .clearable > button.clearX:hover { color: var(--bright); background: var(--hover); }
 .clearable > button.clearX[hidden], #hp .clearable > button.clearX[hidden] { display: none; }
+
+.actionLegend { margin: 4px 0 8px 22px; font-size: 0.85em; }
+.actionLegend summary { cursor: pointer; }
+.actionLegend > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; padding: 6px 0; }
+.actionLegend span { display: flex; align-items: center; gap: 5px; }
+.actionLegend canvas { position: static; width: 20px; height: 20px; flex: none; }
