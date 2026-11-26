@@ -11071,7 +11071,9 @@
         + (out.tip ? '\n' + out.tip : '');
       for (const b of $('hpTabs').children) { hpLink(b, hp.id, b.dataset.tab); b.classList.toggle('on', b.dataset.tab === hp.tab); }
       hpLink($('hpClose'), hp.id, hpFrom || 'overview');
-      $('hpExport').href = 'api/history/export?id=' + encodeURIComponent(hp.id);
+      // the zip named by when, the map and PMC or Scav: "Satellite-raid-20261126-155854-Customs-PMC.zip"
+      const stamp = (/^\d{8}-\d{6}/.exec(hp.id) || [hp.id])[0], kind = a.side === 'Savage' ? 'Scav' : a.side ? 'PMC' : '';
+      $('hpExport').href = 'api/history/export?id=' + encodeURIComponent(hp.id) + '&name=' + encodeURIComponent([stamp, placeName(a.loc), kind].filter(Boolean).join(' '));
       // (a raid still being recorded can't be exported or deleted yet)
       $('hpExport').hidden = $('hpDelete').hidden = !!a.live || onMap;
     }
@@ -12414,6 +12416,20 @@
   };
   const WHY_OWNERS = { combat: T('In a fight'), orbit: T('ORBIT'), sleep: T('Asleep (ORBIT ghost)'), recovery: T('Getting unstuck'), other: T('The game\'s own brain') };
   const WHY_SEEN = 60000;
+  // Who's in control of a bot as its marker has it now (the brain layer, "ly", in every report): "COMET : Post-combat"
+  // is "COMET · Post-combat", ORBIT's layer "ORBIT · Orbit Brain Layer", a ghost "Asleep (ORBIT ghost)", the rest by
+  // their layer's name. Null without one (COMET's own word for it, T04, is said then: it only comes now and then).
+  function whyControl(m) {
+    if (m.gh) return WHY_OWNERS.sleep;
+    const layer = m.ly || '';
+    if (!layer) return null;
+    const owned = /^(\w+)\s*:\s*(.+)$/.exec(layer);
+    if (owned) return owned[1].toUpperCase() + ' · ' + owned[2];
+    return (/^Orbit/i.test(layer) ? 'ORBIT · ' : '') + spaced(layer);
+  }
+  // a move COMET makes that it never says in its decisions (its crossfire and after-the-fight moves): only the bot's
+  // marker has it ("cm"), and it's the move now whatever COMET said before it
+  const whyUnsaid = m => m && m.cm && /^(PostCombat|Crossfire)/.test(m.cm) ? m.cm : '';
   // the bot followed, when it's one (not a person)
   function whyBot() {
     const m = chased !== null ? liveById.get(chased) : null;
@@ -12440,6 +12456,8 @@
           break;
         }
       }
+      // (a move COMET doesn't say in its decisions, as its moves after a fight: as the bot's marker has it now)
+      if (whyUnsaid(bot) || (!said && bot.cm)) said = 'COMET: ' + cometMove(bot.cm);
       if (bot.xr) said = (said ? said + ' · ' : '') + T('Leaving the raid: {why}', { why: bot.xr });
     }
     if (el.textContent !== said) el.textContent = said;
@@ -12450,7 +12468,7 @@
     // (made again only when something in it changes)
     let last = -1;
     if (got) for (let lo = 0, hi = got.ev.length - 1; lo <= hi;) { const mid = (lo + hi) >> 1; if (got.ev[mid].t <= at) { last = mid; lo = mid + 1; } else hi = mid - 1; }
-    const print = [bot ? bot.pid : '', got ? got.state : '', last, bot ? bot.ob || '' : '', bot ? bot.xr || '' : '', Math.floor(at / 5000)].join('|');
+    const print = [bot ? bot.pid : '', got ? got.state : '', last, bot ? bot.ob || '' : '', bot ? bot.xr || '' : '', bot ? bot.ly || '' : '', bot ? bot.cm || '' : '', bot ? bot.gh || '' : '', Math.floor(at / 5000)].join('|');
     if (print === whyPrint && box.childElementCount) return;
     whyPrint = print;
     box.textContent = '';
@@ -12463,9 +12481,11 @@
     const line = (label, text, cls) => { const row = mk('div', 'whyLine' + (cls ? ' ' + cls : '')); row.append(mk('i', '', label), mk('span', '', text)); box.appendChild(row); return row; };
     // the latest of a feature (or features) at the moment shown, no older than WHY_SEEN
     const latest = (test, within = WHY_SEEN) => { for (let i = last; i >= 0; i--) { const e = got.ev[i]; if (at - e.t > within) return null; if (test(e.d)) return e; } return null; };
-    // who's in control
-    const ctl = got && got.state === 'ok' ? latest(d => d.feature === 'T04' && d.controlJournal, Infinity) : null;
-    if (ctl) {
+    // who's in control: as the bot's marker has it now, else as COMET last said
+    const control = whyControl(bot);
+    const ctl = !control && got && got.state === 'ok' ? latest(d => d.feature === 'T04' && d.controlJournal, Infinity) : null;
+    if (control) line(T('In control'), control);
+    else if (ctl) {
       const c = ctl.d.controlJournal;
       line(T('In control'), (WHY_OWNERS[c.owner] || codeSaid(c.owner)) + (c.layer ? ' · ' + spaced(c.layer) : ''));
     }
@@ -12473,13 +12493,19 @@
     if (bot.ob) line('ORBIT', bot.ob);
     if (bot.xr) line(T('Leaving'), bot.xr, 'hot');
     if (!got || got.state === 'loading') { box.appendChild(mk('p', 'hpNone', T('Loading…'))); return; }
-    if (got.state === 'none') { box.appendChild(mk('p', 'hpNone', T('COMET\'s decisions weren\'t recorded in this raid. To record them, set "comet": true under "history" in the server\'s config.jsonc.'))); return; }
-    if (got.state === 'empty') { box.appendChild(mk('p', 'hpNone', T('COMET made no decisions for this one in this raid.'))); return; }
+    // (a move COMET is making that it doesn't say in its decisions, as its moves after a fight: the marker has it)
+    if (got.state === 'none' && !bot.cm) { box.appendChild(mk('p', 'hpNone', T('COMET\'s decisions weren\'t recorded in this raid. To record them, set "comet": true under "history" in the server\'s config.jsonc.'))); return; }
+    if (got.state === 'empty' && !bot.cm) { box.appendChild(mk('p', 'hpNone', T('COMET made no decisions for this one in this raid.'))); return; }
     // COMET's move now: the latest of its choices, weighed or let go
     const moveOf = d => /^A\d\d$/.test(d.feature) && ['selected', 'started', 'accepted', 'released'].includes(d.stage) && (d.decision || d.stage === 'released');
-    const move = latest(moveOf);
+    const move = whyUnsaid(bot) ? null : latest(moveOf);
     rvSection(box, T('COMET\'s move'));
-    if (!move) box.appendChild(mk('p', 'hpNone', T('No move of COMET\'s in the last minute.')));
+    if (!move && bot.cm) {
+      // as the marker has it: no options or reason to show
+      const title = mk('div', 'whyMove');
+      title.append(mk('b', '', cometMove(bot.cm)), mk('small', '', T('just now')));
+      box.appendChild(title);
+    } else if (!move) box.appendChild(mk('p', 'hpNone', T('No move of COMET\'s in the last minute.')));
     else {
       const over = move.d.stage === 'released';
       // (a move let go says what it was by the choice before it, whose options it shows)

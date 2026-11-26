@@ -1336,6 +1336,31 @@ public partial class LiveMapRoute
     private const long MostZip = 256L << 20;
     private const long MostUnpacked = 1L << 30;
 
+    // what an exported raid's zip is called after "Satellite-raid-": letters and digits of any alphabet, the rest
+    // (spaces, brackets) as single dashes, at most 100 characters; "" when nothing's left
+    private static string ExportName(string asked)
+    {
+        var made = new StringBuilder(Math.Min(asked.Length, 100));
+        foreach (var c in asked)
+        {
+            if (made.Length >= 100)
+            {
+                break;
+            }
+
+            if (char.IsLetterOrDigit(c))
+            {
+                made.Append(c);
+            }
+            else if (made.Length > 0 && made[^1] != '-')
+            {
+                made.Append('-');
+            }
+        }
+
+        return made.ToString().TrimEnd('-');
+    }
+
     private async Task ExportRecording(HttpContext context, string id, CancellationToken cancellationToken)
     {
         var about = Path.Combine(HistoryFolder, id + ".json");
@@ -1367,7 +1392,11 @@ public partial class LiveMapRoute
             }
 
             context.Response.ContentType = "application/zip";
-            context.Response.Headers.ContentDisposition = "attachment; filename=\"Satellite-raid-" + id + ".zip\"";
+            // named as the page asks (when, the map, PMC or Scav: "20261126-155854 Customs PMC"), else by the raid's id;
+            // a map's name in another alphabet goes in filename*, the id in filename for what can't read it
+            var name = ExportName(context.Request.Query["name"].ToString());
+            context.Response.Headers.ContentDisposition = "attachment; filename=\"Satellite-raid-" + id + ".zip\""
+                + (name.Length > 0 ? "; filename*=UTF-8''" + Uri.EscapeDataString("Satellite-raid-" + name + ".zip") : "");
             await using var file = new FileStream(zip, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, true);
             context.Response.ContentLength = file.Length;
             await file.CopyToAsync(context.Response.Body, cancellationToken);

@@ -22,6 +22,8 @@
 - Every search box has an ✕ to clear it.
 - Quest goals done in a raid stay off the map once the quest's last goal is done too, and it's ready to hand in.
 - A raid that's slow to load is recorded in full.
+- Why: who's in control of a bot is as its marker has it at that moment, and COMET's moves after a fight and in a crossfire show as its move.
+- An exported raid's zip is named by when it was, the map, and PMC or Scav (`Satellite-raid-20261126-160354-Customs-PMC.zip`).
 - The server adds the options a newer Satellite brings to `config.jsonc` when it starts, with their comments, keeping your own settings.
 - `LICENSE.md` covers the map scans too (`LICENSE-MAPS.md` is merged into it).
 - Raid history: the server records every raid, whether the page is open or not, and keeps it. **Live map | Raid history** at the top of the page leads to it, at `/satellite/raids/`, laid out as Raid Review's. Raid Review (by ekky and Chazut) is merged into Satellite: everything it showed of a raid is here.

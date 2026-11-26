@@ -88,7 +88,8 @@ If port 6969 is forwarded for Fika, anyone with your address can open the map to
 .\build.ps1 -SPTPath D:\SPT
 ```
 
-Needs the .NET 10 SDK and an SPT 4.1 folder.
+Needs the .NET 10 SDK and an SPT 4.1 folder. Add `-Recording` for raid history, replays and the Why panel (the 1.1.0
+betas are built with it), and `-NoInstall` to only build and zip. Pull requests for 1.1.0 go to `release/1.1.0-alpha`.
 
 ## Credits
 
