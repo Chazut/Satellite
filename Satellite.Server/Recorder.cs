@@ -43,6 +43,8 @@ public partial class LiveMapRoute
     private const int ShortestRaid = 45_000;
     // a raid not heard from for this long is over
     private const int RaidGoneAfter = 30_000;
+    // the same while it loads (it hasn't begun): a slow load can hold the game's reports back for well over a minute
+    private const int LoadGoneAfter = 600_000;
 
     private sealed class Recording(string id, string sid, string rid)
     {
@@ -62,6 +64,11 @@ public partial class LiveMapRoute
         public bool Died;
         public int Most;
         public bool Over;
+        // the player left the raid (the game said it's out of it, or in another): not begun again from its host's
+        // reports. A recording that only went quiet, or was stopped from the page, is begun again if the raid goes on.
+        public bool Left;
+        // too short to keep: its files deleted, and nothing more written for it (COMET's decisions included)
+        public volatile bool Dropped;
         // a Fika headless ran the raid; when what lies about was last kept
         public bool Headless;
         public long ThingsAt;
@@ -453,6 +460,7 @@ public partial class LiveMapRoute
                 // idle: out of the raid
                 if (!session.Raid && _recording.TryRemove(session.Id, out var left))
                 {
+                    left.Left = true;
                     End(left);
                 }
 
@@ -477,6 +485,7 @@ public partial class LiveMapRoute
                 }
 
                 _recording.TryRemove(session.Id, out _);
+                now.Left = true;
                 End(now);
                 now = null;
             }
@@ -512,7 +521,8 @@ public partial class LiveMapRoute
             }
 
             // (a raid just ended for this player that its host goes on reporting, the player gone from it: not begun again)
-            if (now == null && _ended.TryGetValue(session.Id, out var done) && done.Rid == rid)
+            // (one that only went quiet, a slow load holding its reports back, is: the raid goes on in a new recording)
+            if (now == null && _ended.TryGetValue(session.Id, out var done) && done.Rid == rid && done.Left)
             {
                 return;
             }
@@ -839,6 +849,8 @@ public partial class LiveMapRoute
             of.Out = null;
         }
 
+        // (decided before it's among the ended, so COMET's decisions still coming for it aren't written to it)
+        of.Dropped = of.LastTick - of.BeganTick < ShortestRaid || of.Loc.Length == 0;
         _ended[of.Sid] = of;
 
         Task.Run(() =>
@@ -846,11 +858,17 @@ public partial class LiveMapRoute
             try
             {
                 var rec = Path.Combine(HistoryFolder, of.Id + ".rec");
-                if (of.LastTick - of.BeganTick < ShortestRaid || of.Loc.Length == 0)
+                if (of.Dropped)
                 {
                     File.Delete(rec);
                     File.Delete(Path.Combine(HistoryFolder, of.Id + ".json"));
-                    File.Delete(Path.Combine(HistoryFolder, of.Id + ".comet.gz"));
+                    var comet = _cometFiles.GetOrAdd(of.Id, _ => new CometFile());
+                    lock (comet.Lock)
+                    {
+                        File.Delete(Path.Combine(HistoryFolder, of.Id + ".comet.gz"));
+                    }
+
+                    _cometFiles.TryRemove(of.Id, out _);
                     return;
                 }
 
@@ -1063,12 +1081,13 @@ public partial class LiveMapRoute
         _cometFiles.TryRemove(id, out _);
     }
 
-    // raids not heard from in a while (the game was closed, or its server lost): over
+    // raids not heard from in a while (the game was closed, or its server lost): over. One still loading (it hasn't
+    // begun: Lead not yet known) is given longer.
     private void EndQuiet()
     {
         foreach (var (sid, of) in _recording)
         {
-            if (Now - of.LastTick > RaidGoneAfter && _recording.TryRemove(new KeyValuePair<string, Recording>(sid, of)))
+            if (Now - of.LastTick > (of.Lead < 0 ? LoadGoneAfter : RaidGoneAfter) && _recording.TryRemove(new KeyValuePair<string, Recording>(sid, of)))
             {
                 End(of);
             }
@@ -1109,6 +1128,16 @@ public partial class LiveMapRoute
             foreach (var part in Directory.GetFiles(HistoryFolder, "*.part"))
             {
                 File.Delete(part);
+            }
+
+            // COMET's decisions for a raid that wasn't kept
+            foreach (var comet in Directory.GetFiles(HistoryFolder, "*.comet.gz"))
+            {
+                var id = Path.GetFileName(comet).Split('.')[0];
+                if (!File.Exists(Path.Combine(HistoryFolder, id + ".json")) && _recording.Values.All(r => r.Id != id))
+                {
+                    File.Delete(comet);
+                }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException)

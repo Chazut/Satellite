@@ -105,7 +105,7 @@ public partial class LiveMapRoute
         Recording? to = _recording.TryGetValue(id, out var now) && now.Rid == rid ? now
             : _ended.TryGetValue(id, out var was) && was.Rid == rid ? was : null;
         var (on, debug, most) = CometSettings();
-        if (to == null || !on || !RecordOn())
+        if (to == null || to.Dropped || !on || !RecordOn())
         {
             return true;
         }
@@ -114,7 +114,7 @@ public partial class LiveMapRoute
         var file = Path.Combine(HistoryFolder, to.Id + ".comet.gz");
         lock (keep.Lock)
         {
-            if (keep.Full)
+            if (keep.Full || to.Dropped)
             {
                 return true;
             }

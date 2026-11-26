@@ -20,6 +20,8 @@
 - Doors say Unlocked, Opened or Shut as they happened. A bot reloading isn't a pick-up or a drop, and a grenade thrown isn't a drop.
 - Room light switches aren't recorded; the raid's Switches fold and the timeline's switch rows show only switches somebody flipped.
 - Every search box has an ✕ to clear it.
+- Quest goals done in a raid stay off the map once the quest's last goal is done too, and it's ready to hand in.
+- A raid that's slow to load is recorded in full.
 - The server adds the options a newer Satellite brings to `config.jsonc` when it starts, with their comments, keeping your own settings.
 - `LICENSE.md` covers the map scans too (`LICENSE-MAPS.md` is merged into it).
 - Raid history: the server records every raid, whether the page is open or not, and keeps it. **Live map | Raid history** at the top of the page leads to it, at `/satellite/raids/`, laid out as Raid Review's. Raid Review (by ekky and Chazut) is merged into Satellite: everything it showed of a raid is here.

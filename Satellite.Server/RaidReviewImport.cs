@@ -1024,7 +1024,7 @@ public partial class LiveMapRoute
                     var name = Path.GetFileName(file);
                     var id = name.Split('.')[0];
                     var stray = name.EndsWith(".part", StringComparison.Ordinal) || name.EndsWith(".part.rec", StringComparison.Ordinal)
-                        || ((name.EndsWith(".rec", StringComparison.Ordinal) || name.EndsWith(".rec.gz", StringComparison.Ordinal))
+                        || ((name.EndsWith(".rec", StringComparison.Ordinal) || name.EndsWith(".rec.gz", StringComparison.Ordinal) || name.EndsWith(".comet.gz", StringComparison.Ordinal))
                             && !File.Exists(Path.Combine(HistoryFolder, id + ".json")))
                         || (name.EndsWith(".json", StringComparison.Ordinal) && !File.Exists(Path.Combine(HistoryFolder, id + ".rec"))
                             && !File.Exists(Path.Combine(HistoryFolder, id + ".rec.gz")));

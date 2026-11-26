@@ -6,7 +6,7 @@ using EFT.Quests;
 
 namespace Satellite.Client
 {
-    // The goals of the player's started quests that are done, as their own game has them: ",\"qd\":[goal id,..]" in a
+    // The goals of the player's started quests (and ones ready to hand in) that are done, as their own game has them: ",\"qd\":[goal id,..]" in a
     // full report. A goal done in a raid is known to the game at once but to the server's profile only once the raid
     // is over, so the server takes these too and the page drops the goal's markers straight away (see QuestsFor).
     internal static class QuestsDone
@@ -26,7 +26,10 @@ namespace Satellite.Client
 
                 foreach (var quest in quests)
                 {
-                    if (quest == null || quest.Status != EQuestStatus.Started || quest.CompletedConditions == null)
+                    // (a quest whose last goal is done in the raid is ready to hand in at once, while the server's profile
+                    // has it started until the raid is over: its goals are said done too, or they'd all come back)
+                    if (quest == null || (quest.Status != EQuestStatus.Started && quest.Status != EQuestStatus.AvailableForFinish)
+                        || quest.CompletedConditions == null)
                     {
                         continue;
                     }
