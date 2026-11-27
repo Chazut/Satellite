@@ -9747,7 +9747,8 @@
       prefs.lowPower = b.dataset.mode === 'perf';
       prefs.hpDebug = b.dataset.mode === 'debug';
       $('optLowPower').checked = prefs.lowPower;
-      save(); replayShown = ''; showReplay(); tipFor = null; dirty = true;
+      if (prefs.hpDebug) { prefs.hpTab = 'bots'; prefs.hpSideOff = false; }
+      save(); hpShow(); hpSideShow(); replayShown = ''; showReplay(); tipFor = null; dirty = true;
     };
   }
   $('replayStop').onclick = () => { if (!replay) return; replay.playing = false; seekReplay(0); replayShown = ''; showReplay(); };
@@ -12245,6 +12246,8 @@
     ['events', T('Raid events'), sideEvents, true, 'events'],
     ['drops', T('Airdrops'), sideDrops, true, 'events'],
     ['switches', T('Switches'), sideSwitches, false, 'events'],
+    ['cometDebug', T('COMET event inspector'), sideCometDebug, false, 'bots'],
+    ['cometReports', T('COMET raid reports'), sideCometReports, false, 'bots'],
     ['why', T('Why it does what it does'), sideWhy, true, 'bots'],
     ['inv', T('Bot inventory'), sideInv, true, 'bots'],
     ['quests', T('Bot quests'), sideQuests, true, 'bots'],
@@ -12305,7 +12308,8 @@
     for (const b of hpTabs.children) b.classList.toggle('on', b.dataset.k === prefs.hpTab);
     const folds = [...hpSide.querySelectorAll('.hpSec')];
     // (one with nothing in this raid isn't there at all)
-    const hasOf = k => k === 'hear' || k === 'orbit' ? orbit
+    const hasOf = k => k === 'cometDebug' || k === 'cometReports' ? prefs.hpDebug
+      : k === 'hear' || k === 'orbit' ? orbit
       : k === 'switches' ? (r.hasSwitch !== undefined ? r.hasSwitch : (r.hasSwitch = switchFlipped(r)))
       : k === 'fields' ? r.events.some(e => e.k === 'orbit.field' || e.k === 'phobos.field')
       : k === 'quests' ? s.sentBy.has('QuestingBots') : k === 'drops' ? s.drops.size > 0
@@ -12313,6 +12317,11 @@
     const shown = folds.filter(f => f.dataset.tab === prefs.hpTab && hasOf(f.dataset.k));
     for (const fold of folds) {
       fold.hidden = !shown.includes(fold);
+      if ((fold.hidden || !fold.open) && fold.lastChild.cometInspector) {
+        fold.lastChild.cometInspector.abort();
+        delete fold.lastChild.cometInspector;
+        fold.lastChild.replaceChildren();
+      }
       const solo = shown.length === 1 && shown[0] === fold;
       fold.classList.toggle('solo', solo);
       if (solo && !fold.open) fold.open = true;
@@ -13216,6 +13225,195 @@
     details.open = detailsOpen;
     fill();
     box.appendChild(details);
+  }
+
+  // Debug panels stay on the page they were opened at while the replay runs. Only the explicit
+  // playhead button starts a new archive lookup. Expanding one field builds just its children.
+  function cometFields(parent, data) {
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== null && typeof value === 'object') {
+        const group = mk('details', 'cometFields'), count = Object.keys(value).length;
+        group.appendChild(mk('summary', '', key + ' (' + count + ')'));
+        group.ontoggle = () => {
+          if (group.open && group.childElementCount === 1) cometFields(group, value);
+        };
+        parent.appendChild(group);
+      } else {
+        const row = mk('div', 'whyLine');
+        row.append(mk('i', '', key), mk('span', '', value === '' ? '""' : String(value)));
+        parent.appendChild(row);
+      }
+    }
+  }
+
+  function cometButton(label, action) {
+    const b = mk('button', '', label);
+    b.type = 'button'; b.onclick = action;
+    return b;
+  }
+
+  function cometEventRow(parent, r, event, names) {
+    const d = event.d, time = Math.max(0, event.t - r.lead);
+    const fold = mk('details', 'cometDebugRow');
+    const stamp = clockText(time) + '.' + String(Math.floor(time % 1000)).padStart(3, '0');
+    const heading = mk('summary', '', [stamp, d.feature, d.decision, d.stage, d.name || names.get(event.p)].filter(Boolean).join(' · '));
+    fold.appendChild(heading);
+    fold.ontoggle = () => {
+      if (!fold.open || fold.childElementCount > 1) return;
+      if (d.name || d.reason) fold.appendChild(mk('p', 'winNote', [d.name, d.reason].filter(Boolean).join(' · ')));
+      fold.appendChild(cometButton(T('Go to this moment on the map'), () => { seekReplay(time); showReplay(); }));
+      if (Array.isArray(d.candidates) && d.candidates.length) {
+        const table = mk('table', 'whyOptions'), head = table.createTHead().insertRow();
+        for (const label of [T('Option'), T('Score'), T('Why')]) head.appendChild(mk('th', '', label));
+        const body = table.createTBody();
+        for (const c of d.candidates) {
+          if (!c || typeof c !== 'object') continue;
+          const row = body.insertRow();
+          row.className = (c.decision === d.decision ? 'on' : '') + (c.eligible === false ? ' no' : '');
+          for (const value of [c.decision, c.score, c.reason]) row.insertCell().textContent = value ?? '';
+        }
+        fold.appendChild(table);
+      }
+      cometFields(fold, d);
+    };
+    parent.appendChild(fold);
+  }
+
+  const reportNames = { T01: T('Combat journal'), T02: T('Decision counters'), T03: T('Weapon journal'), T04: T('Control transitions') };
+  function cometReports(parent, events) {
+    const groups = new Map();
+    for (const { d } of events) {
+      const page = d.tacticCounters || d.journalReport;
+      if (!reportNames[d.feature] || !page || !d.session) continue;
+      const key = d.session + '|' + d.feature;
+      if (!groups.has(key)) groups.set(key, { code: d.feature, pages: [] });
+      groups.get(key).pages.push({ data: d, page });
+    }
+    if (!groups.size) { sideNone(parent, T('No COMET reports were recorded.')); return; }
+    const present = new Set([...groups.values()].map(g => g.code));
+    for (const code of Object.keys(reportNames)) if (!present.has(code))
+      sideNone(parent, code + ' · ' + reportNames[code] + ' · ' + T('No COMET reports were recorded.'));
+    for (const { code, pages } of [...groups.values()].sort((a, b) => a.code.localeCompare(b.code))) {
+      pages.sort((a, b) => a.page.part - b.page.part);
+      const header = pages.find(p => p.page.part === 0)?.page;
+      const expected = header?.parts ?? pages[0].page.parts;
+      const valid = new Map();
+      for (const { page } of pages) if (Number.isInteger(page.part) && page.part >= 0 && page.part < expected &&
+        page.parts === expected && !valid.has(page.part)) valid.set(page.part, page);
+      const complete = header && Number.isInteger(expected) && expected > 0 && valid.size === expected &&
+        pages.every(({ page }) => page.version === 1 && page.parts === expected && Number.isInteger(page.part) &&
+          page.part >= 0 && page.part < expected && page.complete === true);
+      const fold = mk('details', 'cometDebugRow');
+      fold.appendChild(mk('summary', '', code + ' · ' + reportNames[code] + ' · ' + valid.size + '/' + (expected ?? '?') +
+        ' · ' + (header?.enabled === false ? T('Off') : complete ? T('Complete') : T('Partial'))));
+      fold.ontoggle = () => {
+        if (!fold.open || fold.childElementCount > 1) return;
+        if (valid.size !== expected || !header) fold.appendChild(mk('p', 'winNote', T('Some report pages are missing.')));
+        if (header) {
+          const counters = {};
+          for (const field of ['recordedOpportunities', 'queueDropped', 'capacitySkipped', 'invalidEvents', 'omittedEvents', 'oversizeEvents', 'observationGaps'])
+            if (header[field] > 0) counters[codeSaid(field)] = header[field];
+          cometFields(fold, counters);
+        }
+        const records = [...valid.values()].flatMap(p => list(p.rows)).filter(row => row && typeof row === 'object');
+        const listBox = mk('div', 'cometReportRows');
+        if (records.length > 1) {
+          const search = mk('input');
+          search.type = 'search'; search.placeholder = T('Search'); search.setAttribute('aria-label', reportNames[code] + ' · ' + search.placeholder);
+          search.oninput = () => {
+            const term = search.value.trim().toLowerCase();
+            for (const item of listBox.children) item.hidden = !item.firstChild.textContent.toLowerCase().includes(term);
+          };
+          fold.appendChild(search);
+        }
+        fold.appendChild(listBox);
+        for (const row of records) {
+          const entry = mk('details', 'cometFields');
+          entry.appendChild(mk('summary', '', [row.name || row.feature || row.profileId, row.decision || row.action || row.owner, row.personality].filter(Boolean).join(' · ') || T('Details')));
+          entry.ontoggle = () => { if (entry.open && entry.childElementCount === 1) cometFields(entry, row); };
+          listBox.appendChild(entry);
+        }
+        const original = mk('details', 'cometFields');
+        original.appendChild(mk('summary', '', T('Recorded pages')));
+        original.ontoggle = () => {
+          if (original.open && original.childElementCount === 1) cometFields(original, pages.map(p => p.data));
+        };
+        fold.appendChild(original);
+      };
+      parent.appendChild(fold);
+    }
+  }
+
+  function sideCometDebug(box, r) { cometInspector(box, r, false); }
+  function sideCometReports(box, r) { cometInspector(box, r, true); }
+  function cometInspector(box, r, reports) {
+    const bot = whyBot(), pid = reports ? '' : bot?.pid || '';
+    const key = r.about.id + '|' + pid;
+    if (box.cometInspector?.key === key) return;
+    box.cometInspector?.abort(); box.replaceChildren();
+    const state = { key, controller: null, abort: () => state.controller?.abort() };
+    box.cometInspector = state;
+    const nav = mk('div', 'cometDebugTools'), results = mk('div', 'cometDebugResults');
+    const text = mk('input'), scope = mk('input');
+    const search = mk('form', 'cometDebugTools');
+    let from = 0, cursor = 0, previous = [], term = '';
+    function reset(at) { from = at; cursor = 0; previous = []; term = text.value.trim(); load(); }
+    if (!reports) {
+      text.type = 'search'; text.maxLength = 80; text.placeholder = T('Bot, feature, stage or reason');
+      text.setAttribute('aria-label', text.placeholder);
+      const submit = mk('button', '', T('Search')); submit.type = 'submit';
+      search.append(text, submit);
+      search.onsubmit = ev => { ev.preventDefault(); reset(0); };
+      if (pid) {
+        const label = mk('label', 'row'); scope.type = 'checkbox'; scope.checked = true;
+        label.append(scope, mk('span', '', bot.t || pid)); scope.onchange = () => reset(from);
+        nav.appendChild(label);
+      }
+      nav.append(cometButton(T('From playhead'), () => reset(r.at + r.lead)), cometButton(T('From raid start'), () => reset(0)));
+      box.append(search, nav);
+    }
+    box.appendChild(results);
+    async function load() {
+      state.abort();
+      const controller = state.controller = new AbortController();
+      const params = new URLSearchParams({ id: r.about.id, debug: '1' });
+      if (reports) params.set('sum', '1');
+      else {
+        if (scope.checked) params.set('p', pid);
+        if (term) params.set('filter', term);
+        if (from) params.set('at', from);
+        if (cursor) params.set('cursor', cursor);
+      }
+      results.replaceChildren(mk('p', 'winNote', T('Loading…')));
+      try {
+        const response = await fetch('api/history/comet?' + params, { signal: controller.signal });
+        if (!response.ok) throw new Error(String(response.status));
+        const page = await response.json();
+        if (controller.signal.aborted || box.cometInspector !== state || replay !== r) return;
+        results.replaceChildren();
+        if (page.partial || page.unresolved || page.malformed) sideNone(results, T('Some recorded data could not be read.'));
+        const rows = list(page.ev);
+        if (reports) cometReports(results, rows);
+        else {
+          if (!rows.length) sideNone(results, T('No matching COMET events.'));
+          const names = new Map();
+          for (const track of scanReplay(r).tracks.values()) if (track.pid) names.set(track.pid, track.name);
+          for (const row of rows) cometEventRow(results, r, row, names);
+          if (previous.length || page.next != null) {
+            const pages = mk('div', 'cometDebugTools');
+            if (previous.length) pages.appendChild(cometButton('← ' + T('Previous'), () => { cursor = previous.pop(); load(); }));
+            if (page.next != null) pages.appendChild(cometButton(T('Next') + ' →', () => { previous.push(cursor); cursor = page.next; load(); }));
+            results.appendChild(pages);
+          }
+        }
+        if (reports && !rows.length || !reports && (!rows.length || rows.every(e => e.d.schema == null)))
+          results.appendChild(mk('p', 'winNote', T('For full diagnostics, enable COMET Extended replay data and Satellite history.cometDebug before recording.')));
+      } catch (err) {
+        if (controller.signal.aborted || box.cometInspector !== state) return;
+        results.replaceChildren(cometButton(T('Retry'), load));
+      }
+    }
+    load();
   }
 
   function sideInv(box, r, s) {
