@@ -2445,3 +2445,21 @@ table.whyOptions tr.no td { color: var(--dim); }
 .actionLegend > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; padding: 6px 0; }
 .actionLegend span { display: flex; align-items: center; gap: 5px; }
 .actionLegend canvas { position: static; width: 20px; height: 20px; flex: none; }
+
+/* The replay HUD stays within the map when the timeline expands or the viewport changes. */
+#actionDock { position: fixed; top: calc(var(--action-under, 100px) + 8px); bottom: calc(var(--bar-over, 110px) + 8px);
+  left: max(8px, var(--menu-l, 0px)); right: max(8px, var(--menu-r, 0px)); z-index: 4; pointer-events: none; }
+#actionDock[hidden], body:not(.hpMap) #actionDock { display: none; }
+#actionOverlay { position: absolute; width: min(280px, 100%); max-height: 100%; box-sizing: border-box; display: flex;
+  flex-direction: column; overflow: hidden; color: var(--bright); background: var(--panel, #17191e);
+  border: 1px solid var(--line); border-radius: 8px; pointer-events: auto; box-shadow: 0 2px 12px #0005; }
+#actionHandle { display: flex; flex: none; align-items: center; justify-content: space-between; padding: 8px 12px;
+  border-bottom: 1px solid var(--line); font-size: 12px; cursor: grab; touch-action: none; user-select: none; }
+#actionHandle span { color: var(--dim); font-size: 16px; }
+#actionRows { overflow: auto; padding: 2px 12px 6px; overscroll-behavior: contain; }
+.actionMember { padding: 6px 0; line-height: 1.4; }
+.actionMember + .actionMember { border-top: 1px solid var(--line); }
+.actionMember strong, .actionMember small { display: block; }
+.actionMember strong { font-size: 13px; }
+.actionMember small { color: var(--dim); font-size: 12px; }
+.actionMember .actionRole { color: var(--accent); }

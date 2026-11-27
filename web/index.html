@@ -31,6 +31,9 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
 <div id="debugLine" hidden></div>
 <!-- a replay's timeline, under the map (as Raid Review's): the kills along it, the time, then play, stop, how fast,
      and more switches behind the cog -->
+<div id="actionDock" hidden><section id="actionOverlay" class="ui">
+  <header id="actionHandle"><b id="actionTitle"></b><span aria-hidden="true">⠿</span></header><div id="actionRows"></div>
+</section></div>
 <div id="replayBar" data-rec class="ui" hidden>
   <div id="replayBot" hidden><b id="replayBotName"></b><span id="replayBotWhy" title="Why it does it: more in the Bots tab beside the map"></span><div id="replayBotStrip" title="What this one was doing over the raid. Press to go to a moment."></div></div>
   <div id="replayTrack"><div id="replayGrid"></div><div id="replayFights"></div><div id="replaySprees"></div><div id="replayFill"></div><div id="replayHead"></div><div id="replayHover" hidden></div><div id="replayTicks"></div><input type="range" id="replaySeek" min="0" max="1000" step="1" value="0" aria-label="Time in the raid"></div>
@@ -59,6 +62,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
     <button id="replayKeep" type="button" title="In a replay: every death so far stays marked, not only the last few seconds'.">Keep kill marks</button>
     <button id="replaySpree" type="button" title="Along the bottom of the timeline: when somebody picked up a lot in a short while (a bot clearing a marked room, say). Pressed, the map goes there, following them.">Loot sprees</button>
     <button id="replayDoing" type="button" title="What each bot is doing, under its name, as the mod deciding for it has it (SAIN, ORBIT, COMET...).">Behaviour</button>
+    <button id="replayOverlayToggle" type="button" aria-pressed="false">Action overlay</button>
     <button id="replayFacing" type="button" title="Everybody as an arrow pointing the way they face. Off: a dot.">Facing arrows</button>
     <button id="replayMini" type="button" title="In a replay: the whole map small in a corner, with where everybody is and has been. Press it to go there.">Minimap</button>
     <label id="replayColor" title="Your own marker's colour, on the history page and the live map (Settings > Colours has it too)"><span>Your colour</span><input type="color" id="replayColorPick"></label>

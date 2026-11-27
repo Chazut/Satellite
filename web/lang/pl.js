@@ -1,5 +1,17 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Corner peek": "Wychylenie zza rogu",
+"Prefire": "Ogień wyprzedzający",
+"Zigzag": "Zygzak",
+"Doorway jump": "Skok w przejściu",
+"Tactical jump": "Skok taktyczny",
+"Fake reload": "Pozorowane przeładowanie",
+"Cover feint": "Zwód zza osłony",
+"Doorway peek": "Wychylenie przez drzwi",
+"Fake grenade": "Pozorowany rzut granatem",
+"Fake heal": "Pozorowane leczenie",
+"Entered room": "Wejście do pomieszczenia",
+"Action overlay": "Panel akcji",
 "SAIN is handling combat. Check the shot events to see when the bot fired.": "SAIN kieruje walką. Zdarzenia strzałów pokazują, kiedy bot otworzył ogień.",
 "Observed": "Zaobserwowano",
 "Switched to tracking a hidden target": "Śledzi teraz cel poza zasięgiem wzroku",

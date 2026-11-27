@@ -296,22 +296,26 @@ namespace Satellite.Client
 
         // who was in control of each bot as last kept (T04), and of which raid
         private static readonly Dictionary<string, string> Control = new Dictionary<string, string>();
+        private static readonly CometActionSamples ActionSamples = new CometActionSamples();
         private static string _controlRaid = "";
 
         // One decision as {"t":<ms on the raid's clock>,"p":whose (profile id),"f":feature,"s":stage,"d":{...}}: unless
         // full, only what the replay's Why tab shows (Wanted, Kept); null: left out
         private static string Line(string json, string raid, float began, bool full)
         {
-            string feature = null, stage = null;
+            string feature = null, stage = null, trace = null;
             if (!full)
             {
                 feature = Peek(json, "feature");
                 stage = Peek(json, "stage");
-                if (!Wanted(feature, stage))
+                trace = stage == "evaluated" ? CometActionSamples.Trace(feature) : null;
+                if (!Wanted(feature, stage) && (trace == null || json.IndexOf("\"" + trace + "\":", StringComparison.Ordinal) < 0))
                 {
                     return null;
                 }
             }
+
+            if (trace != null && !ActionSamples.NeedsSample(raid, Peek(json, "profileId"), feature, json)) return null;
 
             JObject said;
             try
@@ -323,6 +327,20 @@ namespace Satellite.Client
                 return null;
             }
 
+            JObject action = null;
+            if (trace != null)
+            {
+                try
+                {
+                    action = ActionSamples.Changed(Word(said, "profileId"), feature, trace, said);
+                }
+                catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is ArgumentException || ex is OverflowException)
+                {
+                    // A differently shaped trace from another COMET version must not discard the rest of the batch.
+                    return null;
+                }
+                if (action == null) return null;
+            }
             var realtime = said.Value<double?>("realtime");
             var t = realtime.HasValue ? Math.Max(0L, (long)((realtime.Value - began) * 1000.0)) : 0L;
             var head = "{\"t\":" + t + ",\"p\":" + JsonConvert.ToString(Word(said, "profileId")) + ",\"f\":" + JsonConvert.ToString(Word(said, "feature"))
@@ -332,6 +350,7 @@ namespace Satellite.Client
                 return head + json + "}";
             }
 
+            if (action != null) return head + action.ToString(Formatting.None) + "}";
             if (feature == "E04")
             {
                 // (only a move that went well or badly: most come to nothing either way)

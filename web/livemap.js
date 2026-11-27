@@ -348,7 +348,7 @@
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
-    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
+    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', hpActions: false, floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
       rosterMore: true, who: true, layout: true, spawnKinds: false, rosterRows: true, bots: true, orbitMap: false, feed: true, areas: false, boxKinds: true,
@@ -748,6 +748,7 @@
     if (id === null) backToPlayer();
     // (a replay's Why tab: about the one followed now)
     if (HIST && prefs.hpTab === 'bots') hpSideShow();
+    if (HIST && replay && prefs.hpActions) showActionOverlay(replay);
   }
   // The zoom the player was being followed at, before the map was taken off them (a drag, a look at something,
   // somebody else followed): put back when it returns to them. Without auto zoom only; with it, the zoom is the one
@@ -7172,13 +7173,15 @@
   // panel has its one place.
   // snap(x, y), when given: where the panel would stand for a top left corner there, shown while it's moved (on a grid
   // drawn faintly over the map meanwhile)
-  function draggable(handle, box, drop, snap) {
+  function draggable(handle, box, drop, snap, allowTouch = false) {
     handle.classList.add('dragHandle');
     handle.addEventListener('pointerdown', e => {
-      if (phone.matches || e.button !== 0 || e.target.closest('input, select, #sideClose, #squadClose, #panelClose, #killClose')) return;
+      if ((!allowTouch && phone.matches) || e.button !== 0 || e.target.closest('input, select, #sideClose, #squadClose, #panelClose, #killClose')) return;
+      if (allowTouch) e.preventDefault();
       const start = box.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
       let moved = false;
       const move = ev => {
+        if (ev.pointerId !== e.pointerId) return;
         const dx = ev.clientX - x0, dy = ev.clientY - y0;
         if (!moved && Math.hypot(dx, dy) < 6) return;
         if (!moved) {
@@ -7192,6 +7195,7 @@
         box.style.transform = 'translate(' + (at ? at[0] - start.left : dx) + 'px, ' + (at ? at[1] - start.top : dy) + 'px)';
       };
       const up = ev => {
+        if (ev.pointerId !== e.pointerId) return;
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
@@ -7199,6 +7203,7 @@
         box.classList.remove('panelMoving');
         document.body.classList.remove('gridOn');
         box.style.transform = '';
+        if (ev.type === 'pointercancel') return;
         // the click that follows letting go is the drag's, not a press
         const eat = c => { c.stopPropagation(); c.preventDefault(); };
         window.addEventListener('click', eat, { capture: true, once: true });
@@ -9589,6 +9594,7 @@
   function showReplay() {
     const r = replay;
     if (!r) return;
+    showActionOverlay(r);
     showBotLine();
     // the playhead and what's been played, every frame (not only as the rest is redone), so the dot moves smoothly
     const at = (100 * r.at / r.total) + '%';
@@ -9615,6 +9621,8 @@
     $('replayPeople').classList.toggle('on', !prefs.hpNoPeople);
     $('replayEvents').classList.toggle('on', !prefs.hpNoEvents);
     $('replayShots').classList.toggle('on', !!prefs.shots);
+    $('replayOverlayToggle').setAttribute('aria-pressed', String(!!prefs.hpActions));
+    $('replayOverlayToggle').classList.toggle('on', !!prefs.hpActions);
     $('replayDoing').classList.toggle('on', !!prefs.mapDoing);
     $('replayFacing').classList.toggle('on', !prefs.hpNoFacing);
     for (const b of $('replayModes').children) b.classList.toggle('on', b.dataset.mode === replayMode());
@@ -9664,6 +9672,8 @@
   function leaveReplay() {
     if (!replay) return;
     replay = null;
+    $('actionDock').hidden = true;
+    actionFrame = null;
     // (its containers back where places.json has them)
     addMore();
     replayShown = '';
@@ -9712,6 +9722,7 @@
   $('replaySpree').onclick = () => { prefs.lootSprees = !prefs.lootSprees; $('replaySpree').classList.toggle('on', prefs.lootSprees); save(); if (replay && replay.scan && replay.scan.done) buildSprees(replay); };
   // the cog's other switches: each flips one setting of the replay's map
   for (const [id, flip] of [['replayPeople', () => { prefs.hpNoPeople = !prefs.hpNoPeople; }], ['replayEvents', () => { prefs.hpNoEvents = !prefs.hpNoEvents; }],
+    ['replayOverlayToggle', () => { prefs.hpActions = !prefs.hpActions; actionFrame = null; }],
     ['replayShots', () => { prefs.shots = !prefs.shots; }], ['replayDoing', () => { prefs.mapDoing = !prefs.mapDoing; }],
     ['replayFacing', () => { prefs.hpNoFacing = !prefs.hpNoFacing; }]]) {
     $(id).onclick = () => { flip(); save(); replayShown = ''; showReplay(); tipFor = null; dirty = true; };
@@ -11185,8 +11196,10 @@
       const bar = $('replayBar'), over = bar.hidden ? 0 : window.innerHeight - bar.getBoundingClientRect().top;
       st.setProperty('--hp-under', Math.round(head) + 'px');
       st.setProperty('--bar-over', Math.round(over) + 'px');
+      const toolbar = $('hpMapBar');
+      st.setProperty('--action-under', Math.ceil(Math.max(head, toolbar.getBoundingClientRect().bottom)) + 'px');
     };
-    if (window.ResizeObserver) { const watchSize = new ResizeObserver(measureHp); watchSize.observe(hpPage); watchSize.observe($('replayBar')); }
+    if (window.ResizeObserver) { const watchSize = new ResizeObserver(measureHp); watchSize.observe(hpPage); watchSize.observe($('hpMapBar')); watchSize.observe($('replayBar')); }
     window.addEventListener('resize', measureHp);
     hpMeasure = measureHp;
     // Behaviour: a sort picked out goes back to all of them on a press anywhere but the sorts and the bars
@@ -12647,7 +12660,7 @@
         .map(e => ({ t: Math.max(0, e.t - r.lead), d: e.d })).sort((x, y) => x.t - y.t) : [];
       got.choices = got.ev.filter(e => e.d.stage === 'selected' && /^A\d\d$/.test(e.d.feature) && e.d.decision);
       got.state = j && j.none ? 'none' : got.ev.length ? 'ok' : 'empty';
-    }).catch(() => { got.state = 'error'; }).then(() => { if (replay === r) { whyPrint = ''; dirty = true; hpSideShow(); } });
+    }).catch(() => { got.state = 'error'; }).then(() => { if (replay === r) { whyPrint = ''; dirty = true; hpSideShow(); if (prefs.hpActions) showActionOverlay(r); } });
     return got;
   }
   // COMET's word for a reason ("zzap-ranked-selection", "native-push:incompletePath") as plain words
@@ -12749,6 +12762,146 @@
     if (m.xr && /^Exfil\b/.test(m.ob || '')) return m.xr;
     const hunt = squadHunt(m);
     return hunt ? T('Squad:') + ' ' + hunt : '';
+  }
+  // Replay time is trimmed and sorted by whyLoad. Build the short action track once for the followed bot.
+  // A proposal, a requested animation or crossing time while scrubbing is never evidence of execution.
+  const actionTrackOf = new WeakMap();
+  function actionTrack(events) {
+    if (actionTrackOf.has(events)) return actionTrackOf.get(events);
+    const track = [], previous = new Map();
+    let weave = null;
+    for (const { t, d } of events) {
+      if (d.stage !== 'evaluated') continue;
+      const f = d.feature;
+      const edge = (key, ok, identity, name) => {
+        if (!ok) { previous.delete(key); return; }
+        if (previous.has(key) && previous.get(key) === identity) return;
+        previous.set(key, identity);
+        track.push({ t, name });
+      };
+      if (f === 'M03' && d.cornerPeek) {
+        const q = d.cornerPeek;
+        edge(f, q.openObserved && q.peeks > 0, q.episode + '/' + q.peeks, T('Corner peek'));
+      } else if (f === 'M06' && d.cornerPrefire) {
+        const q = d.cornerPrefire;
+        edge(f, q.actualShots > 0, q.episode, T('Prefire'));
+      } else if (f === 'M11' && d.retreatWeave) {
+        const q = d.retreatWeave;
+        const turn = x => Math.abs(x) >= 5 && Math.abs(x) <= 85 ? Math.sign(x) : 0;
+        const dir = turn(q.yaw);
+        if (q.state !== 'evading' || !q.moveRequested || !(q.speed > 0) || !dir || dir !== turn(q.observedYaw)) continue;
+        if (weave && t - weave.t <= 2000 && weave.context === q.context && weave.dir !== dir)
+          track.push({ t, name: T('Zigzag') });
+        weave = { t, context: q.context, dir };
+      } else if (f === 'M12' && d.tacticalJump) {
+        const q = d.tacticalJump;
+        edge(f, q.takeoffObserved, q.attempt, q.sourceFeature === 'D02' ? T('Doorway jump') : T('Tactical jump'));
+      } else if (f === 'M14' && d.coverFeint) {
+        const q = d.coverFeint;
+        edge('mag', q.animationObserved && q.magazineAccepted, q.episode, T('Fake reload'));
+        edge(f, q.exposedObserved && q.movementObserved, q.episode, T('Cover feint'));
+      } else if (f === 'D02' && d.doorJumpPeek) {
+        const q = d.doorJumpPeek;
+        edge(f, q.takeoffObserved, q.door + '/' + q.target, T('Doorway jump'));
+      } else if (f === 'D04' && d.doorStepPeek) {
+        const q = d.doorStepPeek;
+        edge(f, q.arrived && q.looking, q.door + '/' + q.peek, T('Doorway peek'));
+      } else if (f === 'D05' && d.doorFakeGrenade) {
+        const q = d.doorFakeGrenade;
+        edge(f, q.state === 'completed' && q.handsObserved, q.opportunity, T('Fake grenade'));
+      } else if (f === 'D06' && d.doorFakeMedical) {
+        const q = d.doorFakeMedical, med = q.medical;
+        edge(f, q.state === 'completed' && q.handsObserved && med && med.consumptionObserved === false && !med.medicalHandoff, q.opportunity, T('Fake heal'));
+      } else if ((f === 'D07' || f === 'D08') && d.doorRoomClear) {
+        const q = d.doorRoomClear;
+        edge(f, q.thresholdCrossed && q.movementObserved, q.door + '/' + q.target, T('Entered room'));
+      }
+    }
+    actionTrackOf.set(events, track);
+    return track;
+  }
+
+  const actionDock = $('actionDock'), actionBox = $('actionOverlay');
+  let actionFrame = null, actionPrint = '';
+  const fraction = v => Math.max(0, Math.min(1, v));
+  function placeActionOverlay() {
+    if (actionDock.hidden) return;
+    const x = Number.isFinite(prefs.hpActionX) ? fraction(prefs.hpActionX) : 1;
+    const y = Number.isFinite(prefs.hpActionY) ? fraction(prefs.hpActionY) : 0;
+    actionBox.style.left = Math.round(x * Math.max(0, actionDock.clientWidth - actionBox.offsetWidth)) + 'px';
+    actionBox.style.top = Math.round(y * Math.max(0, actionDock.clientHeight - actionBox.offsetHeight)) + 'px';
+  }
+  draggable($('actionHandle'), actionBox, (x, y) => {
+    const r = actionDock.getBoundingClientRect();
+    prefs.hpActionX = fraction((x - r.left) / Math.max(1, r.width - actionBox.offsetWidth));
+    prefs.hpActionY = fraction((y - r.top) / Math.max(1, r.height - actionBox.offsetHeight));
+    save(); placeActionOverlay();
+  }, null, true);
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(placeActionOverlay);
+    observer.observe(actionDock); observer.observe(actionBox);
+  }
+  const overlayBot = m => m && m.pid && isMapBot(m, KINDS[m.c] || OTHER) && !isHidden(m.c) && !inArea(m);
+  const activeRole = m => !m.gh && modOn('COMET') && m.sq && m.sq.a && !squadOver(m.sq) &&
+    m.sq.u !== 'interrupted' && m.sq.u !== 'declined' ? m.sq : null;
+
+  function showActionOverlay(r) {
+    if (!prefs.hpActions || prefs.hpNoPeople || chased === null) {
+      if (!actionDock.hidden) actionDock.hidden = true;
+      actionFrame = null;
+      return;
+    }
+    const m = liveById.get(chased);
+    if (!r.about || !overlayBot(m)) {
+      if (!actionDock.hidden) actionDock.hidden = true;
+      actionFrame = null;
+      return;
+    }
+    const got = modOn('COMET') ? whyLoad(r, m.pid) : null;
+    const track = got && got.state === 'ok' ? actionTrack(got.ev) : [];
+    const last = lastAt(track, r.at), recent = [];
+    for (let i = last; i >= 0 && r.at - track[i].t < 3000; i--) {
+      if (!recent.some(a => a.name === track[i].name)) recent.push(track[i]);
+    }
+    const printTime = recent.map(a => a.t).join(',');
+    if (actionFrame && actionFrame.raid === r && actionFrame.next === r.next && actionFrame.m === m &&
+        actionFrame.time === printTime && actionFrame.goals === orbitMain && !actionDock.hidden) return;
+    actionFrame = { raid: r, next: r.next, m, time: printTime, goals: orbitMain };
+    const plans = orbitMain && modOn('ORBIT') ? list(orbitMain.d.s) : [];
+    const squad = plans.find(s => list(s.MemberProfileIds).includes(m.pid));
+    const memberIds = squad && list(squad.MemberProfileIds);
+    const role = activeRole(m), team = teamKey(m);
+    const others = live.filter(x => {
+      if (x.id === m.id || !overlayBot(x)) return false;
+      if (memberIds) return memberIds.includes(x.pid);
+      if (plans.some(s => list(s.MemberProfileIds).includes(x.pid))) return false;
+      const otherRole = activeRole(x);
+      return (role && otherRole && role.p && role.p === otherRole.p) || (team && team === teamKey(x));
+    });
+    const members = [m, ...others], inSquad = members.length > 1 || !!role;
+    const title = inSquad ? T('Squad') : T('Bot');
+    const rows = members.map((x, i) => {
+      const brain = brainOf(x), q = activeRole(x);
+      return { name: latin(x.t || x.c), action: currentAction(x, brain), context: mapContext(x, brain),
+        role: q ? squadTactic(q) + ' · ' + squadPart(q) : '',
+        moments: i ? [] : recent.map(a => clockText(a.t) + ' · ' + a.name) };
+    });
+    if (actionDock.hidden) actionDock.hidden = false;
+    const print = JSON.stringify([title, rows]);
+    if (print !== actionPrint) {
+      actionPrint = print;
+      $('actionTitle').textContent = title;
+      const body = $('actionRows'); body.replaceChildren();
+      for (const row of rows) {
+        const el = mk('div', 'actionMember');
+        el.appendChild(mk('strong', '', row.name));
+        for (const detail of [row.action, row.context]) if (detail) el.appendChild(mk('small', '', detail));
+        if (row.role) el.appendChild(mk('small', 'actionRole', row.role));
+        for (const moment of row.moments) el.appendChild(mk('small', 'actionMoment', moment));
+        body.appendChild(el);
+      }
+      placeActionOverlay();
+    }
   }
   // the bot followed, when it's one (not a person)
   function whyBot() {
