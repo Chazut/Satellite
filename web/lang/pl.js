@@ -1,5 +1,7 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Moving": "W ruchu",
+"All objectives done": "Wszystkie cele ukończone",
 "COMET event inspector": "Zdarzenia COMET",
 "COMET raid reports": "Raporty COMET z rajdu",
 "Combat journal": "Dziennik walki",
@@ -85,7 +87,6 @@ fumsLang({
 "Started": "Rozpoczęto",
 "Accepted": "Przyjęto",
 "Selected": "Wybrano",
-"Moving to a waypoint": "Idzie do punktu trasy",
 "Kill ambush": "Zasadzka na przeciwnika",
 "Looking for kills": "Szuka przeciwników",
 "Could not load decision details.": "Nie udało się wczytać szczegółów decyzji.",
