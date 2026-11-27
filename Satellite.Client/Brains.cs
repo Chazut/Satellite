@@ -278,7 +278,9 @@ namespace Satellite.Client
                 return;
             }
 
-            if (json[at + 1] == 'S' && json[at + 2] == '1' && (json[at + 3] == '0' || json[at + 3] == '1') && json[at + 4] == '"')
+            bool action = json.Length <= 2048 && (json.IndexOf("\"stage\":\"performed\"", at, Math.Min(120, json.Length - at), StringComparison.Ordinal) >= 0
+                || json.IndexOf("\"stage\":\"activity-", at, Math.Min(120, json.Length - at), StringComparison.Ordinal) >= 0);
+            if (!action && json[at + 1] == 'S' && json[at + 2] == '1' && (json[at + 3] == '0' || json[at + 3] == '1') && json[at + 4] == '"')
             {
                 json = Cut(json, json[at + 3] == '0' ? "squadGrenade" : "siege");
                 if (json == null)
@@ -286,13 +288,7 @@ namespace Satellite.Client
                     return;
                 }
             }
-            else if ((json[at + 1] == 'M' || json[at + 1] == 'D') && json.Length <= 2048)
-            {
-                // Confirmed one-shot gestures are small in both COMET replay modes. Ignore its planning traces.
-                if (json.IndexOf("\"stage\":\"performed\"", at, Math.Min(120, json.Length - at), StringComparison.Ordinal) < 0)
-                    return;
-            }
-            else if (json.Length > MostLength || !(json[at + 1] == 'S' && json[at + 2] == '0' || json[at + 1] == 'W' && json[at + 2] == '0' && json[at + 3] == '4'))
+            else if (!action && (json.Length > MostLength || !(json[at + 1] == 'S' && json[at + 2] == '0' || json[at + 1] == 'W' && json[at + 2] == '0' && json[at + 3] == '4')))
             {
                 return;
             }
@@ -508,14 +504,17 @@ namespace Satellite.Client
 
             var profileId = Word(said, "profileId");
             var feature = Word(said, "feature");
-            if (Word(said, "stage") == "performed" && profileId.Length > 0 && Amount(said, "realtime", out var performed))
+            var stage = Word(said, "stage");
+            bool activity = stage == "activity-start" || stage == "activity-end";
+            if ((stage == "performed" || activity) && profileId.Length > 0 && Amount(said, "realtime", out var performed))
             {
                 var gesture = Word(said, "decision");
                 if (gesture.Length > 0)
-                    Events.Add("comet.gesture", profileId, Word(said, "name"), performed, to =>
+                    Events.Add(activity ? "comet.activity" : "comet.gesture", profileId, Word(said, "name"), performed, to =>
                     {
                         to.Append("{\"action\":");
                         World.Text(to, gesture);
+                        if (activity) to.Append(stage == "activity-start" ? ",\"active\":true" : ",\"active\":false");
                         to.Append('}');
                     });
                 return;
@@ -581,13 +580,26 @@ namespace Satellite.Client
 
             if (storm["evidence"] is Newtonsoft.Json.Linq.JArray evidence)
             {
+                // A storm can have several contributing clues. Prefer a specific, recorded observation.
+                bool hurt = false, alone = false;
+                string busy = null;
                 foreach (var clue in evidence)
                 {
-                    if (clue.Type == Newtonsoft.Json.Linq.JTokenType.String && (string)clue == "dying")
+                    if (clue.Type != Newtonsoft.Json.Linq.JTokenType.String) continue;
+                    switch ((string)clue)
                     {
-                        return "hurt";
+                        case "badly hurt": case "dying": hurt = true; break;
+                        case "alone": alone = true; break;
+                        case "busy (Reloading)": busy = "reload"; break;
+                        case "busy (Healing)": case "busy (UsingSurgery)": busy = "heal"; break;
+                        case "busy (Looting)": busy = "loot"; break;
+                        case "busy (TryingToExtract)": busy = "extract"; break;
+                        case "busy (HasGrenade)": busy = "grenade"; break;
                     }
                 }
+                if (hurt) return "hurt";
+                if (busy != null) return busy;
+                if (alone) return "alone";
             }
 
             return "vulnerable";

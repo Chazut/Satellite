@@ -9407,7 +9407,7 @@
               for (const e of report.ev || []) if (e && e.d && Number.isFinite(e.n)) {
                 // A gesture may have waited for the next full report. Both clocks include the loading screen here.
                 e.rt = t;
-                if (e.k === 'comet.gesture' && Number.isFinite(e.t) && Number.isFinite(report.clk))
+                if ((e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag') && Number.isFinite(e.t) && Number.isFinite(report.clk))
                   e.performedAt = Math.max(0, t - Math.max(0, report.clk - e.t));
                 events.push(e);
               }
@@ -9437,7 +9437,7 @@
     for (const e of events) e.t = e.rt;
     whyOf.clear();
     const r = replay = { about, lead, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
-      next: 0, hasGestures, gestures: indexGestures(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
+      next: 0, hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
     // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
@@ -12766,11 +12766,22 @@
     return active ? orbitGoalName(active) : '';
   }
   function mapContext(m, brain) {
+    const activity = replay && m.pid && modOn('COMET') && activityAt(replay, m.pid);
+    const context = movementContext(m, brain);
+    return activity ? (context ? activity + ' · ' + context : activity) : context;
+  }
+  function movementContext(m, brain) {
     if (!brain) return '';
     const q = m.sq;
     if (q && q.f === 'S06' && q.a && modOn('COMET') && !brain.ghost && !squadOver(q) &&
         q.u !== 'interrupted' && q.u !== 'declined' && (brain.by === 'SAIN' || brain.by === 'COMET')) {
       if (q.why === 'hurt') return T('Target looks badly hurt');
+      if (q.why === 'extract') return T('Target is extracting');
+      if (q.why === 'reload') return T('Target is reloading');
+      if (q.why === 'heal') return T('Target is healing');
+      if (q.why === 'loot') return T('Target is looting');
+      if (q.why === 'grenade') return T('Target has a grenade out');
+      if (q.why === 'alone') return T('Target appears isolated');
       if (q.why === 'vulnerable') return T('Target looks vulnerable');
     }
     if (brain.by !== 'ORBIT') return '';
@@ -12783,19 +12794,77 @@
     ['CornerPeek', T('Corner peek')], ['Prefire', T('Prefire')], ['Zigzag', T('Zigzag')],
     ['TacticalJump', T('Tactical jump')], ['DoorwayJump', T('Doorway jump')], ['CoverFeint', T('Cover feint')],
     ['FakeReload', T('Fake reload')], ['DoorwayPeek', T('Doorway peek')], ['FakeGrenade', T('Fake grenade')],
-    ['FakeHeal', T('Fake heal')], ['EnteredRoom', T('Entered room')]
+    ['FakeHeal', T('Fake heal')], ['EnteredRoom', T('Entered room')],
+    ['DrewPistolEmpty', T('Drew pistol · primary empty')], ['DrewPistol', T('Drew pistol')],
+    ['BackToPrimary', T('Back to primary weapon')], ['SwitchedForRange', T('Switched guns for range')], ['SwitchedPrimary', T('Switched primary weapon')],
+    ['LeftExposedCover', T('Left cover · taking hits')], ['ReachedNewCover', T('Reached new cover')],
+    ['InterruptedSurgery', T('Interrupted surgery')], ['InterruptedSurgeryHit', T('Interrupted surgery · hit')],
+    ['InterruptedSurgeryThreat', T('Interrupted surgery · enemy nearby')], ['RepairedLimb', T('Repaired a limb')],
+    ['StoppedHeavyBleed', T('Stopped heavy bleeding')], ['StoppedLightBleed', T('Stopped light bleeding')], ['TreatedFracture', T('Treated fracture')],
+    ['SprintedPastDoor', T('Sprinted past doorway')], ['ThrewIntoRoom', T('Threw grenade into room')],
+    ['ScatteredFromGrenade', T('Split from squad · grenade')], ['FledGrenade', T('Fled grenade')], ['DroppedProneGrenade', T('Went prone · grenade')],
+    ['SwitchedDevicesOff', T('Switched tactical devices off')]
   ]);
   const GESTURE_MS = 3000, reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  function indexGestures(events, lead) {
-    const tracks = new Map(), seen = new Set();
+  function indexGestures(events, lead, hasGestures) {
+    const tracks = new Map(), seen = new Set(), mags = new Set();
     for (const e of events) {
-      if (e.k !== 'comet.gesture' || !e.p || !e.d || !GESTURE_LABELS.has(e.d.action) || seen.has(e.n)) continue;
+      if (!e.p || !e.d || seen.has(e.n)) continue;
+      let name;
+      if (e.k === 'comet.gesture') name = GESTURE_LABELS.get(e.d.action);
+      else if (hasGestures && e.k === 'comet.mag') {
+        if (e.d.st === 'queued') name = T('Dropped magazine');
+        if (e.d.st === 'completed') name = T('Recovered magazine');
+        if (name && e.d.id) {
+          const key = e.p + '/' + e.d.id;
+          if (e.d.st === 'queued') {
+            if (mags.has(key)) continue;
+            mags.add(key);
+          } else mags.delete(key);
+        }
+      }
+      if (!name) continue;
       seen.add(e.n);
       if (!tracks.has(e.p)) tracks.set(e.p, []);
-      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), name: GESTURE_LABELS.get(e.d.action) });
+      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), name });
     }
     for (const track of tracks.values()) track.sort((a, b) => a.t - b.t);
     return tracks;
+  }
+  const ACTIVITY_LABELS = new Map([
+    ['PerformingSurgery', T('Performing surgery')], ['UsingStim', T('Using a stim')], ['UsingFirstAid', T('Using first aid')],
+    ['TreatingFracture', T('Treating a fracture')], ['TreatingHeavyBleed', T('Treating heavy bleeding')],
+    ['TreatingLightBleed', T('Treating light bleeding')], ['FlashAffected', T('Blinded by flash')], ['InsideGas', T('Inside CS gas')]
+  ]);
+  function indexActivities(events, lead) {
+    const bots = new Map(), times = [], seen = new Set();
+    for (const e of events) {
+      if (e.k !== 'comet.activity' || !e.p || !ACTIVITY_LABELS.has(e.d.action) || typeof e.d.active !== 'boolean' || seen.has(e.n)) continue;
+      seen.add(e.n);
+      if (!bots.has(e.p)) bots.set(e.p, new Map());
+      const tracks = bots.get(e.p), action = e.d.action;
+      if (!tracks.has(action)) tracks.set(action, []);
+      const edge = { t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), on: e.d.active, n: e.n };
+      tracks.get(action).push(edge);
+      times.push(edge);
+    }
+    const order = (a, b) => a.t - b.t || a.n - b.n;
+    for (const tracks of bots.values()) for (const track of tracks.values()) track.sort(order);
+    return { bots, times: times.sort(order) };
+  }
+  function activityAt(r, pid) {
+    const tracks = r.activities.bots.get(pid);
+    if (!tracks) return '';
+    let label = '';
+    for (const [action, track] of tracks) {
+      const i = lastAt(track, r.at);
+      // Require both recorded edges. An incomplete archive cannot establish how long this lasted.
+      if (i >= 0 && track[i].on && track[i + 1]?.on === false) {
+        const next = ACTIVITY_LABELS.get(action);
+        label = label ? label + ' · ' + next : next;
+      }
+    }
+    return label;
   }
   function gestureTrack(r, pid, loadOld) {
     if (r.hasGestures || r.gestures.size) return r.gestures.get(pid);
@@ -12921,7 +12990,7 @@
     for (let i = last; i >= 0 && r.at - track[i].t < GESTURE_MS; i--) {
       if (!recent.some(a => a.name === track[i].name)) recent.push(track[i]);
     }
-    const printTime = recent.map(a => a.t).join(',');
+    const printTime = lastAt(r.activities.times, r.at) + '/' + recent.map(a => a.t).join(',');
     if (actionFrame && actionFrame.raid === r && actionFrame.next === r.next && actionFrame.m === m &&
         actionFrame.time === printTime && actionFrame.goals === orbitMain && !actionDock.hidden) return;
     actionFrame = { raid: r, next: r.next, m, time: printTime, goals: orbitMain };
