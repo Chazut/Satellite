@@ -1,5 +1,6 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Spotted another bot": "Заметил другого бота",
 "Moving": "В движении",
 "All objectives done": "Все цели выполнены",
 "COMET event inspector": "События COMET",

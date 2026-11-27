@@ -422,6 +422,17 @@ namespace Satellite.Client
         {
             try
             {
+                var sight = AccessTools.Method(typeof(EnemyInfo), nameof(EnemyInfo.SetVisible), new[] { typeof(bool) });
+                harmony.Patch(sight, prefix: new HarmonyMethod(typeof(Recorded), nameof(BeforeSight)),
+                    postfix: new HarmonyMethod(typeof(Recorded), nameof(AfterSight)));
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogWarning($"Bot sightings are unavailable: {e.Message}");
+            }
+
+            try
+            {
                 var end = AccessTools.Method(typeof(Player), "OnGameSessionEnd");
                 if (end != null)
                 {
@@ -458,6 +469,30 @@ namespace Satellite.Client
             {
                 // bots that extract aren't told
             }
+        }
+
+        private static void BeforeSight(EnemyInfo __instance, bool __0, out bool __state)
+        {
+            __state = __0 && !__instance.IsVisible;
+        }
+
+        private static void AfterSight(EnemyInfo __instance, bool __state)
+        {
+            if (!__state || !__instance.IsVisible || !World.Watched || World.BrainsOff || Events.Raid.Length == 0) return;
+            var target = __instance.Person;
+            var observer = __instance.Owner;
+            if (observer == null || target == null || !target.IsAI || string.IsNullOrEmpty(target.ProfileId)) return;
+            ReportSight(observer.ProfileId, target.ProfileId);
+        }
+
+        private static void ReportSight(string observer, string target)
+        {
+            Events.Add("bot.sight", observer, null, Time.realtimeSinceStartup, to =>
+            {
+                to.Append("{\"target\":");
+                World.Text(to, target);
+                to.Append('}');
+            });
         }
 
         // Player.OnGameSessionEnd(ExitStatus exitStatus, float pastTime, string locationId, string exitName)

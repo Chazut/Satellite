@@ -1474,10 +1474,9 @@ html.swap body { opacity: 0; transition: none; }
 }
 #replayBar[hidden] { display: none; }
 #replayBar { flex-wrap: wrap; z-index: 4; }
-#replayBot { flex-basis: 100%; display: flex; align-items: center; gap: 10px; }
+#replayBot { flex: none; width: 100%; }
 #replayBot[hidden] { display: none; }
-#replayBotName { white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-#replayBotStrip { position: relative; flex: 1; height: 12px; border-radius: 3px; background: rgba(200, 205, 255, 0.07); overflow: hidden; cursor: pointer; }
+#replayBotStrip { position: relative; box-sizing: border-box; border-inline: 1px solid transparent; height: 12px; border-radius: 3px; background: rgba(200, 205, 255, 0.07); overflow: hidden; cursor: pointer; }
 #replayBotStrip i { position: absolute; top: 0; bottom: 0; }
 #replayBar button, #replayBar select {
   height: 30px;
@@ -2424,8 +2423,6 @@ table.whyOptions tr.no td { color: var(--dim); }
 .whyBefore i { color: var(--dim); font-style: normal; font-variant-numeric: tabular-nums; }
 .whyBefore small { color: var(--dim); font-variant-numeric: tabular-nums; }
 /* by the followed bot's name over the replay's bar: COMET's move now and why */
-#replayBotWhy { margin-left: 8px; overflow: hidden; color: #ffc56e; font-size: 11.5px; white-space: nowrap; text-overflow: ellipsis; }
-#replayBotWhy:empty { display: none; }
 /* a bot's card by the pointer: what it is and its health on the left, its gear and what it carries on the right */
 #tip.cols { max-width: min(600px, calc(100vw - 16px)); }
 #tip .tipCols { display: grid; grid-template-columns: minmax(170px, auto) minmax(220px, 1fr); }

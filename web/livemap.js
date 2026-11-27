@@ -4029,6 +4029,75 @@
     const m = /^rgba?\(([^,]+),([^,]+),([^,)]+)/.exec(col);
     return m ? 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + a + ')' : col;
   };
+  // Lay out text in screen space after drawing the map. Pins, paths and hit tests stay at their world positions.
+  const botLabels = [];
+  function drawBotLabels(scale) {
+    const blocks = botLabels;
+    if (!blocks.length) return;
+    const bounds = [], gap = 3 * scale, ratio = pixelRatio();
+    blocks.sort((a, b) => b.priority - a.priority || a.id - b.id);
+    const shared = new Map();
+    for (const block of blocks) {
+      const team = teamKey(block.marker);
+      for (const line of block.lines) {
+        if (team && line.objective && block.lines.length > 1) {
+          const key = team + '|' + line.objective;
+          const speakers = shared.get(key);
+          if (speakers?.some(m => Math.hypot(m.x - block.x, m.y - block.y) < 48 * scale)) {
+            line.hidden = true;
+            continue;
+          }
+          if (speakers) speakers.push(block);
+          else shared.set(key, [block]);
+        }
+        const pic = wordPic(line.text, line.px * prefs.textScale, inkOf(line.col), ratio);
+        block.width = Math.max(block.width, pic.w);
+        line.top = block.height;
+        block.height += pic.h - pic.pad;
+      }
+    }
+    function fits(box, block) {
+      const overlaps = other => box.left < other.right + gap && box.right + gap > other.left
+        && box.top < other.bottom + gap && box.bottom + gap > other.top;
+      if (bounds.some(overlaps)) return false;
+      return !blocks.some(other => other !== block && box.left < other.x + other.r && box.right > other.x - other.r
+        && box.top < other.y + other.r && box.bottom > other.y - other.r);
+    }
+    for (const block of blocks) {
+      const { x, y, width, height, r } = block;
+      let place;
+      function tryAt(cx, top) {
+        if (place) return;
+        const left = Math.max(2, Math.min(vw - width - 2, cx - width / 2));
+        top = Math.max(2, Math.min(vh - height - 2, top));
+        const box = { left, right: left + width, top, bottom: top + height };
+        if (fits(box, block)) place = box;
+      }
+      if (block.lines[0].tactic) block.top = y - r - gap - height;
+      tryAt(x, block.top);
+      const reach = width / 2 + r + gap;
+      for (let row = 0; !place && row <= 4; row++) {
+        const shift = row * (height + gap);
+        for (const dx of [reach, -reach, 0]) {
+          tryAt(x + dx, block.top + shift);
+          tryAt(x + dx, y - r - gap - height - shift);
+        }
+      }
+      if (!place) continue;
+      bounds.push(place);
+      const cx = (place.left + place.right) / 2;
+      drawn.push({ m: block.marker, x: cx, y: place.top + height / 2, w: width, h: height });
+      if (Math.abs(cx - x) > r || Math.abs(place.top - block.top) > r) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(Math.max(place.left, Math.min(x, place.right)), Math.max(place.top, Math.min(y, place.bottom)));
+        ctx.lineWidth = Math.max(1, scale);
+        ctx.strokeStyle = 'rgba(210,224,239,0.7)';
+        ctx.stroke();
+      }
+      for (const line of block.lines) if (!line.hidden) write(line.text, line.px, cx, place.top + line.top, line.col, line.alpha);
+    }
+  }
   function drawMarker(m, strong, scale) {
     const kind = KINDS[m.c] || OTHER;
     const at = toScreen(m.cx, m.cy);
@@ -4047,8 +4116,20 @@
     const apart = m.c !== 'Main Player' && m.c !== 'BTR' && m.c !== 'Airdrop' ? otherFloor(m.cx, m.cy, m.cz) : 0;
     const away = apart !== 0;
 
+    const bot = isMapBot(m, kind);
+    const effects = replay && bot && m.pid && !prefs.hpNoEvents;
+    const hop = effects && !m.gh && prefs.hpGestures !== false && modOn('COMET')
+      ? markerHop(gestureTrack(replay, m.pid, chased === m.id), replay.at, r) : 0;
+    if (hop > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 0.8, r * 0.35, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fill();
+      ctx.restore();
+    }
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(x, y - hop);
     ctx.globalAlpha = away && !strong ? 0.6 : 1;
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1.5, r * 0.22);
@@ -4269,25 +4350,26 @@
     }
     if (away) write(apart > 0 ? '▲' : '▼', 9 * scale, x + r * 1.5, y - r * 0.9, col, strong ? 1 : 0.6);
     const person = m.c === 'Enemy Player' || m.c === 'Friendly Player';
-    const bot = isMapBot(m, kind);
     const named = bot ? strong || showBotName(prefs.names, m, kind) : kind.label || strong || (prefs.names === 'players' && person)
       || (m.c === 'Main Player' && (prefs.myName || live.some(o => o.c === 'Friendly Player')))
       || (prefs.names === 'all' && m.c !== 'Corpse' && m.c !== 'Main Player' && m.c !== 'Extract' && m.c !== 'Transit');
     const floorSays = away && (m.c === 'Extract' || m.c === 'Transit') ? floorSaid(m) : '';
     // (names and what they're doing each sized on top of Text size: Settings > Names, What they're doing)
     const namePx = 12 * scale * prefs.nameScale;
-    if (named && (m.t || m.c === 'Transit')) label(markerText(m) + (floorSays ? ' · ' + floorSays : ''), namePx, x, y + r * 1.35 + under, y - r * 1.35, col, away && !strong ? 0.6 : 1);
-    let detailY = y + r * 1.35 + under + (named && m.t ? namePx * prefs.textScale * 1.3 : 0);
+    const lines = [];
+    const alpha = away && !strong ? 0.6 : 1;
+    const top = y + r * 1.35 + under;
+    if (named && (m.t || m.c === 'Transit')) {
+      const text = markerText(m) + (floorSays ? ' · ' + floorSays : '');
+      if (bot) lines.push({ text, px: namePx, col, alpha });
+      else label(text, namePx, x, top, y - r * 1.35, col, alpha);
+    }
     if (bot && (m.psc || prefs.mapDifficulty || prefs.mapPersonality)) {
       const details = [];
       if (m.psc) details.push(T('AI player scav'));
       if (prefs.mapDifficulty && m.df) details.push(DIFFICULTY[m.df] || m.df);
       if (prefs.mapPersonality && m.ps) details.push(m.ps);
-      if (details.length) {
-        const size = 10 * scale;
-        write(details.join(' · '), size, x, detailY, m.psc ? '#9ff4c8' : '#e1e5ec', away && !strong ? 0.6 : 1);
-        detailY += size * prefs.textScale * 1.35;
-      }
+      if (details.length) lines.push({ text: details.join(' · '), px: 10 * scale, col: m.psc ? '#9ff4c8' : '#e1e5ec', alpha });
     }
     if (bot && m.ch) {
       const d = Math.max(6, r * 0.72), bx = x + r + d * 0.65, by = y - r * 0.7;
@@ -4302,13 +4384,32 @@
     if (prefs.mapDoing && brain && !inArea(m)) {
       const said = brain.by === 'EFT' ? '' : currentAction(m, brain, true);
       const context = mapContext(m, brain);
-      if (context) write(context.length > 40 ? context.slice(0, 39) + '…' : context, 9 * scale * prefs.doingScale, x, detailY + 13 * scale * prefs.doingScale * prefs.textScale, '#b4d5df', away && !strong ? 0.55 : 0.95);
-      if (said) write(said.length > 30 ? said.slice(0, 29) + '…' : said, 9.5 * scale * prefs.doingScale, x, detailY,
-        brain.ghost ? '#c2c5ca' : DOING_COL[brain.by] || '#dadcdf', away && !strong ? 0.55 : 0.95);
+      if (said) lines.push({ text: said.length > 30 ? said.slice(0, 29) + '…' : said, px: 9.5 * scale * prefs.doingScale,
+        col: brain.ghost ? '#c2c5ca' : DOING_COL[brain.by] || '#dadcdf', alpha,
+        objective: brain.by === 'ORBIT' ? said : null });
+      if (context && context !== said) lines.push({ text: context.length > 40 ? context.slice(0, 39) + '…' : context,
+        px: 9 * scale * prefs.doingScale, col: '#b4d5df', alpha });
     }
+    const role = m.sq;
+    if (bot && !m.gh && role?.a && prefs.tacticWords !== false && modOn('COMET') && !squadOver(role)
+        && role.u !== 'declined' && role.u !== 'interrupted') {
+      lines.unshift({ tactic: true, text: tacticWord(role), px: 9.5 * scale, col: '#ffc56e', alpha });
+    }
+    if (lines.length && x >= 0 && x <= vw && y >= 0 && y <= vh) botLabels.push({ marker: m, id: m.id, x, y, r, top, width: 0, height: 0, lines,
+      priority: m.id === chased ? 2 : m.id === rosterOver ? 1 : 0 });
     if (replay && bot && m.pid && prefs.hpGestures !== false && !prefs.hpNoEvents && !inArea(m) && modOn('COMET'))
       drawGestures(m, replay, x, y - r * 2.5 - 10 * scale, scale);
-    drawn.push({ m, x, y, w: r * 2.6, h: r * 2.6 });
+    if (bot && m.pid && (!replay || effects) && prefs.actionIcons !== false) {
+      const contacts = replay?.sightings.get(m.pid);
+      const last = contacts ? lastAt(contacts, replay.at) : -1;
+      if (replay ? last >= 0 && replay.at - contacts[last].t < SIGHT_MS : performance.now() < liveSightUntil.get(m.pid)) {
+        const question = badge('?', '#baf4ff', '#0d3450', '#0d3450', 'round', r * 2);
+        const size = question.width / pixelRatio();
+        ctx.drawImage(question, x - size / 2, y - hop - r * 1.6 - size, size, size);
+        if (!replay) dirty = true;
+      }
+    }
+    drawn.push({ m, x, y: y - hop / 2, w: r * 2.6, h: r * 2.6 + hop });
   }
 
   // slanting stripes in a colour, to fill a shape with
@@ -5262,6 +5363,7 @@
     drawSwitches(scale);
     drawOrbitMain(scale);
     drawTrails(scale);
+    botLabels.length = 0;
     let top = null;
     // the corpses first, under everyone: the ones a player killed, or every one when asked
     if (!isHidden('Corpse')) {
@@ -5331,6 +5433,7 @@
     if (prefs.edge || prefs.edgeQuests || prefs.edgeExits !== false) drawEdge(scale);
     // the one pointed at: bigger, named, over the others
     if (top) drawMarker(top, true, scale);
+    drawBotLabels(scale);
     // the one the pointer is over in the Raid list: ringed; and the one followed, in blue
     // (Settings > Ring round the one followed: off, only the white one)
     for (const id of chased !== null && chased !== rosterOver && prefs.chaseRing !== false ? [rosterOver, chased] : [rosterOver]) {
@@ -5611,6 +5714,7 @@
     killEvents = [];
     eventsSeen = new Set();
     eventsRaid = '';
+    liveSightUntil.clear();
   }
 
   // a raid began, ended or moved on, or its location's map arrived: show that map
@@ -6672,11 +6776,21 @@
   // number in the raid, when on the raid's clock in ms, its kind, whose, their name, the rest). They come with the
   // full reports ("rid" the raid, "ev" the new ones); a page opened later asks the server for the raid so far.
   // So far only "comet.squad": what COMET has a bot doing with its squad, whenever that changes.
+  const SIGHT_MS = 1400, liveSightUntil = new Map();
   let squadEvents = [], eventsRaid = '', eventsSeen = new Set(), squadLogOpen = false;
-  function addEvents(list, fresh) {
+  function addEvents(list, fresh, clock) {
     let added = false, killed = false, others = false;
     for (const e of list || []) {
       if (!e || !Number.isFinite(e.n) || eventsSeen.has(e.n) || !e.d) continue;
+      if (e.k === 'bot.sight') {
+        eventsSeen.add(e.n);
+        const age = clock - e.t;
+        if (!replay && fresh && e.d.target && e.p && age >= 0 && age < SIGHT_MS) {
+          liveSightUntil.set(e.p, performance.now() + SIGHT_MS - age);
+          dirty = true;
+        }
+        continue;
+      }
       if (e.k === 'kill') {
         eventsSeen.add(e.n);
         // heard as it happened (not asked for afterwards): shown at the top of the map for a few seconds
@@ -6729,6 +6843,7 @@
     const rid = d.raid && d.rid ? d.rid : '';
     if (rid !== eventsRaid) {
       eventsRaid = rid;
+      liveSightUntil.clear();
       squadEvents = [];
       otherEvents = [];
       ghostMarks = [];
@@ -6746,7 +6861,7 @@
           .then(j => { if (j && j.rid === eventsRaid) addEvents(j.ev); }).catch(() => {});
       }
     }
-    addEvents(d.ev, true);
+    addEvents(d.ev, true, d.clk);
   }
   // ---- the kill feed ----
   // Who killed whom ("kill" events), in a corner of the map as it happens: the latest few (or each for FEED_MS). Its
@@ -9399,7 +9514,7 @@
               for (const e of report.ev || []) if (e && e.d && Number.isFinite(e.n)) {
                 // A gesture may have waited for the next full report. Both clocks include the loading screen here.
                 e.rt = t;
-                if ((e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag' || e.k === 'orbit.main' || e.k === 'loot' || e.k === 'drop') && Number.isFinite(e.t) && Number.isFinite(report.clk))
+                if ((e.k === 'bot.sight' || e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag' || e.k === 'orbit.main' || e.k === 'loot' || e.k === 'drop') && Number.isFinite(e.t) && Number.isFinite(report.clk))
                   e.performedAt = Math.max(0, t - Math.max(0, report.clk - e.t));
                 events.push(e);
               }
@@ -9442,7 +9557,7 @@
     }
     whyOf.clear();
     const r = replay = { about, lead, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
-      next: 0, mainTimes, firstHunts, hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
+      next: 0, mainTimes, firstHunts, sightings: indexSightings(events, lead), hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
     // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
@@ -9692,7 +9807,6 @@
     for (const b of $('hpView').children) b.classList.toggle('on', (b.dataset.v === 'heat') === !!prefs.heat);
     // the panel beside the map that follows the moment shown, every second or so while it plays
     if (!r.playing || performance.now() - hpSideAt > 1000) hpSideShow();
-    whyBrief();
   }
   // The bot pressed (followed) in a replay: what it was doing over the raid, as a line of colours over the bar, a
   // colour for each mod that decided for it. Pointing at a stretch says what; pressing goes there.
@@ -9704,9 +9818,8 @@
     botLinePrint = print;
     box.hidden = !track;
     if (!track) return;
-    $('replayBotName').textContent = track.name || ONE[track.c] || track.c;
-    $('replayBotName').style.color = (KINDS[track.c] || OTHER).col;
     const strip = $('replayBotStrip'), end = track.t[track.t.length - 1];
+    strip.setAttribute('aria-label', track.name || ONE[track.c] || track.c);
     strip.textContent = '';
     track.act.forEach((a, i) => {
       const until = i + 1 < track.act.length ? track.act[i + 1].t : end, part = document.createElement('i');
@@ -10931,6 +11044,12 @@
       item.append(icon, word);
       keys.appendChild(item);
     }
+    const sight = mk('span');
+    const sample = badge('?', '#baf4ff', '#0d3450', '#0d3450', 'round', 16);
+    const icon = sample.cloneNode(false);
+    icon.getContext('2d').drawImage(sample, 0, 0);
+    sight.append(icon, T('Spotted another bot'));
+    keys.appendChild(sight);
     group.appendChild(keys);
     return group;
   }
@@ -10940,7 +11059,7 @@
     if (q.f === 'S03') return q.r === 'support' ? T('Support') : q.r === 'rear' ? T('Rear') : T('Flank');
     if (q.f === 'S02') return T('Second way');
     if (q.f === 'S04') return T('Cover mate');
-    if (q.f === 'S05') return q.r === 'push' ? T('Trade') : T('Watch');
+    if (q.f === 'S05') return squadPart(q);
     if (q.f === 'S06') return T('Squad assault');
     if (q.f === 'S10') return q.r === 'throw' ? T('Grenade') : T('Hold angle');
     if (q.f === 'S11') return T('Siege');
@@ -10948,8 +11067,7 @@
     return T('Squad tactic');
   }
   function drawDoing(scale) {
-    const icons = prefs.actionIcons !== false, words = prefs.tacticWords !== false && modOn('COMET');
-    if (!icons && !words) return;
+    if (prefs.actionIcons === false) return;
     const d = 5.4 * scale;
     for (const m of live) {
       if (!m.dyn || m.c === 'Corpse' || m.gh || !Number.isFinite(m.cx) || isHidden(m.c) || inArea(m) || !hasDetails(m)) continue;
@@ -10960,15 +11078,13 @@
       const s = toScreen(m.cx, m.cy), r = 8 * scale * kind.size;
       if (s[0] < -40 || s[1] < -40 || s[0] > vw + 40 || s[1] > vh + 40) continue;
       const alpha = otherFloor(m.cx, m.cy, m.cz) !== 0 ? 0.55 : 1;
-      const act = icons ? actionOf(m) : null;
+      const act = actionOf(m);
       if (act) {
         const pic = actionPic(act, d);
         ctx.globalAlpha = alpha;
         ctx.drawImage(pic.c, s[0] - r * 1.05 - pic.o, s[1] - r * 1.05 - pic.o, pic.w, pic.w);
         ctx.globalAlpha = 1;
       }
-      const q = words ? m.sq : null;
-      if (q && q.a && !squadOver(q) && q.u !== 'declined' && q.u !== 'interrupted') write(tacticWord(q), 9.5 * scale, s[0], s[1] - r * 1.5 - 13 * scale, '#ffc56e', alpha * 0.95);
     }
   }
   // which letter an ORBIT squad's objective is drawn with: K kills, L loot, Q quest, E extract camp, A airdrop, and a
@@ -12872,6 +12988,28 @@
     ['SwitchedDevicesOff', T('Switched tactical devices off')]
   ]);
   const GESTURE_MS = 3000, reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function indexSightings(events, lead) {
+    const tracks = new Map(), seen = new Set();
+    for (const e of events) {
+      if (e.k !== 'bot.sight' || !e.p || !e.d.target || seen.has(e.n)) continue;
+      seen.add(e.n);
+      if (!tracks.has(e.p)) tracks.set(e.p, []);
+      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead) });
+    }
+    for (const track of tracks.values()) track.sort((a, b) => a.t - b.t);
+    return tracks;
+  }
+  function markerHop(track, time, radius) {
+    if (!track || reducedMotion.matches) return 0;
+    const duration = 650;
+    for (let i = lastAt(track, time); i >= 0 && time - track[i].t < duration; i--) {
+      if (track[i].jump) {
+        const phase = (time - track[i].t) / duration;
+        return 2 * radius * 4 * phase * (1 - phase);
+      }
+    }
+    return 0;
+  }
   function indexGestures(events, lead, hasGestures) {
     const tracks = new Map(), seen = new Set(), mags = new Set();
     for (const e of events) {
@@ -12892,7 +13030,8 @@
       if (!name) continue;
       seen.add(e.n);
       if (!tracks.has(e.p)) tracks.set(e.p, []);
-      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), name });
+      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), name,
+        jump: e.k === 'comet.gesture' && (e.d.action === 'TacticalJump' || e.d.action === 'DoorwayJump') });
     }
     for (const track of tracks.values()) track.sort((a, b) => a.t - b.t);
     return tracks;
@@ -12971,7 +13110,7 @@
         if (!ok) { previous.delete(key); return; }
         if (previous.has(key) && previous.get(key) === identity) return;
         previous.set(key, identity);
-        track.push({ t, name });
+        track.push({ t, name, jump: f === 'M12' || f === 'D02' });
       };
       if (f === 'M03' && d.cornerPeek) {
         const q = d.cornerPeek;
@@ -13109,30 +13248,6 @@
   function whyBot() {
     const m = chased !== null ? liveById.get(chased) : null;
     return m && m.pid && !PEOPLE.includes(m.c) ? m : null;
-  }
-  // The replay bar keeps the sampled action separate from the last COMET decision.
-  function whyBrief() {
-    const el = $('replayBotWhy'), bot = replay && replay.about ? whyBot() : null;
-    if (!el) return;
-    const brain = bot && brainOf(bot);
-    const parts = bot ? [currentAction(bot, brain), mapContext(bot, brain)] : [];
-    if (bot && brain && (brain.by === 'COMET' || brain.by === 'SAIN')) {
-      const got = whyLoad(replay, bot.pid), at = replay.at, last = lastAt(got.ev, at);
-      if (got.last !== last) {
-        got.last = last;
-        got.move = last >= 0 ? recentMove(got.ev, last, got.ev[last].t) : {};
-      }
-      const { event, choice } = got.move;
-      if (event && at - event.t <= WHY_SEEN) {
-        const d = event.d;
-        const name = d.decision || (choice && choice.d.decision);
-        parts.push('COMET · ' + phaseName(d) + (name ? ' · ' + cometMove(name) : ''));
-        const reason = moveReason(d) || (choice && d.stage !== 'released' && moveReason(choice.d));
-        if (reason) parts.push(reason);
-      }
-    }
-    const said = parts.filter(Boolean).join(' · ');
-    if (el.textContent !== said) el.textContent = said;
   }
   function sideWhy(box, r) {
     const bot = whyBot();
