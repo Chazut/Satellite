@@ -203,6 +203,7 @@ namespace Satellite.Client
             public string Sub;
             public string Plan;
             public string Contact;
+            public string AssaultReason;
             public string Mate;
             public string Key;
             public bool Applied;
@@ -527,6 +528,7 @@ namespace Satellite.Client
                 State = Word(crossfire, "state"),
                 Applied = Flag(crossfire, "applied"),
                 Contact = Word(crossfire, "contact"),
+                AssaultReason = feature == "S06" ? AssaultReason(storm) : null,
                 At = when,
                 Role = maneuver != null ? Word(maneuver, "role") : trade != null ? Word(trade, "choice") : "",
                 Sub = storm != null ? Word(storm, "status") : trade != null ? Word(trade, "status") : cover != null ? Word(cover, "status")
@@ -549,9 +551,30 @@ namespace Satellite.Client
             Told(said, profileId, squad, when);
         }
 
+        private static string AssaultReason(Newtonsoft.Json.Linq.JToken storm)
+        {
+            if (storm == null || Word(storm, "reason") != "storm-weak-enemy")
+            {
+                return null;
+            }
+
+            if (storm["evidence"] is Newtonsoft.Json.Linq.JArray evidence)
+            {
+                foreach (var clue in evidence)
+                {
+                    if (clue.Type == Newtonsoft.Json.Linq.JTokenType.String && (string)clue == "dying")
+                    {
+                        return "hurt";
+                    }
+                }
+            }
+
+            return "vulnerable";
+        }
+
         private static void Told(Newtonsoft.Json.Linq.JObject said, string profileId, Squad squad, float when)
         {
-            squad.Key = squad.Feature + "|" + squad.State + "|" + squad.Applied + "|" + squad.Role + "|" + squad.Sub + "|" + squad.Plan + "|" + squad.Fire;
+            squad.Key = squad.Feature + "|" + squad.State + "|" + squad.Applied + "|" + squad.Role + "|" + squad.Sub + "|" + squad.Plan + "|" + squad.Fire + "|" + squad.AssaultReason;
             Squads.TryGetValue(profileId, out var before);
             Squads[profileId] = squad;
             // an event only when it changed, and not for what was said long ago while nobody was looking
@@ -690,6 +713,12 @@ namespace Satellite.Client
             {
                 to.Append(",\"m\":");
                 World.Text(to, squad.Mate);
+            }
+
+            if (!string.IsNullOrEmpty(squad.AssaultReason))
+            {
+                to.Append(",\"why\":");
+                World.Text(to, squad.AssaultReason);
             }
 
             if (squad.Fire)

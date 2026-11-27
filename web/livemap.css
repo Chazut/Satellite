@@ -2400,6 +2400,9 @@ table.board.sizes th .sortBtn:hover, table.board.sizes th .sortBtn.on { color: v
 .whyMove b { font-size: 14px; color: #ffc56e; }
 .whyMove.over b { color: var(--dim); }
 .whyMove small { color: var(--dim); font-variant-numeric: tabular-nums; }
+.whyAction { font-weight: 650; font-size: 16px; color: var(--text); margin: 3px 0 6px; }
+.whyDetails { margin: 6px 0; }
+.whyDetails > summary { cursor: pointer; color: var(--dim); font-size: 12px; }
 table.whyOptions { width: 100%; margin: 6px 0 2px; border-collapse: collapse; font-size: 12px; }
 table.whyOptions th { color: var(--dim); font-weight: 600; text-align: left; padding: 2px 4px; }
 table.whyOptions td { padding: 3px 4px; border-top: 1px solid var(--line); }

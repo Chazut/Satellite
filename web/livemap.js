@@ -4321,7 +4321,9 @@
     }
     // what it's doing, under its name ("What each bot is doing"): as a mod has it, not the game's own brain
     if (prefs.mapDoing && brain && !inArea(m)) {
-      const said = brain.ghost ? m.ob || '' : brain.by === 'EFT' ? '' : brain.text;
+      const said = brain.by === 'EFT' ? '' : currentAction(m, brain);
+      const context = mapContext(m, brain);
+      if (context) write(context.length > 40 ? context.slice(0, 39) + '…' : context, 9 * scale * prefs.doingScale, x, detailY + 13 * scale * prefs.doingScale * prefs.textScale, '#b4d5df', away && !strong ? 0.55 : 0.95);
       if (said) write(said.length > 30 ? said.slice(0, 29) + '…' : said, 9.5 * scale * prefs.doingScale, x, detailY,
         brain.ghost ? '#c2c5ca' : DOING_COL[brain.by] || '#dadcdf', away && !strong ? 0.55 : 0.95);
     }
@@ -6740,6 +6742,7 @@
       switchNow = new Map();
       magNow = new Map();
       orbitMain = orbitField = phobosField = null;
+      huntSnapshot = null; huntsByMember.clear();
       eventsSeen = new Set();
       if (!replay) forgetSquads();
       showKills();
@@ -9415,7 +9418,8 @@
     }
     // (a replay's clock is the recording's own: what the kill feed and the lists say goes by it)
     for (const e of events) e.t = e.rt;
-    const r = replay = { about, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
+    whyOf.clear();
+    const r = replay = { about, lead, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
       next: 0, scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
@@ -9486,6 +9490,7 @@
     magNow = new Map();
     blastMarks = [];
     orbitMain = orbitField = phobosField = null;
+    huntSnapshot = null; huntsByMember.clear();
     addEvents(r.events.filter(e => e.rt <= t), false);
     showKills();
     squadPanePrint = '';
@@ -10868,7 +10873,7 @@
     if (q.f === 'S02') return T('Second way');
     if (q.f === 'S04') return T('Cover mate');
     if (q.f === 'S05') return q.r === 'push' ? T('Trade') : T('Watch');
-    if (q.f === 'S06') return T('Storm');
+    if (q.f === 'S06') return T('Squad assault');
     if (q.f === 'S10') return q.r === 'throw' ? T('Grenade') : T('Hold angle');
     if (q.f === 'S11') return T('Siege');
     if (q.f === 'S01') return T('Crossfire');
@@ -12603,7 +12608,7 @@
         if (!o) return;
         const chip = mk('button', 'goal' + (o.Completed ? ' done' : i === first ? ' now' : ''));
         chip.type = 'button';
-        chip.append(mk('i', '', orbitLetter(o)), mk('span', '', spaced(String(o.OperationName || o.QuestTitle || o.Type || '')) + (o.OperationStepCount ? ' ' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount : '')
+        chip.append(mk('i', '', orbitLetter(o)), mk('span', '', orbitGoalName(o) + (o.OperationStepCount ? ' ' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount : '')
           + (o.AirdropStage ? ' · ' + words(String(o.AirdropStage)) : '') + (o.CampState ? ' · ' + words(String(o.CampState)) : '')));
         chip.title = o.Completed ? T('Done') : i === first ? T('What the squad is on now') : T('To do after that');
         if (Number.isFinite(o.X) && Number.isFinite(o.Z)) chip.onclick = () => goTo(o.X, o.Z);
@@ -12628,15 +12633,21 @@
   // it's followed. COMET's own words for its reasons are shown as it says them, in English.
   const whyOf = new Map();
   let whyPrint = '';
-  function whyLoad(raid, pid) {
-    const key = raid + '|' + pid;
+  function whyLoad(r, pid) {
+    const raid = r.about.id, key = raid + '|' + pid;
     if (whyOf.has(key)) return whyOf.get(key);
     const got = { state: 'loading', ev: [] };
     whyOf.set(key, got);
-    fetch('api/history/comet?id=' + encodeURIComponent(raid) + '&p=' + encodeURIComponent(pid)).then(a => a.json()).then(j => {
-      got.ev = j && Array.isArray(j.ev) ? j.ev.filter(e => e && e.d).sort((x, y) => x.t - y.t) : [];
+    fetch('api/history/comet?id=' + encodeURIComponent(raid) + '&p=' + encodeURIComponent(pid)).then(a => {
+      if (!a.ok) throw new Error(String(a.status));
+      return a.json();
+    }).then(j => {
+      // The server timestamps these rows from recording start. The map trims the loading screen.
+      got.ev = j && Array.isArray(j.ev) ? j.ev.filter(e => e && e.d && Number.isFinite(e.t))
+        .map(e => ({ t: Math.max(0, e.t - r.lead), d: e.d })).sort((x, y) => x.t - y.t) : [];
+      got.choices = got.ev.filter(e => e.d.stage === 'selected' && /^A\d\d$/.test(e.d.feature) && e.d.decision);
       got.state = j && j.none ? 'none' : got.ev.length ? 'ok' : 'empty';
-    }).catch(() => { got.state = 'none'; }).then(() => { whyPrint = ''; hpSideShow(); });
+    }).catch(() => { got.state = 'error'; }).then(() => { if (replay === r) { whyPrint = ''; dirty = true; hpSideShow(); } });
     return got;
   }
   // COMET's word for a reason ("zzap-ranked-selection", "native-push:incompletePath") as plain words
@@ -12644,7 +12655,7 @@
     const said = String(c || '').replace(/^zzap-/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').replace(/\s*:\s*/g, ': ').replace(/\s+/g, ' ').trim().toLowerCase();
     return said.charAt(0).toUpperCase() + said.slice(1);
   };
-  const WHY_OWNERS = { combat: T('In a fight'), orbit: T('ORBIT'), sleep: T('Asleep (ORBIT ghost)'), recovery: T('Getting unstuck'), other: T('The game\'s own brain') };
+  const WHY_OWNERS = { combat: T('Combat'), orbit: T('ORBIT'), sleep: T('Asleep (ORBIT ghost)'), recovery: T('Getting unstuck'), other: T('The game\'s own brain') };
   const WHY_SEEN = 60000;
   // Who's in control of a bot as its marker has it now (the brain layer, "ly", in every report): "COMET : Post-combat"
   // is "COMET · Post-combat", ORBIT's layer "ORBIT · Orbit Brain Layer", a ghost "Asleep (ORBIT ghost)", the rest by
@@ -12657,50 +12668,130 @@
     if (owned) return owned[1].toUpperCase() + ' · ' + owned[2];
     return (/^Orbit/i.test(layer) ? 'ORBIT · ' : '') + spaced(layer);
   }
-  // a move COMET makes that it never says in its decisions (its crossfire and after-the-fight moves): only the bot's
-  // marker has it ("cm"), and it's the move now whatever COMET said before it
-  const whyUnsaid = m => m && m.cm && /^(PostCombat|Crossfire)/.test(m.cm) ? m.cm : '';
+  function lastAt(events, at) {
+    let lo = 0, hi = events.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (events[mid].t <= at) lo = mid + 1; else hi = mid;
+    }
+    return lo - 1;
+  }
+  // Keep evidence from the same action together. An unnamed release never inherits an unrelated decision.
+  function recentMove(events, last, at) {
+    let event = null, choice = null;
+    for (let i = last; i >= 0 && at - events[i].t <= WHY_SEEN; i--) {
+      const e = events[i], d = e.d;
+      if (!/^A\d\d$/.test(d.feature) || !['started', 'selected', 'accepted', 'rejected', 'released'].includes(d.stage)) continue;
+      if (!event) event = e;
+      else if (d.feature !== event.d.feature || ['released', 'rejected'].includes(d.stage) || (event.d.decision && d.decision !== event.d.decision)) break;
+      if (d.stage === 'selected') { choice = e; break; }
+    }
+    return { event, choice };
+  }
+  function phaseName(d) {
+    if (d.stage === 'released') return T('Ended');
+    if (d.stage === 'rejected') return T('Declined');
+    if (d.stage === 'started') return d.reason === 'native-action-observed' ? T('Observed') : T('Started');
+    if (d.stage === 'accepted') return T('Accepted');
+    return T('Selected');
+  }
+  function moveReason(d) {
+    const c = (d.candidates || []).find(c => c && c.decision === d.decision);
+    const reason = c && c.reason && c.reason !== 'available' ? c.reason : d.reason;
+    if (!reason || ['zzap-ranked-selection', 'zzap-capability-refreshed', 'native-action-observed', 'available'].includes(reason)) return '';
+    if (reason === 'hidden-contact-handoff') return T('Switched to tracking a hidden target');
+    if (reason === 'visible-contact-handoff') return T('Switched to a visible target');
+    return codeSaid(reason);
+  }
+  const SAMPLED_SAIN_ACTIONS = { 'SAIN:Reload': T('Reloading'), 'SAIN:SeekCover': T('Moving to cover'), 'SAIN:RushEnemy': T('Pushing') };
+  function currentAction(m, brain) {
+    if (!brain) return '';
+    if (brain.by === 'ORBIT') {
+      if (m.ob === 'Synthetic (Moving)') return T('Moving to a waypoint');
+      if (m.ob === 'AmbushHotspot (Moving)') return T('Ambush') + ' · ' + T('Moving to it');
+      return brain.ghost ? (m.ob || T('Ghost')) : brain.text;
+    }
+    const dc = m.dc || '';
+    if (!brain.ghost && /^(SAIN|COMET)/i.test(m.ly || '') && modOn('SAIN') && /^SAIN:(?!None$|Peace$).+/.test(dc))
+      return SAMPLED_SAIN_ACTIONS[dc] || cometMove(dc.slice(5));
+    if (brain.fight && brain.by === 'SAIN') return 'SAIN · ' + T('Combat');
+    if (brain.by === 'COMET' && m.cm) return T('Selected') + ' · ' + (m.cm === 'Storm' ? T('Squad assault') : brain.text);
+    return brain.text;
+  }
+  const orbitGoalName = o => o.Type === 'Kills' ? (o.KillAmbush ? T('Kill ambush') : T('Looking for kills')) : spaced(String(o.OperationName || o.QuestTitle || o.Type || ''));
+  // A hunt timer belongs to the squad. Several main objectives can be pending at the same time.
+  let huntSnapshot;
+  const huntsByMember = new Map();
+  function squadHunt(m) {
+    if (!orbitMain || !m.pid || !modOn('ORBIT') || !/^(Synthetic \(Moving\)|AmbushHotspot\b)/.test(m.ob || '')) return '';
+    if (huntSnapshot !== orbitMain) {
+      huntSnapshot = orbitMain;
+      huntsByMember.clear();
+      for (const squad of list(orbitMain.d.s)) {
+        const active = list(squad.MainObjectives).filter(o => o && o.Type === 'Kills' && !o.Completed &&
+          (o.KillAmbush ? ['approach', 'holding'].includes(o.CampState) : o.KillsRoamStartedAt > 0));
+        for (const pid of list(squad.MemberProfileIds)) huntsByMember.set(pid, active);
+      }
+    }
+    const ambush = m.ob.startsWith('AmbushHotspot');
+    const active = (huntsByMember.get(m.pid) || []).find(o => !!o.KillAmbush === ambush);
+    return active ? orbitGoalName(active) : '';
+  }
+  function mapContext(m, brain) {
+    if (!brain) return '';
+    const q = m.sq;
+    if (q && q.f === 'S06' && q.a && modOn('COMET') && !brain.ghost && !squadOver(q) &&
+        q.u !== 'interrupted' && q.u !== 'declined' && (brain.by === 'SAIN' || brain.by === 'COMET')) {
+      if (q.why === 'hurt') return T('Target looks badly hurt');
+      if (q.why === 'vulnerable') return T('Target looks vulnerable');
+    }
+    if (brain.by !== 'ORBIT') return '';
+    if (m.xr && /^Exfil\b/.test(m.ob || '')) return m.xr;
+    const hunt = squadHunt(m);
+    return hunt ? T('Squad:') + ' ' + hunt : '';
+  }
   // the bot followed, when it's one (not a person)
   function whyBot() {
     const m = chased !== null ? liveById.get(chased) : null;
     return m && m.pid && !PEOPLE.includes(m.c) ? m : null;
   }
-  // In a line over the replay's bar, by the followed bot's name: COMET's move now and why, and why ORBIT has it leaving
+  // The replay bar keeps the sampled action separate from the last COMET decision.
   function whyBrief() {
     const el = $('replayBotWhy'), bot = replay && replay.about ? whyBot() : null;
     if (!el) return;
-    let said = '';
-    if (bot) {
-      const got = whyLoad(replay.about.id, bot.pid), at = replay.at;
-      let over = '';
-      for (let i = got.ev.length - 1; i >= 0; i--) {
-        const e = got.ev[i];
-        if (e.t > at) continue;
-        if (at - e.t > WHY_SEEN) break;
-        const d = e.d;
-        if (!/^A\d\d$/.test(d.feature)) continue;
-        // (a move let go: the one before it, said as done, with why it was let go)
-        if (d.stage === 'released' && !over) { over = d.reason || '-'; if (!d.decision) continue; }
-        if (d.decision && ['selected', 'started', 'released'].includes(d.stage)) {
-          said = 'COMET: ' + cometMove(d.decision) + (over ? ' (' + T('Done') + ')' : '') + ((over && over !== '-' ? over : d.reason) ? ' · ' + codeSaid(over && over !== '-' ? over : d.reason) : '');
-          break;
-        }
+    const brain = bot && brainOf(bot);
+    const parts = bot ? [currentAction(bot, brain), mapContext(bot, brain)] : [];
+    if (bot && brain && (brain.by === 'COMET' || brain.by === 'SAIN')) {
+      const got = whyLoad(replay, bot.pid), at = replay.at, last = lastAt(got.ev, at);
+      if (got.last !== last) {
+        got.last = last;
+        got.move = last >= 0 ? recentMove(got.ev, last, got.ev[last].t) : {};
       }
-      // (a move COMET doesn't say in its decisions, as its moves after a fight: as the bot's marker has it now)
-      if (whyUnsaid(bot) || (!said && bot.cm)) said = 'COMET: ' + cometMove(bot.cm);
-      if (bot.xr) said = (said ? said + ' · ' : '') + T('Leaving the raid: {why}', { why: bot.xr });
+      const { event, choice } = got.move;
+      if (event && at - event.t <= WHY_SEEN) {
+        const d = event.d;
+        const name = d.decision || (choice && choice.d.decision);
+        parts.push('COMET · ' + phaseName(d) + (name ? ' · ' + cometMove(name) : ''));
+        const reason = moveReason(d) || (choice && d.stage !== 'released' && moveReason(choice.d));
+        if (reason) parts.push(reason);
+      }
     }
+    const said = parts.filter(Boolean).join(' · ');
     if (el.textContent !== said) el.textContent = said;
   }
   function sideWhy(box, r) {
     const bot = whyBot();
-    const got = bot ? whyLoad(r.about.id, bot.pid) : null, at = r.at;
+    const got = bot ? whyLoad(r, bot.pid) : null, at = r.at;
     // (made again only when something in it changes)
-    let last = -1;
-    if (got) for (let lo = 0, hi = got.ev.length - 1; lo <= hi;) { const mid = (lo + hi) >> 1; if (got.ev[mid].t <= at) { last = mid; lo = mid + 1; } else hi = mid - 1; }
-    const print = [bot ? bot.pid : '', got ? got.state : '', last, bot ? bot.ob || '' : '', bot ? bot.xr || '' : '', bot ? bot.ly || '' : '', bot ? bot.cm || '' : '', bot ? bot.gh || '' : '', Math.floor(at / 5000)].join('|');
+    const last = got ? lastAt(got.ev, at) : -1;
+    const brain = bot && brainOf(bot), action = bot && currentAction(bot, brain), context = bot && mapContext(bot, brain);
+    const tactic = bot && bot.sq && bot.sq.a && !squadOver(bot.sq) && !['declined', 'interrupted'].includes(bot.sq.u) ? squadSaid(bot.sq) : '';
+    const print = [r.about.id, bot && bot.pid, got && got.state, last, action, context, tactic, bot && bot.ly,
+      bot && bot.cm, bot && bot.ob, bot && bot.xr, bot && bot.gh, Math.floor(at / 1000)].join('|');
     if (print === whyPrint && box.childElementCount) return;
     whyPrint = print;
+    const detailsOpen = box.dataset.pid === (bot && bot.pid) && !!box.querySelector('.whyDetails[open]');
+    box.dataset.pid = bot ? bot.pid : '';
     box.textContent = '';
     if (!bot) { sideNone(box, T('Follow a bot (press it on the map or in the list) to see why it does what it does.')); return; }
     const head = mk('div', 'whyHead'), name = mk('b', '', markerText(bot) || bot.t || ONE[bot.c] || bot.c);
@@ -12708,106 +12799,113 @@
     head.append(name, mk('small', '', ONE[bot.c] || bot.c));
     box.appendChild(head);
     const ago = t => at - t < 1000 ? T('just now') : T('{t} ago', { t: clockText(at - t) });
-    const line = (label, text, cls) => { const row = mk('div', 'whyLine' + (cls ? ' ' + cls : '')); row.append(mk('i', '', label), mk('span', '', text)); box.appendChild(row); return row; };
+    const line = (label, text, cls, parent = box) => { const row = mk('div', 'whyLine' + (cls ? ' ' + cls : '')); row.append(mk('i', '', label), mk('span', '', text)); parent.appendChild(row); return row; };
     // the latest of a feature (or features) at the moment shown, no older than WHY_SEEN
     const latest = (test, within = WHY_SEEN) => { for (let i = last; i >= 0; i--) { const e = got.ev[i]; if (at - e.t > within) return null; if (test(e.d)) return e; } return null; };
-    // who's in control: as the bot's marker has it now, else as COMET last said
+    if (action) box.appendChild(mk('div', 'whyAction', action));
+    if (context) line(T('Why'), context);
+    if (tactic) line(T('Squad'), tactic);
+    // Who owns the sampled action can differ from the last COMET decision.
     const control = whyControl(bot);
     const ctl = !control && got && got.state === 'ok' ? latest(d => d.feature === 'T04' && d.controlJournal, Infinity) : null;
-    if (control) line(T('In control'), control);
+    if (control) {
+      const row = line(T('In control'), control);
+      if (/^SAIN\s*:\s*(Combat|Squad) Layer$/i.test(bot.ly || '')) row.title = T('SAIN is handling combat. Check the shot events to see when the bot fired.');
+    }
     else if (ctl) {
       const c = ctl.d.controlJournal;
       line(T('In control'), (WHY_OWNERS[c.owner] || codeSaid(c.owner)) + (c.layer ? ' · ' + spaced(c.layer) : ''));
     }
     // ORBIT
-    if (bot.ob) line('ORBIT', bot.ob);
-    if (bot.xr) line(T('Leaving'), bot.xr, 'hot');
+    if (bot.ob && brain && brain.by !== 'ORBIT') line('ORBIT', bot.ob);
+    if (bot.xr && bot.xr !== context) line(T('Leaving'), bot.xr, 'hot');
     if (!got || got.state === 'loading') { box.appendChild(mk('p', 'hpNone', T('Loading…'))); return; }
-    // (a move COMET is making that it doesn't say in its decisions, as its moves after a fight: the marker has it)
-    if (got.state === 'none' && !bot.cm) { box.appendChild(mk('p', 'hpNone', T('COMET\'s decisions weren\'t recorded in this raid. To record them, set "comet": true under "history" in the server\'s config.jsonc.'))); return; }
-    if (got.state === 'empty' && !bot.cm) { box.appendChild(mk('p', 'hpNone', T('COMET made no decisions for this one in this raid.'))); return; }
-    // COMET's move now: the latest of its choices, weighed or let go
-    const moveOf = d => /^A\d\d$/.test(d.feature) && ['selected', 'started', 'accepted', 'released'].includes(d.stage) && (d.decision || d.stage === 'released');
-    const move = whyUnsaid(bot) ? null : latest(moveOf);
-    rvSection(box, T('COMET\'s move'));
-    if (!move && bot.cm) {
-      // as the marker has it: no options or reason to show
-      const title = mk('div', 'whyMove');
-      title.append(mk('b', '', cometMove(bot.cm)), mk('small', '', T('just now')));
+    if (!got.ev.length) { sideNone(box, got.state === 'error' ? T('Could not load decision details.') : T('No decision details recorded.')); return; }
+    const { event: move, choice } = recentMove(got.ev, last, at);
+    const d = move && move.d, selected = choice && choice.d;
+    const decision = d && (d.decision || (selected && selected.decision));
+    if (move) {
+      const title = mk('div', 'whyMove' + (d.stage === 'released' ? ' over' : ''));
+      title.append(mk('b', '', [phaseName(d), decision && cometMove(decision)].filter(Boolean).join(' · ')), mk('small', '', ago(move.t)));
+      rvSection(box, T("COMET's move"));
       box.appendChild(title);
-    } else if (!move) box.appendChild(mk('p', 'hpNone', T('No move of COMET\'s in the last minute.')));
-    else {
-      const over = move.d.stage === 'released';
-      // (a move let go says what it was by the choice before it, whose options it shows)
-      let chose = move;
-      if (over && !move.d.decision) for (let i = got.ev.indexOf(move); i >= 0; i--) { const e = got.ev[i]; if (moveOf(e.d) && e.d.decision && e.d.stage !== 'released') { chose = e; break; } if (move.t - e.t > WHY_SEEN) break; }
-      const d = Object.assign({}, chose.d, { reason: move.d.reason || chose.d.reason, stage: move.d.stage });
-      const title = mk('div', 'whyMove' + (over ? ' over' : ''));
-      title.append(mk('b', '', over ? T('Done') + (d.decision ? ': ' + cometMove(d.decision) : '') : cometMove(d.decision)), mk('small', '', ago(move.t)));
-      box.appendChild(title);
-      if (d.reason) line(T('Why'), codeSaid(d.reason));
-      const mistake = (d.mixing || {}).mistake;
+      const reason = moveReason(d) || (d.stage !== 'released' && selected && moveReason(selected));
+      if (reason) line(T('Why'), reason);
+      const mistake = ((selected || d).mixing || {}).mistake;
       if (mistake && mistake.state === 'mistake-selected') line(T('Note'), T('Picked a worse option on purpose, as its personality allows ({best} was best)', { best: cometMove(mistake.best || '') }), 'hot');
-      const options = (d.candidates || []).filter(c => c && c.decision);
-      if (options.length) {
-        const table = mk('table', 'whyOptions');
-        const top = table.createTHead().insertRow();
-        for (const [text, cls] of [[T('Option'), ''], [T('Score'), 'num'], [T('Why'), '']]) top.appendChild(mk('th', cls, text));
-        const body = table.createTBody();
-        for (const c of options.slice().sort((x, y) => (Number.isFinite(y.score) ? y.score : -1e9) - (Number.isFinite(x.score) ? x.score : -1e9))) {
-          const row = body.insertRow();
-          row.className = (c.decision === d.decision ? 'on' : '') + (c.eligible ? '' : ' no');
-          row.insertCell().textContent = cometMove(c.decision);
-          const score = row.insertCell();
-          score.className = 'num';
-          score.textContent = Number.isFinite(c.score) ? String(Math.round(c.score * 10) / 10) : '–';
-          row.insertCell().textContent = c.eligible ? (c.reason && c.reason !== 'available' ? codeSaid(c.reason) : T('Could')) : codeSaid(c.reason || '');
+    }
+    if (last < 0) return;
+    const details = mk('details', 'whyDetails');
+    details.appendChild(mk('summary', '', T('Decision details')));
+    const fill = () => {
+      if (!details.open || details.childElementCount > 1) return;
+      if (move) {
+        details.appendChild(mk('p', 'winNote', [d.feature, d.stage, d.reason].filter(Boolean).join(' · ')));
+        const options = ((selected || d).candidates || []).filter(c => c && c.decision);
+        if (options.length) {
+          const table = mk('table', 'whyOptions');
+          const top = table.createTHead().insertRow();
+          for (const [text, cls] of [[T('Option'), ''], [T('Score'), 'num'], [T('Why'), '']]) top.appendChild(mk('th', cls, text));
+          const body = table.createTBody();
+          for (const c of options.slice().sort((x, y) => (Number.isFinite(y.score) ? y.score : -1e9) - (Number.isFinite(x.score) ? x.score : -1e9))) {
+            const row = body.insertRow();
+            row.className = (c.decision === decision ? 'on' : '') + (c.eligible ? '' : ' no');
+            row.insertCell().textContent = cometMove(c.decision);
+            const score = row.insertCell();
+            score.className = 'num';
+            score.textContent = Number.isFinite(c.score) ? String(Math.round(c.score * 10) / 10) : '–';
+            row.insertCell().textContent = c.eligible ? (c.reason && c.reason !== 'available' ? codeSaid(c.reason) : T('Could')) : codeSaid(c.reason || '');
+          }
+          details.appendChild(table);
         }
-        box.appendChild(table);
       }
-    }
-    // what else COMET has it doing
-    const also = [];
-    const med = latest(d => d.feature === 'H01' && d.medicalChoice, 30000);
-    if (med) also.push([T('Medical'), cometMove(med.d.medicalChoice.choice || '') + ' · ' + codeSaid(med.d.medicalChoice.reason || med.d.reason)]);
-    const reload = latest(d => d.feature === 'W04' && d.quickReload, 30000);
-    if (reload) also.push([T('Reload'), codeSaid(reload.d.quickReload.choice || '') + ' · ' + codeSaid(reload.d.quickReload.reason || reload.d.reason)]);
-    const search = latest(d => d.feature === 'P09' && d.searchAbandonment, 30000);
-    if (search) also.push([T('Searching'), codeSaid(search.d.searchAbandonment.state || '') + ' · ' + codeSaid(search.d.searchAbandonment.reason || search.d.reason)]);
-    const squad = latest(d => /^S\d\d$/.test(d.feature) && d.stage === 'evaluated', 30000);
-    if (squad) {
-      const q = squad.d, part = q.crossfire || q[Object.keys(q).find(k => q[k] && typeof q[k] === 'object' && 'state' in q[k])] || {};
-      also.push([T('Squad'), codeSaid(q.decision || q.feature) + (part.state ? ' · ' + codeSaid(part.state) : '') + (part.execution ? ' · ' + part.execution : '') + (q.reason ? ' · ' + codeSaid(q.reason) : '')]);
-    }
-    const learnt = latest(d => d.feature === 'E04' && d.tacticalOutcome && d.tacticalOutcome.result && !['pending', 'neutral'].includes(d.tacticalOutcome.result), 30000);
-    if (learnt) also.push([T('Learnt'), cometMove(learnt.d.tacticalOutcome.action || '') + ' · ' + codeSaid(learnt.d.tacticalOutcome.result)]);
-    if (also.length) {
-      rvSection(box, T('Also'));
-      for (const [label, text] of also) line(label, text);
-    }
-    // its moves before: the newest first, each pressed to go there (the same move chosen again and again, as COMET
-    // weighs it anew every moment, once: when it was first chosen)
-    const before = [];
-    for (let i = last; i >= 0 && before.length < 12; i--) {
-      const e = got.ev[i];
-      if (!/^A\d\d$/.test(e.d.feature) || e.d.stage !== 'selected' || !e.d.decision) continue;
-      if (before.length && before[before.length - 1].d.decision === e.d.decision) before[before.length - 1] = e;
-      else before.push(e);
-    }
-    if (before.length) {
-      rvSection(box, T('Before'));
-      const list = mk('div', 'whyBefore');
-      for (const e of before) {
-        const b = mk('button', '', '');
-        b.type = 'button';
-        const best = (e.d.candidates || []).find(c => c.decision === e.d.decision);
-        b.append(mk('i', '', clockText(e.t)), mk('b', '', cometMove(e.d.decision)), mk('small', '', best && Number.isFinite(best.score) ? String(Math.round(best.score * 10) / 10) : ''));
-        b.title = T('Go to this moment on the map');
-        b.onclick = () => { seekReplay(Math.max(0, e.t - 1500)); replayShown = ''; showReplay(); whyPrint = ''; };
-        list.appendChild(b);
+      // what else COMET has it doing
+      const also = [];
+      const med = latest(d => d.feature === 'H01' && d.medicalChoice, 30000);
+      if (med) also.push([T('Medical'), cometMove(med.d.medicalChoice.choice || '') + ' · ' + codeSaid(med.d.medicalChoice.reason || med.d.reason)]);
+      const reload = latest(d => d.feature === 'W04' && d.quickReload, 30000);
+      if (reload) also.push([T('Reload'), codeSaid(reload.d.quickReload.choice || '') + ' · ' + codeSaid(reload.d.quickReload.reason || reload.d.reason)]);
+      const search = latest(d => d.feature === 'P09' && d.searchAbandonment, 30000);
+      if (search) also.push([T('Searching'), codeSaid(search.d.searchAbandonment.state || '') + ' · ' + codeSaid(search.d.searchAbandonment.reason || search.d.reason)]);
+      const squad = latest(d => /^S\d\d$/.test(d.feature) && d.stage === 'evaluated', 30000);
+      if (squad) {
+        const q = squad.d, part = q.crossfire || q[Object.keys(q).find(k => q[k] && typeof q[k] === 'object' && 'state' in q[k])] || {};
+        also.push([T('Squad'), codeSaid(q.decision || q.feature) + (part.state ? ' · ' + codeSaid(part.state) : '') + (part.execution ? ' · ' + part.execution : '') + (q.reason ? ' · ' + codeSaid(q.reason) : '')]);
       }
-      box.appendChild(list);
-    }
+      const learnt = latest(d => d.feature === 'E04' && d.tacticalOutcome && d.tacticalOutcome.result && !['pending', 'neutral'].includes(d.tacticalOutcome.result), 30000);
+      if (learnt) also.push([T('Learnt'), cometMove(learnt.d.tacticalOutcome.action || '') + ' · ' + codeSaid(learnt.d.tacticalOutcome.result)]);
+      if (also.length) {
+        rvSection(details, T('Also'));
+        for (const [label, text] of also) line(label, text, '', details);
+      }
+      // its moves before: the newest first, each pressed to go there (the same move chosen again and again, as COMET
+      // weighs it anew every moment, once: when it was first chosen)
+      const before = [];
+      for (let i = lastAt(got.choices, at); i >= 0 && before.length < 12; i--) {
+        const e = got.choices[i];
+        if (before.length && before[before.length - 1].d.decision === e.d.decision) before[before.length - 1] = e;
+        else before.push(e);
+      }
+      if (before.length) {
+        rvSection(details, T('Before'));
+        const list = mk('div', 'whyBefore');
+        for (const e of before) {
+          const b = mk('button', '', '');
+          b.type = 'button';
+          const best = (e.d.candidates || []).find(c => c.decision === e.d.decision);
+          b.append(mk('i', '', clockText(e.t)), mk('b', '', cometMove(e.d.decision)), mk('small', '', best && Number.isFinite(best.score) ? String(Math.round(best.score * 10) / 10) : ''));
+          b.title = T('Go to this moment on the map');
+          b.onclick = () => { seekReplay(e.t); replayShown = ''; showReplay(); whyPrint = ''; };
+          list.appendChild(b);
+        }
+        details.appendChild(list);
+      }
+      if (details.childElementCount === 1) sideNone(details, T('No decision details recorded.'));
+    };
+    details.ontoggle = fill;
+    details.open = detailsOpen;
+    fill();
+    box.appendChild(details);
   }
 
   function sideInv(box, r, s) {
@@ -13235,7 +13333,7 @@
     const squad = orbitMain.d.s.find(q => list(q.MemberProfileIds).includes(pid));
     const o = squad ? list(squad.MainObjectives).find(g => g && !g.Completed) : null;
     if (!o) return null;
-    const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : words(String(o.OperationName || o.Type || ''));
+    const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : (o.Type === 'Kills' ? orbitGoalName(o) : words(String(o.OperationName || o.Type || '')));
     const step = o.OperationStep ? words(o.OperationStep) + (o.OperationStepCount ? ' (' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount + ')' : '') : '';
     return { o, text: what + (step ? ' · ' + step : '') + (o.QuestTitle ? ' · ' + o.QuestTitle : '') };
   }
@@ -13258,7 +13356,7 @@
       goals.forEach((o, i) => {
         if (offFloor(o.X, o.Z, o.Y)) return;
         const s = toScreen(o.X, o.Z), r = 8 * scale;
-        const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : words(String(o.OperationName || o.Type || ''));
+        const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : (o.Type === 'Kills' ? orbitGoalName(o) : words(String(o.OperationName || o.Type || '')));
         ctx.globalAlpha = i ? 0.45 : 1;
         if ((plans || shown) && !i && Number.isFinite(here[0].cx)) {
           const from = toScreen(here[0].cx, here[0].cy);
