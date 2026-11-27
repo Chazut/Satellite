@@ -547,7 +547,7 @@ public partial class LiveMapRoute
 
         things["sid"] = session.Id;
         things["v"] = session.ThingsSent;
-        things["names"] = Names(named);
+        things["names"] = Names(named, session.Id);
         // packed quickly rather than small: it's made again every few seconds of a raid
         var answer = Packed(things.ToJsonString(), System.IO.Compression.CompressionLevel.Fastest);
         session.ThingsMade = new ThingsAnswer(text, answer);
@@ -565,11 +565,15 @@ public partial class LiveMapRoute
     private Dictionary<string, double>? _handbook;
     private readonly Dictionary<string, JsonObject> _names = new(StringComparer.Ordinal);
 
-    private JsonObject Names(IEnumerable<string> ids)
+    // (sid: the game whose player the prices are for, under "Most it sells for" and "Trader only"; null: the game heard
+    // from last)
+    private JsonObject Names(IEnumerable<string> ids, string? sid = null)
     {
         var all = new JsonObject();
         lock (_namesLock)
         {
+            var mode = PriceMode();
+            var seller = mode is "most" or "trader" ? SellerOf(sid) : null;
             foreach (var id in ids)
             {
                 if (!_names.TryGetValue(id, out var entry))
@@ -588,6 +592,14 @@ public partial class LiveMapRoute
                 else if (copy is JsonObject fleaNamed && FleaPrice(id) is { } flea)
                 {
                     fleaNamed["p"] = Math.Round(flea);
+                }
+
+                // the most the player can sell it for: the flea's (as above) while that's open to them and pays more,
+                // else the best trader's; only the best trader's, under "Trader only"
+                if (seller != null && copy is JsonObject sold)
+                {
+                    var onFlea = mode == "most" && seller.Flea && FleaSells(id) && sold["p"] is JsonValue fp && fp.TryGetValue<double>(out var fleaPrice) ? fleaPrice : 0;
+                    sold["p"] = Math.Round(Math.Max(onFlea, TraderPrice(id, seller)));
                 }
 
                 all[id] = copy;

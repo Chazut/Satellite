@@ -24,6 +24,18 @@
 - A raid that's slow to load is recorded in full.
 - Why: who's in control of a bot is as its marker has it at that moment, and COMET's moves after a fight and in a crossfire show as its move.
 - An exported raid's zip is named by when it was, the map, and PMC or Scav (`Satellite-raid-20261126-160354-Customs-PMC.zip`).
+- The live map and Raid history keep their own settings: a change on one never changes the other (only the language is one for both). The live map's menu has no History tab or replay settings; Raid history is at the top of the page, with its replay settings beside the replay.
+- Either page can copy groups of settings from the other (colours, markers and names, kill feed and more): Presets > Copy from Raid history on the live map, Copy from the live map in Raid history's settings.
+- The Raid list is tidier: each row is the name with its team, distance and level, and under it what it's doing and what it's worth. Difficulty, SAIN personality and health in numbers are said when the row is pointed at. The counts at the top show only in Nearest order (each group's title says them otherwise).
+- The heat map shows where people went and how many of them: each person counts once in each place, however long they stood there, so routes show as plain bands, red where many went the same way, and nobody camping one spot makes a red blot. The bands are the same few pixels wide at any zoom.
+- Grow with the zoom (Settings > Markers, on): markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, between 0.6× and 1.5×). Marker size is their size following outdoors.
+- People and bots are all one size on the map. Bigger me, bosses and friends (Settings > Markers, off) draws your marker, bosses' and friends' a little bigger, and whoever the map follows bigger again.
+- Drop, a marker shape (Settings > Markers): a round body narrowing to a point the way they face.
+- The other marker shapes are redrawn: Circle with a pointer is a dot with a broad arrowhead ahead of it, its tip rounded off (and Circle with a dart, a new shape, the same with a slim dart), Chevron has slim arms to a sharp point, Dot with a view cone has a smaller dot and a cone that fades out with distance, and Dot is smaller.
+- Raid history's legend says only what the marks mean (the Raid list under it already shows who's on the map and their teams), folded to begin with.
+- The menu's settings are grouped under plain headings in every tab, and Pick-ups worth at least is a value of its own (a page set to "as Worth at least" keeps what that was).
+- Loose loot on your wishlist has a blue star badge of its own, as found-in-raid needs have.
+- Prices (Loot > Filters) has "Most it sells for", the new default: the flea price or the best trader's, whichever pays more. Below the flea's unlock level, and for items that can't go on the flea, it's the best trader's that you have unlocked, at your loyalty level. "Trader only" is always the best trader's, "Flea only" always the flea's (as before), and "Handbook only" the handbook's.
 - The server adds the options a newer Satellite brings to `config.jsonc` when it starts, with their comments, keeping your own settings.
 - `LICENSE.md` covers the map scans too (`LICENSE-MAPS.md` is merged into it).
 - Raid history: the server records every raid, whether the page is open or not, and keeps it. **Live map | Raid history** at the top of the page leads to it, at `/satellite/raids/`, laid out as Raid Review's. Raid Review (by ekky and Chazut) is merged into Satellite: everything it showed of a raid is here.

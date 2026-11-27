@@ -15,6 +15,8 @@
   const ROOT = new URL('.', document.baseURI).pathname;
   const HIST = RECORDING && /^raids(\/|$)/.test(location.pathname.slice(ROOT.length));
   if (HIST) document.documentElement.classList.add('hist');
+  // where this page keeps its settings (see read)
+  const STORE = HIST ? 'satelliteHistory' : 'livemap';
   // the page's own words, in the language picked (see lang.js), before anything else is written
   window.fumsLangs.translatePage(document.body);
   // What a thing says when pointed at, in a box of the page's own (#hoverTip), not the browser's slow plain one. Every
@@ -117,6 +119,11 @@
   const ZOOM_MIN_DIVIDER = 1.1;
   // as close as it goes: screen pixels to a metre
   const ZOOM_CLOSEST = 48;
+  // Markers grow with the zoom (Settings > Markers, on to begin with): markers, loot and their labels grow as the
+  // map is zoomed in and shrink as it's zoomed out, as the map itself does, only less (to the power ZOOM_GROW) and
+  // within limits so they stay readable. ZOOM_PLAIN pixels to the metre (following outdoors) is Marker size as set.
+  const ZOOM_PLAIN = 2.5, ZOOM_GROW = 0.6, ZOOM_SCALE = [0.6, 1.5];
+  const zoomScale = () => prefs.worldScale === false ? 1 : Math.min(ZOOM_SCALE[1], Math.max(ZOOM_SCALE[0], Math.pow(zoom / ZOOM_PLAIN, ZOOM_GROW)));
 
   // a lock, by its kind (KeycardDoor: "Keycard door")
   const lockName = kind => T({ Door: 'Door', Trunk: 'Trunk', KeycardDoor: 'Keycard door', Switch: 'lock|Switch', DoorSwitch: 'Door switch' }[kind] || 'Lock');
@@ -340,7 +347,7 @@
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
-    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', floatWorth: -1, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true,
+    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: true, sizeByKind: false,
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
       rosterMore: true, who: true, layout: true, spawnKinds: false, rosterRows: true, bots: true, orbitMap: false, feed: true, areas: false, boxKinds: true,
@@ -349,7 +356,7 @@
   // shown. rosterFog: the Raid list names everyone seen this raid but not who's still alive. latin: names written in
   // Cyrillic are shown in Latin letters (bosses by their English names)
   // botShape, meShape: how bots, and you and your friends, are drawn (see MARKER_SHAPES)
-  for (const k of ['botShape', 'meShape']) if (!['arrow', 'disc', 'chevron', 'cone', 'dot'].includes(prefs[k])) prefs[k] = 'arrow';
+  for (const k of ['botShape', 'meShape']) if (!['arrow', 'disc', 'dart', 'drop', 'chevron', 'cone', 'dot'].includes(prefs[k])) prefs[k] = 'arrow';
   if (!Array.isArray(prefs.lootOff)) prefs.lootOff = [];
   // boxOff: the sorts of container left off the map (see BOX_GLYPH)
   if (!Array.isArray(prefs.boxOff)) prefs.boxOff = [];
@@ -399,8 +406,9 @@
   // nameScale, doingScale: names under markers, and what a bot is doing under its name, each on top of textScale
   prefs.nameScale = Math.min(2, Math.max(0.5, +prefs.nameScale || 1));
   prefs.doingScale = Math.min(2, Math.max(0.5, +prefs.doingScale || 1));
-  // floatWorth: what a pick-up written on the map must be worth (-1: as the map's Worth at least)
-  prefs.floatWorth = Number.isFinite(+prefs.floatWorth) ? +prefs.floatWorth : -1;
+  // floatWorth: what a pick-up written on the map must be worth, apart from Worth at least (a page from before 1.1.0
+  // may say -1, "as Worth at least": it takes what that's set to now)
+  prefs.floatWorth = Number.isFinite(+prefs.floatWorth) && +prefs.floatWorth >= 0 ? +prefs.floatWorth : Math.max(0, +prefs.worth || 0);
   prefs.mapLight = Math.min(100, Math.max(30, +prefs.mapLight || 100));
   prefs.alertSound = prefs.alertSound === true;
   prefs.feedRows = [3, 5, 8, 12].includes(+prefs.feedRows) ? +prefs.feedRows : 5;
@@ -558,39 +566,42 @@
   paintCursor();
   $('optCursor').value = prefs.cursor;
   $('optCursor').onchange = e => { prefs.cursor = e.target.value; save(); paintCursor(); };
+  // The live map and the raid history page keep their settings apart: the live map's as "livemap", the history
+  // page's as "satelliteHistory", so neither changes the other. Only the language is one for both (lang.js reads it
+  // from the live map's). The first time the history page is opened after they were split, it takes over only what
+  // was its own of the settings they shared (a replay's speed, its panels, trails, minimap and kill marks).
   function read() {
-    try { return JSON.parse(localStorage.getItem('livemap') || '{}') || {}; } catch (e) { return {}; }
+    try {
+      const own = localStorage.getItem(STORE);
+      if (!HIST) return JSON.parse(own || '{}') || {};
+      const live = JSON.parse(localStorage.getItem('livemap') || '{}') || {};
+      let mine = own ? JSON.parse(own) || {} : null;
+      if (!mine) {
+        mine = {};
+        for (const k of Object.keys(live)) {
+          if (/^hp/.test(k) || ['minimap', 'killKeep', 'trailMs', 'eventsKind', 'eventsAllFirst', 'eventsAllOnce', 'debugOffOnce'].includes(k)) mine[k] = live[k];
+        }
+      }
+      if (live.lang) mine.lang = live.lang;
+      else delete mine.lang;
+      return mine;
+    } catch (e) { return {}; }
   }
-  // The history page shares the live map's settings (one browser, one set), but saves only what's its own: a replay's
-  // switches. What it changes of the rest (the Raid list shown, the menu, following) stays on the page, so a live map
-  // open in another tab isn't changed under it.
-  const HIST_KEYS = ['heat', 'trails', 'killLines', 'floorOnly', 'hitFlash', 'switches', 'orbitMain', 'orbitRush', 'orbitField', 'phobosField',
-    'orbitHear', 'minimap', 'killKeep', 'trailMs', 'lootFloats', 'grenades', 'squadMarks', 'turns', 'lang', 'hpOpen', 'hpSpeed', 'hpSettings',
-    'shots', 'mapDoing', 'cols', 'hpNoPeople', 'hpNoEvents', 'hpNoFacing', 'hpDebug', 'hpLoot', 'hpLootMap', 'hpSideOff', 'hpRecWho',
-    'lootSprees', 'lowPower', 'hpEventsAll', 'eventsAllOnce', 'debugOffOnce', 'squadCols', 'actionIcons', 'tacticWords', 'teamNames', 'doorEvents', 'floorGrey', 'floorHide', 'floorDim',
-    // (the settings the panel beside a replay's map has: see sideSettings)
-    'hpTab', 'eventsKind', 'eventsAllFirst', 'botShape', 'meShape', 'health', 'healthAll', 'myName', 'latin', 'scale', 'textScale', 'squadParts', 'orbitLines', 'orbitNames', 'orbitFights',
-    'mapLight', 'feed', 'feedMine', 'feedPmc', 'feedBoss', 'feedAi', 'feedNames', 'feedRows', 'feedKeep', 'feedBox', 'feedBg', 'worth', 'itemNames', 'modTints',
-    'peek', 'roofLoot', 'roofTotals', 'roofTotalsUnder', 'otherLoot', 'corpseKind', 'floatWorth', 'chaseRing', 'nameScale', 'doingScale', 'tipGear', 'tipCarry', 'secureShown', 'wishMarks', 'modTeams'];
-  // (the history page's switches as it read them: it writes back only what it changed itself, so a page left open
-  // doesn't put back what the live map changed since, a preset's switches say)
-  let histRead = null;
   function save() {
     try {
       for (const key of NOT_BLACK) if (prefs.cols && blackRefused(key, prefs.cols[key])) delete prefs.cols[key];
-      let keep = prefs;
+      localStorage.setItem(STORE, JSON.stringify(prefs));
+      // (a language picked on the history page: the live map's too, as that's where lang.js reads it)
       if (HIST) {
-        keep = read();
-        for (const k of HIST_KEYS) {
-          if (!(k in prefs)) continue;
-          const now = JSON.stringify(prefs[k]);
-          if (!histRead || histRead[k] !== now) { keep[k] = prefs[k]; if (histRead) histRead[k] = now; }
+        const live = JSON.parse(localStorage.getItem('livemap') || '{}') || {};
+        if (live.lang !== prefs.lang) {
+          if (prefs.lang) live.lang = prefs.lang;
+          else delete live.lang;
+          localStorage.setItem('livemap', JSON.stringify(live));
         }
       }
-      localStorage.setItem('livemap', JSON.stringify(keep));
     } catch (e) { /* private window */ }
   }
-  if (HIST) { histRead = {}; for (const k of HIST_KEYS) histRead[k] = JSON.stringify(prefs[k]); }
 
   // ---- state ---------------------------------------------------------------------------------------------------
   let maps = [];
@@ -661,7 +672,8 @@
   let questsPrint = null;
   let find = '';                // what the search box asks for, lower case; '' for nothing
   // The menu: one panel with a tab each for the raid, its loot, the quests, the map and the settings.
-  const TABS = ['raid', 'loot', 'quests', 'map', 'presets'].concat(RECORDING ? ['history'] : [], ['settings']);
+  // (raid history has a page of its own, with its own settings: the live map's menu has no tab for it)
+  const TABS = ['raid', 'loot', 'quests', 'map', 'presets', 'settings'];
   let tab = TABS.includes(prefs.tab) ? prefs.tab : 'raid';
   // A phone, upright or on its side: the menu is a sheet (from the bottom, or down the right), and the map's buttons
   // are round ones down its right edge (see placeQuick).
@@ -3470,6 +3482,10 @@
           put(s, [it.x, it.y, it.z], badge('!', LAYERS.quest.col, '#0c0c12', '#0c0c12', 'diamond', size * 1.05));
         } else if (fir) {
           put(s, [it.x, it.y, it.z], badge('i:fir', LAYERS.firItems.col, '#0c0c12', '#0c0c12', 'hex', size * 0.95));
+        } else if (onWish) {
+          // on the wishlist: a badge of its own, as a found-in-raid need has (one that's both keeps that one's, with
+          // the wishlist's ring and star round it)
+          put(s, [it.x, it.y, it.z], badge('i:star', WISH_COL, '#0c0c12', '#0c0c12', 'round', size * 0.95));
         } else {
           ctx.globalAlpha = away([it.x, it.y, it.z]) ? Math.max(0.15, faint) : 1;
           ctx.beginPath();
@@ -3481,13 +3497,13 @@
           ctx.stroke();
           ctx.globalAlpha = 1;
         }
-        const marked = quest || !!fir;
+        const wishBadge = onWish && !fir, marked = quest || !!fir || wishBadge;
         if (match) ring(s, marked ? size * 0.9 : r + 4);
-        else if (onWish) ring(s, marked ? size * 0.9 : r + 4, WISH_COL);
-        if (onWish) star(s, marked ? size * 0.9 : r + 4);
+        else if (onWish && !wishBadge) ring(s, size * 0.9, WISH_COL);
+        if (onWish && !wishBadge) star(s, size * 0.9);
         const short = (names[it.tpl] || {}).s || nameOf(it.tpl);
         const named = match || (marked && zoom >= 3) || (prefs.itemNames && close);
-        if (named) write(short, 10 * scale, s[0], s[1] + (marked ? size * 0.7 : r * 1.3), quest ? LAYERS.quest.col : fir ? LAYERS.firItems.col : '#e8e9eb', away([it.x, it.y, it.z]) ? 0.5 : 0.95);
+        if (named) write(short, 10 * scale, s[0], s[1] + (marked ? size * 0.7 : r * 1.3), quest ? LAYERS.quest.col : fir ? LAYERS.firItems.col : wishBadge ? WISH_COL : '#e8e9eb', away([it.x, it.y, it.z]) ? 0.5 : 0.95);
         // its worth beside its name, in its colour as a container's is (a quest item says whose quest instead)
         const whose = w => w && w[2] ? T("{who}'s quest", { who: w[2] }) : '';
         const why = want ? want[0].name + (want[1].text ? ': ' + want[1].text : '') : it.q ? T('Quest item') : '';
@@ -4012,12 +4028,21 @@
   // a PMC who came in with others: their team's colour (Settings > Team colours), for their marker and trail
   const teamColOf = m => m.c === 'Enemy Player' && prefs.squadCols && teamKey(m) && squadOf(m) ? squadCol(squadNo(teamKey(m))) : null;
   const DOING_COL = { SAIN: '#ff8d84', COMET: '#ffc56e', ORBIT: '#9fd8ff', QuestingBots: '#b7e3a1', Phobos: '#b7e3a1' };
+  // a colour as the canvas gives it back ("#rrggbb", or "rgba(..)" once it's see-through), at alpha a
+  const seeThrough = (col, a) => {
+    if (/^#[0-9a-f]{6}$/i.test(col)) return col + Math.round(a * 255).toString(16).padStart(2, '0');
+    const m = /^rgba?\(([^,]+),([^,]+),([^,)]+)/.exec(col);
+    return m ? 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + a + ')' : col;
+  };
   function drawMarker(m, strong, scale) {
     const kind = KINDS[m.c] || OTHER;
     const at = toScreen(m.cx, m.cy);
     const x = at[0], y = at[1];
     if (x < -150 || y < -150 || x > vw + 150 || y > vh + 150) return;
-    const r = 8 * scale * kind.size * (strong ? 1.2 : 1);
+    // (people and bots all one size, unless Bigger me, bosses and friends is on: then each kind's own size, and the
+    // one followed bigger again)
+    const even = prefs.sizeByKind !== true && PEOPLE_OR_BOTS(m.c);
+    const r = 8 * scale * (even ? 1 : kind.size * (strong ? 1.2 : 1));
     const col = m.c === 'Extract' && m.st !== undefined ? EXIT_COL[m.st] || kind.col
       : m.c === 'Transit' && m.st === 0 ? EXIT_COL[0]
       : m.c === 'Corpse' && prefs.corpseKind && m.was && KINDS[m.was] ? KINDS[m.was].col
@@ -4078,50 +4103,61 @@
       // the shape picked (Settings > Markers): one for bots, one for you and your friends; each within the arrow's
       // reach (r × 1.25), where the health bar, team badge and name are put
       const shape = m.c === 'Main Player' || m.c === 'Friendly Player' ? prefs.meShape : prefs.botShape;
-      if (shape === 'disc') {
-        // a disc with a small pointer on its rim, the way it faces
-        ctx.moveTo(0, -r * 1.28);
-        ctx.lineTo(r * 0.42, -r * 0.6);
-        ctx.lineTo(-r * 0.42, -r * 0.6);
+      if (shape === 'disc' || shape === 'dart') {
+        // a dot a little behind the middle, and just ahead of it, the way it faces, an arrowhead with its tip rounded
+        // off: a broad one (Circle with a pointer), or a slim dart with a deep notch (Circle with a dart)
+        const dart = shape === 'dart', tip = -r * (dart ? 1.25 : 1.2), wing = r * (dart ? 0.5 : 0.64);
+        const back = -r * (dart ? 0.3 : 0.32), notch = -r * (dart ? 0.58 : 0.5);
+        ctx.arc(0, r * (dart ? 0.3 : 0.28), r * (dart ? 0.54 : 0.56), 0, Math.PI * 2);
         ctx.closePath();
+        ctx.moveTo(-r * 0.12, tip + r * 0.16);
+        ctx.quadraticCurveTo(0, tip - r * 0.04, r * 0.12, tip + r * 0.16);
+        ctx.lineTo(wing, back);
+        ctx.lineTo(0, notch);
+        ctx.lineTo(-wing, back);
+        ctx.closePath();
+        if (!dart) ctx.lineWidth *= 1.15;
         ctx.stroke();
         ctx.fill();
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fill();
-        // (the pointer's foot, under the disc's rim, filled over again so the two read as one)
-        ctx.beginPath();
-        ctx.moveTo(r * 0.36, -r * 0.62);
-        ctx.lineTo(0, -r * 0.95);
-        ctx.lineTo(-r * 0.36, -r * 0.62);
+      } else if (shape === 'drop') {
+        // a drop: a round body, narrowing to a point the way it faces (the body a little behind the middle, so the
+        // whole of it stays within the arrow's reach)
+        const cy = r * 0.15, R = r * 0.8, tip = -r * 1.25, side = Math.acos(R / (cy - tip));
+        ctx.lineJoin = 'round';
+        ctx.moveTo(0, tip);
+        ctx.arc(0, cy, R, -Math.PI / 2 + side, Math.PI * 1.5 - side);
         ctx.closePath();
+        ctx.stroke();
         ctx.fill();
       } else if (shape === 'chevron') {
-        ctx.moveTo(0, -r * 1.2);
-        ctx.lineTo(r * 1.0, r * 0.55);
-        ctx.lineTo(r * 0.5, r * 0.9);
-        ctx.lineTo(0, r * 0.05);
-        ctx.lineTo(-r * 0.5, r * 0.9);
-        ctx.lineTo(-r * 1.0, r * 0.55);
+        // slim arms, tapering to a sharp point
+        ctx.moveTo(0, -r * 1.25);
+        ctx.lineTo(r * 0.95, r * 0.78);
+        ctx.lineTo(r * 0.5, r * 0.95);
+        ctx.lineTo(0, -r * 0.12);
+        ctx.lineTo(-r * 0.5, r * 0.95);
+        ctx.lineTo(-r * 0.95, r * 0.78);
         ctx.closePath();
         ctx.stroke();
         ctx.fill();
       } else if (shape === 'cone') {
-        // a dot, and a pale cone the way it faces
+        // a small dot, and the way it looks: a cone in its colour, fading out with distance
+        const fade = ctx.createRadialGradient(0, 0, r * 0.3, 0, 0, r * 2.3);
+        fade.addColorStop(0, seeThrough(ctx.fillStyle, 0.5));
+        fade.addColorStop(1, seeThrough(ctx.fillStyle, 0));
         ctx.save();
-        ctx.globalAlpha *= 0.4;
+        ctx.fillStyle = fade;
         ctx.moveTo(0, 0);
-        ctx.arc(0, 0, r * 1.25, -Math.PI / 2 - 0.6, -Math.PI / 2 + 0.6);
+        ctx.arc(0, 0, r * 2.3, -Math.PI / 2 - 0.48, -Math.PI / 2 + 0.48);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 0.52, 0, Math.PI * 2);
         ctx.stroke();
         ctx.fill();
       } else if (shape === 'dot') {
-        ctx.arc(0, 0, r * 0.75, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 0.52, 0, Math.PI * 2);
         ctx.stroke();
         ctx.fill();
       } else {
@@ -5093,17 +5129,18 @@
   // Recording as the server has it: on (config.jsonc's history.record) and stopped (the REC button), asked at the start,
   // once a minute and when it's pressed
   let recState = { on: true, paused: false }, recPrint = '';
-  // Prices as the server gives them (Loot > Filters > Prices): the flea's, or the handbook's for a game without it.
-  // Changed, the page is loaded again, so everything already priced is priced the new way.
-  async function askPrices(handbook) {
+  // Prices as the server gives them (Loot > Filters > Prices): the most it sells for (the flea's or the best trader's),
+  // the best trader's, the flea's, or the handbook's for a game without it. Changed, the page is loaded again, so everything already
+  // priced is priced the new way. (A server older than 1.1.0 says only "handbook", and knows no "most".)
+  async function askPrices(mode) {
     try {
-      const r = await fetch('api/prices' + (handbook === undefined ? '' : '?handbook=' + (handbook ? 1 : 0)), handbook === undefined ? undefined : { method: 'POST' });
+      const r = await fetch('api/prices' + (mode === undefined ? '' : '?mode=' + mode + '&handbook=' + (mode === 'handbook' ? 1 : 0)), mode === undefined ? undefined : { method: 'POST' });
       const j = await answered(r).json();
-      $('optPrices').value = j.handbook ? 'handbook' : 'flea';
-      if (handbook !== undefined) location.reload();
+      $('optPrices').value = ['most', 'trader', 'flea', 'handbook'].includes(j.mode) ? j.mode : j.handbook ? 'handbook' : 'flea';
+      if (mode !== undefined) location.reload();
     } catch (e) { /* as it was */ }
   }
-  $('optPrices').onchange = e => askPrices(e.target.value === 'handbook');
+  $('optPrices').onchange = e => askPrices(e.target.value);
   askPrices();
   async function askRec(paused) {
     if (!RECORDING) return;
@@ -5154,7 +5191,7 @@
     drawn = [];
     showScale();
     if (!map) return;
-    const scale = prefs.scale;
+    const scale = prefs.scale * zoomScale();
     drawZones(scale);
     drawHeat();
     drawFloorEdge();
@@ -6293,6 +6330,13 @@
   // fights; COMET amber, likewise; ORBIT blue; an ORBIT ghost dashed grey; the game's own brain plain) and what it
   // carries, in its worth's colour.
   const PS_HOT = ['wreckless', 'gigachad', 'chad', 'snappingturtle'], PS_MEEK = ['timmy', 'coward', 'rat'];
+  // a bot's difficulty and SAIN personality, added to what its row says when pointed at
+  const traitsSaid = (row, m) => {
+    const lines = [];
+    if (m.df && prefs.botDiff !== false) lines.push(T('Difficulty') + ': ' + (DIFFICULTY[m.df] || m.df));
+    if (m.ps && prefs.botSAIN !== false) lines.push(T('SAIN personality') + ': ' + m.ps);
+    if (lines.length) row.title = (row.title ? row.title + '\n' : '') + lines.join('\n');
+  };
   const chip = (text, cls, title) => {
     const c = document.createElement('i');
     c.className = 'chip ' + cls;
@@ -6322,13 +6366,7 @@
     if (part >= 0.98) fill.style.opacity = '0.45';
     bar.appendChild(fill);
     row.appendChild(bar);
-    // the number, by the name: faint while whole
-    const num = document.createElement('small');
-    num.className = 'hpNum' + (part >= 0.98 ? ' whole' : '');
-    num.textContent = Math.round(m.hp[0]);
-    if (part < 0.98) num.style.color = hpCol(part);
-    num.title = hpSaid(m);
-    row.insertBefore(num, row.querySelector('small'));
+    // (no number by the name: the bar says it, and pointed at, the row gives it in full)
     row.title = (row.title ? row.title + '\n' : '') + hpSaid(m);
   };
   const botLine = (row, m) => {
@@ -6366,18 +6404,15 @@
       const chips = document.createElement('span');
       chips.className = 'chips';
       if (details) {
-        if (m.df) chips.appendChild(chip(DIFFICULTY[m.df] || m.df, 'df df-' + String(m.df).toLowerCase(), T('Difficulty')));
-        if (m.ps) {
-          const key = String(m.ps).toLowerCase().replace(/[^a-z]/g, '');
-          chips.appendChild(chip(m.ps, 'ps' + (PS_HOT.includes(key) ? ' hot' : PS_MEEK.includes(key) ? ' meek' : ''), T('SAIN personality')));
-        }
-        if (!modOn('SAIN')) chips.classList.add('noPs');
+        // (how hard it is and its SAIN personality: said when it's pointed at, so the row holds only what it's doing
+        // and what it's worth)
+        traitsSaid(row, m);
         if (prefs.rosterDoing !== false) {
           // there for every bot, so the rows don't change as what they do comes and goes
           const doing = document.createElement('span');
           doing.className = 'doing';
           for (const tag of doingTags()) doing.appendChild(tag);
-          chips.appendChild(doing);
+          if (doing.childNodes.length) chips.appendChild(doing);
         }
       }
       if (carried && carried.total) {
@@ -6481,10 +6516,10 @@
     const box = $('roster');
     box.textContent = '';
     rosterFar = new Map();
-    // how many of each kind, at the top
+    // how many of each kind, at the top: only while the list is nearest first (in groups, each group's title says)
     const sum = $('rosterSum');
     sum.textContent = '';
-    for (const kind of ROSTER) {
+    for (const kind of near ? ROSTER : []) {
       const count = rows.filter(m => m.c === kind).length;
       if (!count) continue;
       const tag = chip((ONE[kind] || kind) + ' ' + count, 'count' + (rosterIsShut(kind) && !near ? ' shut' : ''), KINDS[kind].name + (near ? '' : '. ' + T('Press to fold these away, or show them')));
@@ -6529,14 +6564,7 @@
         state.title = m.fogDead ? T('Killed by a player, or you have been by its body') : T('Not known whether still alive');
         row.insertBefore(state, row.children[2] || null);
         teamDot(row, m);
-        if (prefs.botDetails && (m.df || m.ps)) {
-          const chips = document.createElement('span');
-          chips.className = 'chips';
-          if (m.df) chips.appendChild(chip(DIFFICULTY[m.df] || m.df, 'df df-' + String(m.df).toLowerCase(), T('Difficulty')));
-          if (m.ps) chips.appendChild(chip(m.ps, 'ps', T('SAIN personality')));
-          row.classList.add('two');
-          row.appendChild(chips);
-        }
+        if (prefs.botDetails) traitsSaid(row, m);
         return row;
       }
       const row = sideRow(m.t || (ONE[m.c] || m.c), sub(m), KINDS[m.c].col, go(m));
@@ -8557,6 +8585,7 @@
     };
     entry($('keyForms'), picture('i:boxCrate', 'square', '#7c7f8f'), T('Container'));
     entry($('keyForms'), picture('i:lock', 'hex', LAYERS.locks.col), T('Lock'));
+    entry($('keyForms'), (() => { const b = picture('i:star', 'round', '#0c0c12'); b.firstChild.src = badge('i:star', WISH_COL, '#0c0c12', '#0c0c12', 'round', 22).toDataURL(); return b; })(), T('On your wishlist'));
     // the Map tab's key was written with emoji: each is swapped for the picture the map draws (an emoji may or may
     // not carry a variation selector, U+FE0F, so they're matched without it)
     const plain = text => text.replace(/️/g, '');
@@ -8696,8 +8725,8 @@
   if ($('optWorth').value !== String(prefs.worth)) $('optWorth').value = '20000';
   $('optWorth').onchange = e => { prefs.worth = +e.target.value || 0; save(); dirty = true; };
   $('optFloatWorth').value = String(prefs.floatWorth);
-  if ($('optFloatWorth').value !== String(prefs.floatWorth)) $('optFloatWorth').value = '-1';
-  $('optFloatWorth').onchange = e => { prefs.floatWorth = Number.isFinite(+e.target.value) ? +e.target.value : -1; save(); };
+  if ($('optFloatWorth').value !== String(prefs.floatWorth)) $('optFloatWorth').value = '0';
+  $('optFloatWorth').onchange = e => { prefs.floatWorth = Math.max(0, +e.target.value || 0); save(); };
   // which way up this map is: as the maps people know have it, or turned by hand (kept for each map)
   $('optTurn').onchange = e => {
     if (!map) return;
@@ -8822,7 +8851,7 @@
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],
     ['optOrbitFights', 'orbitFights'], ['optOrbitHear', 'orbitHear'], ['optRoofLoot', 'roofLoot'], ['optRoofTotals', 'roofTotals'], ['optRoofTotalsUnder', 'roofTotalsUnder'], ['optAlertSound', 'alertSound'], ['optFeedKeep', 'feedKeep'], ['optFeedBox', 'feedBox'],
-    ['optChaseRing', 'chaseRing'], ['optTipGear', 'tipGear'], ['optTipCarry', 'tipCarry'], ['optSecureShown', 'secureShown'], ['optWishMarks', 'wishMarks'], ['optModTeams', 'modTeams']]) {
+    ['optChaseRing', 'chaseRing'], ['optTipGear', 'tipGear'], ['optTipCarry', 'tipCarry'], ['optSecureShown', 'secureShown'], ['optWishMarks', 'wishMarks'], ['optModTeams', 'modTeams'], ['optWorldScale', 'worldScale'], ['optSizeByKind', 'sizeByKind']]) {
     $(id).checked = !!prefs[key];
     $(id).onchange = e => { prefs[key] = e.target.checked; save(); dirty = true; rosterPrint = bestPrint = null; tipFor = null; feedPrint = ''; listRoster(); showKills(); };
   }
@@ -10010,12 +10039,19 @@
     }
   }
 
-  // The heat map: how long people spent where, over the whole raid. Each one's path is filled in between the places
-  // recorded (so somebody running leaves a trail, not a row of dots), every metre weighted by the time spent on it,
-  // then softened into a smooth field and coloured from blue (a little) through green and yellow to red (a lot).
-  // It's a picture of the whole map, made once (again when the kinds shown or the floor change), and laid on the map
-  // as the map moves, so it reads the same at any zoom; the map under it is dimmed. The minimap shows it too.
-  const HEAT_SOFT = 3.5, HEAT_GAP = 6000, HEAT_JUMP = 40;
+  // The heat map: where people went over the whole raid, and how many of them. Each one's path is filled in between
+  // the places recorded (so somebody running leaves a trail, not a row of dots), and each square metre counts each
+  // person once, however long they stood there: a guard or a sniper camping one spot all raid is one person there,
+  // not a red blot, and a route many took is what glows. Softened into a smooth field some metres wide and coloured
+  // from blue (one went by) through green and yellow to red (the most of anywhere). It's softened by a few pixels on
+  // the screen, not metres, so a way someone went reads as the same soft band however far in or out the map is: the
+  // count of the whole map is made once (again when the kinds shown or the floor change), and a picture of it for
+  // each step of zoom, kept, laid on the map as it moves; the map under it is dimmed. The minimap shows it too.
+  const HEAT_PX = 4, HEAT_GAP = 6000, HEAT_JUMP = 40;
+  // the softening, in squares, kept to a few sizes so zooming makes only a few pictures
+  const HEAT_STEPS = [1, 2, 3, 4, 6, 8, 11, 16, 22, 32, 45];
+  // how solid the heat is at its busiest (the map shows through everywhere)
+  const HEAT_SEE = 0.6;
   let heatLut = null;
   function heatRamp() {
     if (heatLut) return heatLut;
@@ -10050,70 +10086,100 @@
     return a;
   }
   // the heat of a replay, as a picture of the whole map: { img, cell, print } (null while the scan isn't done)
-  function heatPicture() {
+  // (perMetre: how many pixels a metre is where it's laid)
+  function heatPicture(perMetre) {
     const s = replay && scanReplay(replay);
     if (!s || !s.done || !map) return null;
     const kinds = new Set([...s.heat.keys()].filter(k => !isHidden(k) && !prefs.areaKinds.includes(k)));
     const print = [...kinds].join(',') + '|' + map.loc + '|' + (prefs.floorOnly ? floorShown.place + ':' + floorShown.n : '');
-    if (s.heatPic && s.heatPic.print === print) return s.heatPic;
+    if (!s.heatCount || s.heatCount.print !== print) s.heatCount = heatCount(s, kinds, print);
+    const hc = s.heatCount, want = HEAT_PX / Math.max(1e-3, perMetre) / hc.cell;
+    const r = HEAT_STEPS.reduce((best, n) => Math.abs(Math.log(n / want)) < Math.abs(Math.log(best / want)) ? n : best, HEAT_STEPS[0]);
+    if (hc.pics.has(r)) return hc.pics.get(r);
+    // (while the map is still zooming: the nearest picture made already, so zooming stays smooth; the right one is
+    // made once it's settled)
+    if (hc.pics.size && Math.abs(zoom - zoomTarget) > zoom * 0.01) {
+      dirty = true;
+      return [...hc.pics].reduce((best, p) => Math.abs(Math.log(p[0] / r)) < Math.abs(Math.log(best[0] / r)) ? p : best)[1];
+    }
+    hc.pics.set(r, heatShade(hc, r));
+    return hc.pics.get(r);
+  }
+  // how many people went by each square of the map: { grid, w, h, cell, print, pics (softening -> picture) }
+  function heatCount(s, kinds, print) {
     // a square a metre across, coarser on a big map (no more than about 1100 across)
     const spanX = map.max.x - map.min.x, spanY = map.max.y - map.min.y, cell = Math.max(1, Math.max(spanX, spanY) / 1100);
     const w = Math.max(1, Math.ceil(spanX / cell)), h = Math.max(1, Math.ceil(spanY / cell)), grid = new Float32Array(w * h);
-    const add = (x, y, z, sec) => {
+    // (the squares the one being added has been in: each counts them once)
+    let been = new Set();
+    const add = (x, y, z) => {
       if (offFloor(x, y, z)) return;
       const cx = Math.floor((x - map.min.x) / cell), cy = Math.floor((y - map.min.y) / cell);
-      if (cx >= 0 && cy >= 0 && cx < w && cy < h) grid[cy * w + cx] += sec;
+      if (cx < 0 || cy < 0 || cx >= w || cy >= h) return;
+      const at = cy * w + cx;
+      if (been.has(at)) return;
+      been.add(at);
+      grid[at] += 1;
     };
     for (const track of s.tracks.values()) {
       if (!kinds.has(track.c)) continue;
+      been = new Set();
       const { t, x, y, z } = track;
+      if (t.length) add(x[0], y[0], z[0]);
       for (let i = 1; i < t.length; i++) {
         const dt = t[i] - t[i - 1], d = Math.hypot(x[i] - x[i - 1], y[i] - y[i - 1]);
         // (a gap in the recording, or a jump across the map: not walked, so not filled in)
-        if (dt > HEAT_GAP || d > HEAT_JUMP) { add(x[i], y[i], z[i], 0.5); continue; }
-        const steps = Math.max(1, Math.ceil(d / (cell * 0.75))), sec = dt / 1000 / steps;
+        if (dt > HEAT_GAP || d > HEAT_JUMP) { add(x[i], y[i], z[i]); continue; }
+        const steps = Math.max(1, Math.ceil(d / (cell * 0.75)));
         for (let k = 1; k <= steps; k++) {
           const f = k / steps;
-          add(x[i - 1] + (x[i] - x[i - 1]) * f, y[i - 1] + (y[i] - y[i - 1]) * f, z[i - 1] + (z[i] - z[i - 1]) * f, sec);
+          add(x[i - 1] + (x[i] - x[i - 1]) * f, y[i - 1] + (y[i] - y[i - 1]) * f, z[i - 1] + (z[i] - z[i - 1]) * f);
         }
       }
     }
-    const soft = blurGrid(grid, w, h, Math.max(1, Math.round(HEAT_SOFT / cell)));
-    // "a lot" is what the busiest places have (the top one in a hundred of the squares anyone was in), on a log
-    // scale, so a few minutes camped in one spot doesn't drown the rest
-    const busy = [];
-    for (let i = 0; i < soft.length; i += 3) if (soft[i] > 0.0005) busy.push(soft[i]);
-    busy.sort((p, q) => p - q);
-    const top = Math.log1p(busy.length ? busy[Math.floor(busy.length * 0.99)] * 40 : 1);
+    return { grid, w, h, cell, print, pics: new Map() };
+  }
+  // the count softened by r squares and coloured: { img, cell, w, h }
+  function heatShade(hc, r) {
+    const { w, h, cell } = hc;
+    const soft = blurGrid(Float32Array.from(hc.grid), w, h, r);
+    // "the most" is what the busiest places have (the top one in two hundred of the squares anyone went by), and the
+    // scale is eased (a square root) so one person's way is still plain to see beside a route everybody took
+    const busy = new Float32Array(Math.ceil(soft.length / 3));
+    let n = 0;
+    for (let i = 0; i < soft.length; i += 3) if (soft[i] > 1e-6) busy[n++] = soft[i];
+    const went = busy.subarray(0, n).sort();
+    const top = n ? went[Math.min(n - 1, Math.floor(n * 0.995))] : 1;
     const img = document.createElement('canvas');
     img.width = w;
     img.height = h;
     const g = img.getContext('2d'), out = g.createImageData(w, h), px = out.data, lut = heatRamp();
     for (let i = 0; i < soft.length; i++) {
-      if (soft[i] <= 0.0005) continue;
-      const v = Math.min(1, Math.log1p(soft[i] * 40) / top);
+      if (soft[i] <= 1e-6) continue;
+      const v = Math.sqrt(Math.min(1, soft[i] / top));
       if (v < 0.03) continue;
       const k = Math.min(255, Math.round(v * 255)) * 4, o = i * 4;
       px[o] = lut[k]; px[o + 1] = lut[k + 1]; px[o + 2] = lut[k + 2];
-      // faint at the edges, solid where it's busy
-      px[o + 3] = Math.round(255 * Math.min(0.88, 0.12 + v * 1.25));
+      // see-through: from nothing at the very edges, rising smoothly, to at most HEAT_SEE where it's busy
+      const e = Math.min(1, (v - 0.03) / 0.5);
+      px[o + 3] = Math.round(255 * HEAT_SEE * e * e * (3 - 2 * e));
     }
     g.putImageData(out, 0, 0);
-    return s.heatPic = { img, cell, print, w, h };
+    return { img, cell, w, h };
   }
   // the picture laid on the map: square by square onto the map's own metres, however it's turned
   function layHeat(g, pic, place) {
     const o = place(map.min.x, map.min.y), ex = place(map.min.x + pic.cell, map.min.y), ey = place(map.min.x, map.min.y + pic.cell);
     g.save();
     g.transform(ex[0] - o[0], ex[1] - o[1], ey[0] - o[0], ey[1] - o[1], o[0], o[1]);
+    // (the browser's usual smoothing: "high" is slow on a picture this big, drawn every frame)
     g.imageSmoothingEnabled = true;
-    g.imageSmoothingQuality = 'high';
     g.drawImage(pic.img, 0, 0);
     g.restore();
   }
   function drawHeat() {
     if (!replay || !prefs.heat || !map) return;
-    const pic = heatPicture();
+    const pic = heatPicture(zoom);
     ctx.save();
     ctx.fillStyle = 'rgba(6, 6, 12, 0.55)';
     ctx.fillRect(0, 0, vw, vh);
@@ -10812,7 +10878,7 @@
       mini.whole = whole;
     }
     // where everybody has been: the heat map's own picture, small (see heatPicture)
-    const pic = heatPicture();
+    const pic = heatPicture(W / Math.max(1, map.max.x - map.min.x));
     const g = mini.el.getContext('2d');
     g.setTransform(ratio, 0, 0, ratio, 0, 0);
     g.clearRect(0, 0, W, H);
@@ -10900,8 +10966,9 @@
   // the map's legend, over the Raid list down the left (see showKey)
   const hpLegend = mk('details');
   hpLegend.id = 'hpLegend';
-  hpLegend.open = true;
-  hpLegend.append(mk('summary', '', T('Key')), mk('div', '', ''));
+  hpLegend.open = prefs.hpOpen && prefs.hpOpen.legend === true;
+  hpLegend.ontoggle = () => { prefs.hpOpen = Object.assign({}, prefs.hpOpen, { legend: hpLegend.open }); save(); };
+  hpLegend.append(mk('summary', '', T('What the marks mean')), mk('div', '', ''));
   hpLegend.lastChild.id = 'hpLegendBody';
   const hpUrl = (id, tab) => 'raids/' + (id ? encodeURIComponent(id) + (tab && tab !== 'overview' && tab !== 'list' ? '/' + tab : '') : '');
   // a link to a view: gone to on the page itself, or in another tab as any link (Ctrl, the middle button)
@@ -11523,11 +11590,11 @@
       const more = body.insertRow(), cell = more.insertCell();
       more.className = 'detail';
       cell.colSpan = cols.length;
-      const follow = mk('button', 'linkBtn', T('Follow on the map'));
+      const follow = mk('button', 'linkBtn follow', '▶ ' + T('Follow on the map'));
       follow.type = 'button';
       follow.onclick = e => { e.stopPropagation(); rvGo(Math.max(p.spawn || 0, 0) + 2500, null, p.id); };
       if (p.id !== null) cell.appendChild(follow);
-      if (!p.killList.length && !p.died) cell.appendChild(mk('span', 'dim', T('No kills.')));
+      if (!p.killList.length && !p.died) cell.appendChild(mk('div', 'dim noKills', T('No kills.')));
       for (const e of p.killList) {
         const b = mk('button', 'linkBtn killLine', clockText(e.rt) + '  ' + T('killed') + ' ' + (e.nm ? latin(e.nm) : ONE[e.d.vk] || e.d.vk || '') + (killSaid(e.d) ? ' · ' + killSaid(e.d) : ''));
         b.type = 'button';
@@ -12126,7 +12193,7 @@
   // in groups. Each is the menu's own control, mirrored: changed through it, so both pages keep the same, with its
   // name and its explanation as the menu has them. Made once; brought up to date each time it's shown.
   const SIDE_SETTINGS = [
-    ['markers', T('Markers and names'), ['optBotShape', 'optMeShape', 'optScale', 'optTextScale', 'optNameScale', 'optDoingScale', 'optChaseRing', 'optMyName', 'optLatin', 'optHealth', 'optHealthAll']],
+    ['markers', T('Markers and names'), ['optBotShape', 'optMeShape', 'optScale', 'optWorldScale', 'optSizeByKind', 'optTextScale', 'optNameScale', 'optDoingScale', 'optChaseRing', 'optMyName', 'optLatin', 'optHealth', 'optHealthAll']],
     ['people', T('People and bots'), ['optSquadMarks', 'optModTeams', 'optTeamNames', 'optSquadCols', 'optMapDoing', 'optActionIcons', 'optTacticWords', 'optSquadParts', 'optDoorEvents']],
     ['onMap', T('On the map'), ['optShots', 'optLootFloats', 'optFloatWorth', 'optHitFlash', 'optKillLines', 'optGrenades', 'optSwitches', 'optKillKeep', 'optTrailMs', 'optMinimap']],
     ['orbit', T('ORBIT on the map'), ['optOrbitMain', 'optOrbitRush', 'optOrbitLines', 'optOrbitNames', 'optOrbitFights', 'optOrbitHear', 'optOrbitField', 'optPhobosField']],
@@ -12135,6 +12202,54 @@
     ['feed', T('Kill feed'), ['optFeed', 'optFeedMine', 'optFeedPmc', 'optFeedBoss', 'optFeedAi', 'optFeedNames', 'optFeedRows', 'optFeedKeep', 'optFeedBox', 'optFeedBg']],
     ['screen', T('Screen'), ['optMapLight', 'optTurn', 'optLowPower']],
     ['colours', T('Colours'), []]];
+  // ---- copying settings over from the other page --------------------------------------------------------------
+  // The live map and Raid history keep their settings apart (see read); either can take groups of them from the
+  // other, ticked by what they're about (as the history page's settings panel groups them), then loads again.
+  const COPY_GROUPS = [
+    ['markers', T('Markers and names'), ['botShape', 'meShape', 'scale', 'worldScale', 'sizeByKind', 'textScale', 'nameScale', 'doingScale', 'chaseRing', 'myName', 'latin', 'health', 'healthAll']],
+    ['people', T('People and bots'), ['squadMarks', 'modTeams', 'teamNames', 'squadCols', 'mapDoing', 'actionIcons', 'tacticWords', 'squadParts', 'doorEvents']],
+    ['onMap', T('On the map'), ['shots', 'lootFloats', 'floatWorth', 'hitFlash', 'killLines', 'grenades', 'switches', 'killKeep', 'trailMs', 'minimap']],
+    ['orbit', T('ORBIT on the map'), ['orbitMain', 'orbitRush', 'orbitLines', 'orbitNames', 'orbitFights', 'orbitHear', 'orbitField', 'phobosField']],
+    ['floors', T('Floors'), ['floorOnly', 'floorDim', 'floorGrey', 'floorHide', 'otherLoot']],
+    ['loot', T('Loot'), ['worth', 'peek', 'wishMarks', 'tipGear', 'tipCarry', 'secureShown', 'itemNames', 'modTints', 'roofLoot', 'roofTotals', 'roofTotalsUnder']],
+    ['feed', T('Kill feed'), ['feed', 'feedMine', 'feedPmc', 'feedBoss', 'feedAi', 'feedNames', 'feedRows', 'feedKeep', 'feedBox', 'feedBg']],
+    ['screen', T('Screen'), ['mapLight', 'turns', 'lowPower']],
+    ['colours', T('Colours'), ['cols']]];
+  // the ticks, the copy button and what it says: into box
+  function copyFromOther(box) {
+    const picked = new Set(Array.isArray(prefs.copyPick) ? prefs.copyPick : ['colours']);
+    box.appendChild(mk('p', '', HIST ? T("Take settings from the live map: the ticked groups replace this page's own, and the page loads again.")
+      : T("Take settings from Raid history: the ticked groups replace this page's own, and the page loads again.")));
+    const grid = mk('div', 'filterGrid');
+    for (const [key, title] of COPY_GROUPS) {
+      const row = mk('label', 'row'), tick = mk('input');
+      tick.type = 'checkbox';
+      tick.checked = picked.has(key);
+      tick.onchange = () => { if (tick.checked) picked.add(key); else picked.delete(key); prefs.copyPick = [...picked]; save(); };
+      row.append(tick, mk('span', '', title));
+      grid.appendChild(row);
+    }
+    box.appendChild(grid);
+    const go = mk('button', 'linkBtn', HIST ? T('Copy from the live map') : T('Copy from Raid history')), said = mk('p', 'dim');
+    go.type = 'button';
+    go.onclick = () => {
+      let from = null;
+      try { from = JSON.parse(localStorage.getItem(HIST ? 'livemap' : 'satelliteHistory') || 'null'); } catch (e) { /* none */ }
+      if (!from || typeof from !== 'object') {
+        said.textContent = HIST ? T("Nothing to copy yet: the live map hasn't been opened in this browser.") : T("Nothing to copy yet: Raid history hasn't been opened in this browser.");
+        return;
+      }
+      if (!picked.size) { said.textContent = T('Tick what to copy first.'); return; }
+      for (const [key, , keys] of COPY_GROUPS) {
+        if (!picked.has(key)) continue;
+        for (const k of keys) if (k in from) prefs[k] = JSON.parse(JSON.stringify(from[k]));
+      }
+      save();
+      location.reload();
+    };
+    box.append(go, said);
+  }
+  if (!HIST && $('copyFrom')) copyFromOther($('copyFrom'));
   const sideTwins = [];
   // one of the menu's controls, mirrored: a switch, a list to pick from or a slider, named as in the menu
   function sideTwin(id) {
@@ -12173,6 +12288,14 @@
   }
   function sideSettings(box) {
     if (!box.childElementCount) {
+      // (first: taking settings from the live map, folded to begin with)
+      const copy = mk('details', 'setGroup');
+      copy.dataset.k = 'copy';
+      copy.open = prefs.hpOpen['set:copy'] === true;
+      copy.ontoggle = () => { prefs.hpOpen['set:copy'] = copy.open; save(); };
+      copy.appendChild(mk('summary', '', T('Copy from the live map')));
+      copyFromOther(copy);
+      box.appendChild(copy);
       for (const [key, title, ids] of SIDE_SETTINGS) {
         const group = mk('details', 'setGroup');
         group.dataset.k = key;
@@ -12872,35 +12995,7 @@
     if (print === keyPrint) return;
     keyPrint = print;
     box.textContent = '';
-    const kinds = new Map();
-    for (const m of here) kinds.set(m.c, (kinds.get(m.c) || 0) + 1);
-    box.appendChild(mk('h4', '', T('On the map now')));
-    for (const [kind, n] of [...kinds].sort((x, y) => (KINDS[y[0]] || OTHER).order - (KINDS[x[0]] || OTHER).order)) {
-      const row = mk('div', 'keyRow'), dot = mk('i');
-      dot.style.background = (KINDS[kind] || OTHER).col;
-      row.append(dot, mk('span', '', (KINDS[kind] || {}).name || kind), mk('b', '', String(n)));
-      box.appendChild(row);
-    }
-    const squads = new Map();
-    for (const m of here) if (teamKey(m) && squadOf(m)) { const n = squadNo(teamKey(m)); if (!squads.has(n)) squads.set(n, []); squads.get(n).push(m); }
-    if (squads.size) box.appendChild(mk('h4', '', T('Teams')));
-    for (const [n, members] of [...squads].sort((x, y) => x[0] - y[0])) {
-      // (a block each: the team's number down its left, in its colour, and its members one under another beside it)
-      const row = mk('div', 'keyTeam'), badge = mk('i', 'squadDot', String(n)), names = mk('div', 'keyTeamNames');
-      badge.style.background = squadCol(n);
-      row.style.borderLeftColor = squadCol(n);
-      row.append(badge, names);
-      for (const m of members) {
-        const b = mk('button', 'linkBtn', m.t || ONE[m.c] || m.c);
-        b.type = 'button';
-        b.style.color = (KINDS[m.c] || OTHER).col;
-        b.title = T('Follow on the map');
-        b.onclick = () => watch(m);
-        names.appendChild(b);
-      }
-      box.appendChild(row);
-    }
-    box.appendChild(mk('h4', '', T('Marks')));
+    // (who's on the map, by kind and by team, the Raid list under it says: here only what the marks mean)
     for (const [cls, label] of [['kKill', T('Somebody died here')], ['kHit', T('Hit by a bullet')], ['kBlast', T('A grenade went off')], ['kDown', T('Down, can be got up')],
       ['kSwitch', T('Switch (green: on)')], ['kGoal', T('ORBIT squad objective')], ['kGhost', T('Parked by ORBIT as a ghost')]]) {
       const row = mk('div', 'keyRow');
@@ -13180,7 +13275,7 @@
       return;
     }
     // (a grenade thrown isn't a drop: its arc and burst show it, Settings > Grenades)
-    if (prefs.lootFloats === false || replaySeeking || (e.k === 'loot' && !eventListed(e, 'loot', prefs.floatWorth >= 0 ? prefs.floatWorth : prefs.worth)) || (e.k === 'drop' && (e.d.g || isHidden(e.d.wk || 'None') || prefs.areaKinds.includes(e.d.wk)))) return;
+    if (prefs.lootFloats === false || replaySeeking || (e.k === 'loot' && !eventListed(e, 'loot', prefs.floatWorth)) || (e.k === 'drop' && (e.d.g || isHidden(e.d.wk || 'None') || prefs.areaKinds.includes(e.d.wk)))) return;
     let at = Array.isArray(e.d.at) ? e.d.at : null;
     if (!at) {
       const m = e.p ? live.find(o => o.pid === e.p && o.c !== 'Corpse') : null;
