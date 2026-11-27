@@ -1670,7 +1670,14 @@ tr.act-left .actTag { background: rgba(45, 212, 191, 0.2); color: #a5f0e5; }
 .goalChain { display: flex; flex-wrap: wrap; gap: 6px; }
 .goal { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 4px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
 .goal i { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #12314d; border: 1.5px solid #6fbcff; color: #d7ecff; font-style: normal; font-size: 11px; font-weight: 700; }
-.goal.now { border-color: #6fbcff; color: var(--bright); }
+.squadRow.selected { border-inline-start: 3px solid #68d9c2; padding-inline-start: 8px; }
+.goal.active { border-color: #65dec4; color: var(--bright); }
+.goal.paused { border-color: #f5bd62; }
+.goal.failed { border-color: #ef8982; }
+.goal small { font-size: .88em; color: var(--dim); }
+.goal.active small { color: #65dec4; }
+.goal.paused small { color: #f5bd62; }
+.goal.failed small { color: #ef8982; }
 .goal.done { opacity: 0.5; text-decoration: line-through; }
 /* the menu's own list of raids: the button that looks into one */
 .histLook { font-size: 13px; }
@@ -1748,6 +1755,7 @@ a.histPlay { text-decoration: none; }
   text-decoration: none; white-space: nowrap; transition: background 0.12s, color 0.12s; }
 #modeNav a:hover { color: var(--bright); background: var(--hover); }
 #modeNav a.on { color: var(--ink); background: var(--accent); cursor: default; }
+html:not(.hist) .orbitReplayRoutes { display: none; }
 html.hist #modeNav { margin-right: auto; }
 html.hist #status, html.hist #backRaid, html.hist #session, html.hist #map, html.hist #mapBtn, html.hist #findBox, html.hist #listBtn,
 html.hist #follow, html.hist #reveal, html.hist #options, html.hist #mapTools, html.hist #panel, html.hist #notice, html.hist #recBtn,

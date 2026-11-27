@@ -343,10 +343,11 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <details class="group" data-group="mapMods" open>
         <summary>Bot mods</summary>
         <label class="row" title="Phobos's field over the map: the arrows its bots are drawn along, and its zones."><input type="checkbox" id="optPhobosField"><span>Phobos field</span></label>
-        <label class="row" title="Where each ORBIT squad is headed and what for: a blue diamond, with a line to it from the squad. Off unless you turn it on."><input type="checkbox" id="optOrbitMain"><span>ORBIT squad objectives</span></label>
+        <label class="row" title="Mark squad objectives by their recorded status. Select a bot to highlight its squad."><input type="checkbox" id="optOrbitMain"><span>ORBIT squad objectives</span></label>
         <label class="row" title="The places an ORBIT squad is sent to sweep (a boss rush, a spawn rush): a blue ring each, as big as the place, named over its top with what for and the squad. Green once swept. Off unless you turn it on."><input type="checkbox" id="optOrbitRush"><span>ORBIT rush points</span></label>
         <label class="row" title="ORBIT's field over the map: the arrows its bots are drawn along, and its zones."><input type="checkbox" id="optOrbitField"><span>ORBIT field</span></label>
-        <label class="row" id="optOrbitLinesRow" title="A thin blue line from every ORBIT bot to the place it is heading for, with a small circle there. Off: only for the bot you point at or follow."><input type="checkbox" id="optOrbitLines"><span>Lines to where all are heading</span></label>
+        <label data-rec class="row orbitReplayRoutes" title="Show the reported destinations of all squads on tactical assignments."><input type="checkbox" id="optOrbitTactics"><span>Squad tactical routes</span></label>
+        <label class="row" id="optOrbitLinesRow" title="Show the recorded destinations of all bots, including ordinary travel."><input type="checkbox" id="optOrbitLines"><span>Lines to where all are heading</span></label>
         <label class="row sub" title="At the end of each line: what the bot is going there for."><input type="checkbox" id="optOrbitNames"><span>Say what for, at the place</span></label>
         <label class="row" title="A fight between ORBIT's ghosts (bots parked far from every player, fought out without the game): a ⚔ where it was, for half a minute."><input type="checkbox" id="optOrbitFights"><span>Ghost fights</span></label>
         <label class="row" title="When a ghost hears shots: a big pale blue circle round it, as wide as it could hear, for a few seconds. These can be hundreds of metres across."><input type="checkbox" id="optOrbitHear"><span>Hearing circles</span></label>

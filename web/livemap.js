@@ -342,7 +342,7 @@
   // myQuests: only quest items and places of the quests the player has started
   // (what a page starts with, the first time it's opened, is how the mod ships: the author's own page as of 1.0.0)
   const prefs = Object.assign({ follow: true, autoZoom: false, spanIn: 120, spanOut: 400, scale: 1, zoom: 0.32, map: '',
-    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, modTints: false, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, lootSprees: true, edgeExits: true, doorEvents: true, teamNames: true, squadCols: false, actionIcons: true, mapDifficulty: false, mapPersonality: false, tacticWords: true, floorGrey: true, keyStates: false,
+    hide: [], show: [], player: null, floor: 'auto', worth: 0, wishOnly: false, heat: false, lootFloats: true, trails: true, killLines: true, floorOnly: false, hitFlash: true, switches: true, orbitMain: false, orbitRush: false, orbitTactics: true, recSign: true, orbitField: false, squadMarks: true, grenades: true, phobosField: false, minimap: true, killKeep: false, trailMs: 60000, itemNames: true, modTints: false, names: 'all', closeSpan: 250, myExits: true, goneExits: false, secretExits: false, allCorpses: true, botKills: false, lootSprees: true, edgeExits: true, doorEvents: true, teamNames: true, squadCols: false, actionIcons: true, mapDifficulty: false, mapPersonality: false, tacticWords: true, floorGrey: true, keyStates: false,
     myQuests: true, otherLoot: 30, floorDim: 70, insideMine: true, insideLook: true, lookSpan: 220, pressOpen: true, squadParts: true, edge: true, corpseKind: true, botDetails: true, botDiff: true, botSAIN: true, botORBIT: true, botCOMET: true, botLoot: true, edgeQuests: true, myName: true, shots: true, health: true, eventsKind: 'all', feed: true, feedMine: true, feedPmc: true, feedBoss: true, feedAi: true, orbitLines: false, areaPmc: false, lootArea: false, squadPane: true,
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: false, healthAll: true,
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
@@ -3899,7 +3899,7 @@
     if (!killTipKept || killTipKept.title !== title || killTipKept.lines[0] !== line) killTipKept = { title, lines: [line] };
     return killTipKept;
   }
-  const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitMain', 'ORBIT'], ['optOrbitRush', 'ORBIT'], ['optOrbitField', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
+  const MOD_OPTIONS = [['optOrbitLines', 'ORBIT'], ['optOrbitTactics', 'ORBIT'], ['optOrbitMain', 'ORBIT'], ['optOrbitRush', 'ORBIT'], ['optOrbitField', 'ORBIT'], ['optOrbitNames', 'ORBIT'], ['optOrbitFights', 'ORBIT'], ['optOrbitHear', 'ORBIT'],
     ['optRosterGhosts', 'ORBIT'], ['optSquadParts', 'COMET'], ['optTacticWords', 'COMET'], ['optPhobosField', 'Phobos']];
   const modHere = n => (prefs.brains || []).includes(n);
   // (in a replay always: what SAIN, COMET and ORBIT had the bots doing is what a replay is watched for)
@@ -4013,14 +4013,16 @@
     if (!hasDetails(m) && !carried && !m.ch && !m.psc) return null;
     // (made again once a part of it is folded or unfolded)
     const folds = (prefs.tipGear !== false) + '|' + (prefs.tipCarry !== false) + '|' + !!prefs.secureShown;
-    if (!m.botTip || m.botTipFolds !== folds) {
+    if (!m.botTip || m.botTipFolds !== folds || m.botTipOrbit !== orbitMain?.n) {
       m.botTipFolds = folds;
+      m.botTipOrbit = orbitMain?.n;
+      const goal = hasDetails(m) ? orbitGoalOf(m.pid) : null;
       const brain = hasDetails(m) ? brainOf(m) : null, like = hasDetails(m) ? likeOf(m) : '';
       m.botTip = { title: (m.t || ONE[m.c] || m.c) + (carried && carried.total ? ' · ' + roubles(carried.total) : ''),
         lines: [(m.psc ? T('AI player scav') : ONE[m.c] || m.c) + (levelShown(m.bl, m.c) ? ' · ' + T('Lv {n}', { n: m.bl }) : '') + (like ? ' · ' + like : ''), m.dn ? T('Down: can be got up again') : '', brain ? brain.by + ': ' + brain.text : '',
           m.ch ? T('PBT cheater') + (m.chd ? ' · ' + cheatSaid(m.chd) : '') : '', ...(prefs.health && Array.isArray(m.hp) ? hpSaid(m).split('\n') : ['']),
           hasDetails(m) && m.sq ? T('Squad:') + ' ' + squadSaid(m.sq) + (squadFoe(m.sq) ? ' · ' + T('against {who}', { who: squadFoe(m.sq) }) : '') : '',
-          hasDetails(m) && orbitGoalOf(m.pid) ? T('ORBIT goal:') + ' ' + orbitGoalOf(m.pid).text : '',
+          hasDetails(m) && goal ? T('ORBIT goal:') + ' ' + goal.text : '',
           hasDetails(m) && m.xr ? T('Leaving the raid: {why}', { why: m.xr }) : ''], side: carried ? carried.lines : null };
     }
     return m.botTip;
@@ -4772,16 +4774,21 @@
   function drawHeadings(scale) {
     drawGhostEvents(scale);
     const focus = [pointed, rosterOver, chased];
+    let labelled;
     for (const m of live) {
       if (!(m.os ? prefs.botDetails : modOn('ORBIT'))) continue;
       if (!Array.isArray(m.og) || m.c === 'Corpse' || inArea(m) || isHidden(m.c || 'None') || !Number.isFinite(m.cx)) continue;
       const strong = focus.includes(m.id);
-      if (!strong && !prefs.orbitLines) continue;
+      const tactical = orbitTacticalOrder(m);
+      if (!strong && !prefs.orbitLines && !tactical) continue;
+      if (tactical && (offFloor(m.cx, m.cy, m.cz) || offFloor(m.og[0], m.og[1], m.og[2]))) continue;
+      const team = tactical && orbitSquadOf(m.pid);
+      const tint = team && Number.isInteger(team.SquadId) && team.SquadId >= 0 ? squadCol(team.SquadId + 1) : '#6fbcff';
       const a = toScreen(m.cx, m.cy), b = toScreen(m.og[0], m.og[1]);
-      if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 14 * scale) continue;
+      if (!tactical && Math.hypot(a[0] - b[0], a[1] - b[1]) < 14 * scale) continue;
       const r = Math.max(5 * scale, 4 * zoom);
       ctx.save();
-      ctx.globalAlpha = strong ? 1 : 0.5;
+      ctx.globalAlpha = strong ? 1 : tactical ? .8 : .5;
       ctx.lineCap = 'round';
       ctx.setLineDash([2 * scale, 6 * scale]);
       ctx.beginPath();
@@ -4791,7 +4798,7 @@
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
       ctx.stroke();
       ctx.lineWidth = strong ? 2 : 1.3;
-      ctx.strokeStyle = '#6fbcff';
+      ctx.strokeStyle = tint;
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.beginPath();
@@ -4800,12 +4807,20 @@
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';
       ctx.stroke();
       ctx.lineWidth = 1.6;
-      ctx.strokeStyle = '#6fbcff';
+      ctx.strokeStyle = tint;
       ctx.stroke();
       ctx.fillStyle = 'rgba(111, 188, 255, 0.18)';
       ctx.fill();
       ctx.restore();
-      if ((strong || prefs.orbitNames) && m.ob) write(m.ob, 10 * scale, b[0], b[1] + r + 3 * scale, '#9fd8ff', strong ? 0.95 : 0.7);
+      if (tactical) {
+        const action = m.ob.split(/\s*[:(]/, 1)[0].trim(), key = (team ? 's' + team.SquadId : 'b' + m.id) + '/' + action;
+        if (strong || !labelled?.has(key)) {
+          (labelled ??= new Set()).add(key);
+          const caption = (team ? T('Squad {n}', { n: team.SquadId }) : m.t || m.c) + ' · ' + (strong || prefs.orbitNames ? m.ob : spaced(action));
+          write(caption, 10 * scale, b[0], b[1] + r + 3 * scale, tint, strong ? .95 : .85);
+        }
+      } else if ((strong || prefs.orbitNames) && m.ob)
+        write(m.ob, 10 * scale, b[0], b[1] + r + 3 * scale, '#9fd8ff', strong ? .95 : .7);
     }
   }
 
@@ -6014,7 +6029,7 @@
   // the switches that tell of bots, whichever preset: on for everything, off for the other two. What's for finding out
   // what a mod is doing (its fields, hearing circles, ghost fights, lines to where every bot is heading) is never put
   // on by a preset: turned on by hand only.
-  const botSwitches = v => ({ mapDoing: v, squadParts: v, actionIcons: v, tacticWords: v, squadPane: v, orbitMain: v, orbitRush: v,
+  const botSwitches = v => ({ mapDoing: v, squadParts: v, actionIcons: v, tacticWords: v, squadPane: v, orbitTactics: v, orbitMain: v, orbitRush: v,
     doorEvents: v, grenades: v, botLoot: v,
     orbitField: false, phobosField: false, orbitLines: false, orbitNames: false, orbitHear: false, orbitFights: false });
   const PRESETS = [
@@ -6714,7 +6729,7 @@
       if (e.k === 'switch') { eventsSeen.add(e.n); if (e.d.id && !lightSwitch(e.d)) switchNow.set(e.d.id, e); dirty = true; continue; }
       // a magazine dropped in a quick reload, and a bot going back for it (COMET): the latest of each
       if (e.k === 'comet.mag') { eventsSeen.add(e.n); if (e.d.id) magNow.set(e.d.id, e); dirty = true; continue; }
-      if (e.k === 'orbit.main') { eventsSeen.add(e.n); orbitMain = e; dirty = true; continue; }
+      if (e.k === 'orbit.main') { eventsSeen.add(e.n); orbitMain = e; orbitReceivedAt = performance.now(); dirty = true; continue; }
       if (e.k === 'orbit.field') { eventsSeen.add(e.n); orbitField = e; dirty = true; continue; }
       if (e.k === 'phobos.field') { eventsSeen.add(e.n); phobosField = e; dirty = true; continue; }
       if (e.k === 'drop') { eventsSeen.add(e.n); if (fresh) floatLoot(e); continue; }
@@ -6746,6 +6761,7 @@
       magNow = new Map();
       orbitMain = orbitField = phobosField = null;
       huntSnapshot = null; huntsByMember.clear();
+      indexedOrbitMain = null; orbitByMember.clear();
       eventsSeen = new Set();
       if (!replay) forgetSquads();
       showKills();
@@ -8925,7 +8941,7 @@
       requestAnimationFrame(() => { again = false; findSettings(); });
     }).observe($('panelBody'), { childList: true, subtree: true });
   }
-  for (const [id, key] of [['optItemNames', 'itemNames'], ['optModTints', 'modTints'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optSquadCols', 'squadCols'], ['optTeamNames', 'teamNames'], ['optDoorEvents', 'doorEvents'], ['optActionIcons', 'actionIcons'], ['optMapDifficulty', 'mapDifficulty'], ['optMapPersonality', 'mapPersonality'], ['optTacticWords', 'tacticWords'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
+  for (const [id, key] of [['optItemNames', 'itemNames'], ['optModTints', 'modTints'], ['optWishOnly', 'wishOnly'], ['optLootFloats', 'lootFloats'], ['optKillLines', 'killLines'], ['optFloorOnly', 'floorOnly'], ['optHitFlash', 'hitFlash'], ['optSwitches', 'switches'], ['optOrbitMain', 'orbitMain'], ['optOrbitTactics', 'orbitTactics'], ['optOrbitRush', 'orbitRush'], ['optOrbitField', 'orbitField'], ['optSquadMarks', 'squadMarks'], ['optSquadCols', 'squadCols'], ['optTeamNames', 'teamNames'], ['optDoorEvents', 'doorEvents'], ['optActionIcons', 'actionIcons'], ['optMapDifficulty', 'mapDifficulty'], ['optMapPersonality', 'mapPersonality'], ['optTacticWords', 'tacticWords'], ['optGrenades', 'grenades'], ['optPhobosField', 'phobosField'], ['optMinimap', 'minimap'], ['optKillKeep', 'killKeep'], ['optMyQuestItems', 'myQuestItems'], ['optMyQuestPlaces', 'myQuestPlaces'], ['optFriendQuests', 'friendQuests'],
     ['optInsideMine', 'insideMine'], ['optInsideLook', 'insideLook'], ['optPressOpen', 'pressOpen'], ['optEdge', 'edge'], ['optEdgeQuests', 'edgeQuests'], ['optEdgeExits', 'edgeExits'], ['optMyName', 'myName'], ['optRecSign', 'recSign'], ['optShots', 'shots'], ['optHealth', 'health'], ['optFeed', 'feed'], ['optPhoneLight', 'phoneLight'], ['optAwake', 'awake'], ['optLowPower', 'lowPower'], ['optSpeed', 'speed'], ['optFeedMine', 'feedMine'], ['optFeedPmc', 'feedPmc'], ['optFeedBoss', 'feedBoss'], ['optFeedAi', 'feedAi'], ['optOrbitLines', 'orbitLines'], ['optBotLoot', 'botLoot'],
     ['optPeek', 'peek'], ['optFog', 'rosterFog'], ['optRosterDoing', 'rosterDoing'], ['optRosterHp', 'rosterHp'],
     ['optRosterSlim', 'rosterSlim'], ['optHealthAll', 'healthAll'], ['optMapDoing', 'mapDoing'], ['optSquadParts', 'squadParts'], ['optOrbitNames', 'orbitNames'],
@@ -9407,7 +9423,7 @@
               for (const e of report.ev || []) if (e && e.d && Number.isFinite(e.n)) {
                 // A gesture may have waited for the next full report. Both clocks include the loading screen here.
                 e.rt = t;
-                if ((e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag') && Number.isFinite(e.t) && Number.isFinite(report.clk))
+                if ((e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag' || e.k === 'orbit.main') && Number.isFinite(e.t) && Number.isFinite(report.clk))
                   e.performedAt = Math.max(0, t - Math.max(0, report.clk - e.t));
                 events.push(e);
               }
@@ -9435,9 +9451,12 @@
     }
     // (a replay's clock is the recording's own: what the kill feed and the lists say goes by it)
     for (const e of events) e.t = e.rt;
+    const mainTimes = new Map();
+    for (const e of events) if (e.k === 'orbit.main' && !mainTimes.has(e.n))
+      mainTimes.set(e.n, e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead));
     whyOf.clear();
     const r = replay = { about, lead, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
-      next: 0, hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
+      next: 0, mainTimes, hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
     // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
@@ -9508,6 +9527,7 @@
     blastMarks = [];
     orbitMain = orbitField = phobosField = null;
     huntSnapshot = null; huntsByMember.clear();
+    indexedOrbitMain = null; orbitByMember.clear();
     addEvents(r.events.filter(e => e.rt <= t), false);
     showKills();
     squadPanePrint = '';
@@ -12311,7 +12331,12 @@
     const row = mk('label', 'row'), tick = mk('input');
     tick.type = 'checkbox';
     tick.checked = byDefault ? prefs[key] !== false : !!prefs[key];
-    tick.onchange = () => { prefs[key] = tick.checked; save(); squadPanePrint = ''; tipFor = null; dirty = true; };
+    tick.onchange = () => {
+      prefs[key] = tick.checked;
+      const setting = $('opt' + key[0].toUpperCase() + key.slice(1));
+      if (setting?.type === 'checkbox') setting.checked = tick.checked;
+      save(); squadPanePrint = ''; tipFor = null; dirty = true;
+    };
     row.append(tick, mk('span', '', label));
     if (title) row.title = title;
     box.appendChild(row);
@@ -12332,7 +12357,7 @@
     ['markers', T('Markers and names'), ['optBotShape', 'optMeShape', 'optScale', 'optWorldScale', 'optSizeByKind', 'optTextScale', 'optNameScale', 'optDoingScale', 'optChaseRing', 'optNames', 'optMapDifficulty', 'optMapPersonality', 'optMyName', 'optLatin', 'optHealth', 'optHealthAll']],
     ['people', T('People and bots'), ['optSquadMarks', 'optModTeams', 'optTeamNames', 'optSquadCols', 'optMapDoing', 'optActionIcons', 'optTacticWords', 'optSquadParts', 'optDoorEvents']],
     ['onMap', T('On the map'), ['optShots', 'optLootFloats', 'optFloatWorth', 'optHitFlash', 'optKillLines', 'optGrenades', 'optSwitches', 'optKillKeep', 'optTrailMs', 'optMinimap']],
-    ['orbit', T('ORBIT on the map'), ['optOrbitMain', 'optOrbitRush', 'optOrbitLines', 'optOrbitNames', 'optOrbitFights', 'optOrbitHear', 'optOrbitField', 'optPhobosField']],
+    ['orbit', T('ORBIT on the map'), ['optOrbitMain', 'optOrbitRush', 'optOrbitTactics', 'optOrbitLines', 'optOrbitNames', 'optOrbitFights', 'optOrbitHear', 'optOrbitField', 'optPhobosField']],
     ['floors', T('Floors'), ['optFloorOnly', 'optFloorDim', 'optFloorGrey', 'optFloorHide', 'optOtherLoot']],
     ['loot', T('Loot'), ['optPrices', 'optWorth', 'optPeek', 'optWishMarks', 'optTipGear', 'optTipCarry', 'optSecureShown', 'optItemNames', 'optModTints', 'optRoofLoot', 'optRoofTotals', 'optRoofTotalsUnder']],
     ['feed', T('Kill feed'), ['optFeed', 'optFeedMine', 'optFeedPmc', 'optFeedBoss', 'optFeedAi', 'optFeedNames', 'optFeedRows', 'optFeedKeep', 'optFeedBox', 'optFeedBg']],
@@ -12345,7 +12370,7 @@
     ['markers', T('Markers and names'), ['botShape', 'meShape', 'scale', 'worldScale', 'sizeByKind', 'textScale', 'nameScale', 'doingScale', 'chaseRing', 'names', 'mapDifficulty', 'mapPersonality', 'myName', 'latin', 'health', 'healthAll']],
     ['people', T('People and bots'), ['squadMarks', 'modTeams', 'teamNames', 'squadCols', 'mapDoing', 'actionIcons', 'tacticWords', 'squadParts', 'doorEvents']],
     ['onMap', T('On the map'), ['shots', 'lootFloats', 'floatWorth', 'hitFlash', 'killLines', 'grenades', 'switches', 'killKeep', 'trailMs', 'minimap']],
-    ['orbit', T('ORBIT on the map'), ['orbitMain', 'orbitRush', 'orbitLines', 'orbitNames', 'orbitFights', 'orbitHear', 'orbitField', 'phobosField']],
+    ['orbit', T('ORBIT on the map'), ['orbitMain', 'orbitRush', 'orbitTactics', 'orbitLines', 'orbitNames', 'orbitFights', 'orbitHear', 'orbitField', 'phobosField']],
     ['floors', T('Floors'), ['floorOnly', 'floorDim', 'floorGrey', 'floorHide', 'otherLoot']],
     ['loot', T('Loot'), ['worth', 'peek', 'wishMarks', 'tipGear', 'tipCarry', 'secureShown', 'itemNames', 'modTints', 'roofLoot', 'roofTotals', 'roofTotalsUnder']],
     ['feed', T('Kill feed'), ['feed', 'feedMine', 'feedPmc', 'feedBoss', 'feedAi', 'feedNames', 'feedRows', 'feedKeep', 'feedBox', 'feedBg']],
@@ -12617,32 +12642,37 @@
     box.appendChild(mk('p', 'winNote', T('The field shown is the one recorded last before the moment shown.')));
   }
 
-  // ORBIT's squads at the moment shown, each with the things it means to do in order
+  // Keep the squad's reported objective order, independently of which goals are in progress.
   function sideOrbit(box, r, s) {
     box.textContent = '';
     sideCheck(box, 'orbitMain', T('Show on map'), false, T('Where each ORBIT squad is headed, and what for.'));
     sideCheck(box, 'orbitRush', T('Rush points'), false, T('The places an ORBIT squad is to sweep, as rings.'));
-    const squads = orbitMain && Array.isArray(orbitMain.d.s) ? orbitMain.d.s : [];
+    sideCheck(box, 'orbitTactics', T('Squad tactical routes'), true, T('Show the reported destinations of all squads on tactical assignments.'));
+    const squads = modOn('ORBIT') && orbitMain ? list(orbitMain.d.s) : [];
     sideCount(box, squads.length);
     if (!squads.length) sideNone(box, T('ORBIT had no squad objectives at this moment (or wasn\'t in this raid).'));
-    const nameOf = pid => { for (const t of s.tracks.values()) if (t.pid === pid) return t.name || ONE[t.c] || t.c; return ''; };
-    for (const squad of squads) {
-      const row = mk('div', 'squadRow'), members = list(squad.MemberProfileIds).map(nameOf).filter(Boolean);
-      row.appendChild(mk('b', '', T('Squad {n}', { n: squad.SquadId !== undefined ? squad.SquadId : '?' }) + (members.length ? ' · ' + members.slice(0, 6).join(', ') : '')));
+    const selected = orbitSquadOf(liveById.get(chased)?.pid);
+    const names = new Map();
+    for (const t of s.tracks.values()) if (t.pid) names.set(t.pid, t.name || ONE[t.c] || t.c);
+    for (const squad of selected ? [selected, ...squads.filter(team => team !== selected)] : squads) {
+      const row = mk('div', 'squadRow' + (squad === selected ? ' selected' : ''));
+      const members = list(squad.MemberProfileIds).map(pid => names.get(pid)).filter(Boolean);
+      row.dataset.squad = squad.SquadId;
+      row.appendChild(mk('b', '', T('Squad {n}', { n: squad.SquadId ?? '?' }) + (members.length ? ' · ' + members.join(', ') : '')));
       const chain = mk('div', 'goalChain');
-      const goals = list(squad.MainObjectives);
-      const first = goals.findIndex(o => o && !o.Completed);
-      goals.forEach((o, i) => {
-        if (!o) return;
-        const chip = mk('button', 'goal' + (o.Completed ? ' done' : i === first ? ' now' : ''));
+      for (const o of list(squad.MainObjectives)) {
+        if (!o) continue;
+        const state = orbitGoalState(o, squad), chip = mk('button', 'goal ' + state);
         chip.type = 'button';
-        chip.append(mk('i', '', orbitLetter(o)), mk('span', '', orbitGoalName(o) + (o.OperationStepCount ? ' ' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount : '')
-          + (o.AirdropStage ? ' · ' + words(String(o.AirdropStage)) : '') + (o.CampState ? ' · ' + words(String(o.CampState)) : '')));
-        chip.title = o.Completed ? T('Done') : i === first ? T('What the squad is on now') : T('To do after that');
+        chip.append(mk('i', '', orbitLetter(o)), mk('span', '', orbitGoalName(o) + orbitStepCount(o)),
+          mk('small', '', orbitStateText(o, state)));
+        const phase = o.OperationState || o.CampState || o.AirdropStage;
+        if (state === 'active' && phase && phase !== 'active') chip.lastChild.prepend(words(String(phase)) + ' · ');
+        chip.title = [o.OperationStep, o.OperationState, o.CampState, o.CampFailure, o.AirdropStage].filter(Boolean).join(' · ');
         if (Number.isFinite(o.X) && Number.isFinite(o.Z)) chip.onclick = () => goTo(o.X, o.Z);
         chain.appendChild(chip);
-      });
-      if (!goals.length) chain.appendChild(mk('span', 'dim', T('Nothing planned')));
+      }
+      if (!chain.childElementCount) chain.appendChild(mk('span', 'dim', T('Nothing planned')));
       row.appendChild(chain);
       box.appendChild(row);
     }
@@ -13594,80 +13624,124 @@
         lines: [on ? T('Switched on') : T('Not switched'), e.t ? raidClock(e.t) : ''] } });
     }
   }
-  // Where each ORBIT squad is headed, and what for: a blue diamond at each thing it's out to do (the one it's on
-  // now strong, the ones after it faint), a line to it from the squad, and the points of a rush as small rings.
+  // ORBIT objectives and the individual points of a rush share the squad's recorded progress.
   const ORBIT_LETTER = { Kills: 'K', LootValue: 'L', Quest: 'Q' };
-  // (the squad of the bot pointed at, followed or picked in the Raid list: its goal now is drawn whatever the
-  // switches, so what it's out to do is a press away)
-  function orbitFocus() {
-    const pids = new Set();
-    for (const id of [pointed, rosterOver, chased]) {
-      const m = id !== null && id !== undefined ? liveById.get(id) : null;
-      if (m && m.pid) pids.add(m.pid);
+  // Snapshot-local membership. ORBIT's squad id and the native game group are separate identifiers.
+  let indexedOrbitMain, orbitByMember = new Map(), orbitReceivedAt = 0;
+  function orbitSquadOf(pid) {
+    if (!pid || !orbitMain || !modOn('ORBIT')) return null;
+    if (indexedOrbitMain !== orbitMain) {
+      indexedOrbitMain = orbitMain;
+      orbitByMember.clear();
+      for (const squad of list(orbitMain.d.s)) for (const member of list(squad.MemberProfileIds)) {
+        if (orbitByMember.has(member) && orbitByMember.get(member) !== squad) orbitByMember.set(member, null);
+        else orbitByMember.set(member, squad);
+      }
     }
-    return pids;
+    return orbitByMember.get(pid) || null;
   }
-  // the ORBIT squad a bot is in, and the goal it's on now, from ORBIT's latest snapshot
+  const activeOrbitStages = new Set(['approach', 'holding', 'searching cover', 'planning route', 'entering room',
+    'returning to room', 'opening door', 'unlocking door', 'looting', 'searching', 'interacting', 'extracting',
+    'waiting', 'loot', 'approaching camp cover', 'camping', 'finding camp cover', 'looting area', 'returning to camp',
+    'approaching site', 'leaving post', 'looting own kill', 'returning to post', 'surveying another post',
+    'surveying corrected site', 'surveying post', 'waiting for transfer']);
+  function orbitGoalState(o, squad) {
+    const stage = String(o.OperationState || o.CampState || o.AirdropStage || '').toLowerCase();
+    if (/^(failed|aborted|cancelled)(?:\b|:)/.test(stage)) return 'failed';
+    if (o.Completed) return 'done';
+    if (stage === 'paused' || o.LootValueInterrupted) return 'paused';
+    if (activeOrbitStages.has(stage) || o.CampHolding || o.Type === 'LootValue' && o.LootValueEnteredAt > 0 ||
+        o.Type === 'Kills' && !o.KillAmbush && o.KillsRoamStartedAt > 0) return 'active';
+    // A recorded Quest order has only a destination. Match its rounded coordinates to a unique quest in this squad.
+    if (squad && o.Type === 'Quest' && Number.isFinite(o.X) && Number.isFinite(o.Z)) {
+      const near = (x, z) => Math.abs(x - o.X) <= .26 && Math.abs(z - o.Z) <= .26;
+      const member = live.find(m => m.c !== 'Corpse' && (!m.os || m.os === 'ORBIT') && orbitSquadOf(m.pid) === squad &&
+        m.ob === 'Quest (Moving)' && Array.isArray(m.og) && near(m.og[0], m.og[1]) &&
+        (!Number.isFinite(m.og[2]) || !Number.isFinite(o.Y) || Math.abs(m.og[2] - o.Y) <= .26) &&
+        (m.gh || /^orbit/i.test(m.ly || '')));
+      if (member && !list(squad.MainObjectives).some(g => g !== o && g?.Type === 'Quest' && !g.Completed && near(g.X, g.Z)))
+        return 'active';
+    }
+    return 'planned';
+  }
+  const orbitStateNames = { active: T('In progress'), paused: T('Paused'), done: T('Done'), failed: T('Failed'), planned: T('Planned') };
+  const orbitStateColors = { active: '#65dec4', paused: '#f5bd62', done: '#94aa9d', failed: '#ef8982', planned: '#8db8e0' };
+  function orbitStepCount(o) {
+    return o.OperationStepIndex > 0 && o.OperationStepCount > 0 ? ' ' + o.OperationStepIndex + '/' + o.OperationStepCount : '';
+  }
+  function orbitStateText(o, state) {
+    const title = orbitStateNames[state];
+    if (state !== 'active' && state !== 'paused') return title;
+    const at = replay ? replay.mainTimes.get(orbitMain?.n) : orbitReceivedAt;
+    const age = at == null ? 0 : Math.max(0, ((replay ? replay.at : performance.now()) - at) / 1000);
+    let remaining;
+    if (o.CampUntilTimeExtract && Number.isFinite(o.CampExtractRemainingSeconds))
+      remaining = o.CampExtractRemainingSeconds - age; // raid departure clock continues during an interruption
+    else if (o.CampTargetDuration > 0 && Number.isFinite(o.CampElapsed) && (o.CampHolding || state === 'paused'))
+      remaining = o.CampTargetDuration - o.CampElapsed - (state === 'active' && o.CampHolding ? age : 0);
+    if (remaining != null) return title + ' · ' + T('{t} left', { t: clockText(Math.max(0, Math.ceil(remaining)) * 1000) });
+    if (o.Type === 'Kills' && !o.KillAmbush && o.KillsRoamTargetDuration > 0)
+      return title + ' · ' + T('Target duration {t}', { t: clockText(o.KillsRoamTargetDuration * 1000) });
+    return title;
+  }
   function orbitGoalOf(pid) {
-    if (!orbitMain || !pid || !modOn('ORBIT') || !Array.isArray(orbitMain.d.s)) return null;
-    const squad = orbitMain.d.s.find(q => list(q.MemberProfileIds).includes(pid));
-    const o = squad ? list(squad.MainObjectives).find(g => g && !g.Completed) : null;
-    if (!o) return null;
-    const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : (o.Type === 'Kills' ? orbitGoalName(o) : words(String(o.OperationName || o.Type || '')));
-    const step = o.OperationStep ? words(o.OperationStep) + (o.OperationStepCount ? ' (' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount + ')' : '') : '';
-    return { o, text: what + (step ? ' · ' + step : '') + (o.QuestTitle ? ' · ' + o.QuestTitle : '') };
+    const squad = orbitSquadOf(pid);
+    if (!squad) return null;
+    const active = list(squad.MainObjectives).filter(o => o && orbitGoalState(o, squad) === 'active');
+    return active.length ? { text: active.map(o => orbitGoalName(o) + orbitStepCount(o)).join(' · ') } : null;
+  }
+  function orbitTacticalOrder(m) {
+    if (!replay || prefs.orbitTactics === false || (m.os && m.os !== 'ORBIT') || !m.ob || !Array.isArray(m.og) || !modOn('ORBIT')) return false;
+    const squad = orbitSquadOf(m.pid);
+    if ((!m.gh && m.ly && !/^ORBIT/i.test(m.ly)) || /\((?:Failed|paused|interrupted)\)/i.test(m.ob)) return false;
+    const operation = squad && list(squad.MainObjectives).find(o => o?.OperationName && m.ob.startsWith(o.OperationName + ':'));
+    if (operation) return orbitGoalState(operation) === 'active';
+    return /^(?:Ambush|Airdrop|SquadCover|MultiStep:|(?:Spawn|Boss|Marked|Custom) rush\b|Sniper overwatch\b)/i.test(m.ob);
   }
   function drawOrbitMain(scale) {
     const plans = !!prefs.orbitMain, rush = !!prefs.orbitRush;
     if (!orbitMain || !modOn('ORBIT')) return;
-    const focus = plans && rush ? null : orbitFocus();
-    if (!(plans || rush) && !focus.size) return;
-    const squads = Array.isArray(orbitMain.d.s) ? orbitMain.d.s : [];
+    const selected = orbitSquadOf(liveById.get(chased)?.pid);
+    const focus = selected || orbitSquadOf(liveById.get(rosterOver)?.pid) || orbitSquadOf(liveById.get(pointed)?.pid);
+    if (!(plans || rush || focus)) return;
+    const squads = list(orbitMain.d.s), visible = new Map();
+    for (const m of live) {
+      if (m.c === 'Corpse' || isHidden(m.c) || inArea(m)) continue;
+      const squad = orbitSquadOf(m.pid);
+      if (!squad || !(plans || rush || squad === focus)) continue;
+      if (!visible.has(squad)) visible.set(squad, []);
+      visible.get(squad).push(m);
+    }
     ctx.save();
     for (const squad of squads) {
-      const members = list(squad.MemberProfileIds);
-      const shown = focus && members.some(id => focus.has(id));
-      if (!(plans || rush || shown)) continue;
-      const goals = list(squad.MainObjectives).filter(o => o && !o.Completed && Number.isFinite(o.X) && Number.isFinite(o.Z)).slice(0, plans ? undefined : 1);
-      if (!goals.length) continue;
-      const here = live.filter(m => m.pid && members.includes(m.pid) && m.c !== 'Corpse');
-      // (a squad nobody of which is shown: its plans aren't either)
-      if (!here.length || here.every(m => isHidden(m.c) || inArea(m))) continue;
-      goals.forEach((o, i) => {
+      const shown = squad === focus;
+      const here = visible.get(squad);
+      if (!here) continue;
+      const goals = list(squad.MainObjectives).filter(o => o && Number.isFinite(o.X) && Number.isFinite(o.Z));
+      goals.forEach(o => {
         if (offFloor(o.X, o.Z, o.Y)) return;
-        const s = toScreen(o.X, o.Z), r = 8 * scale;
-        const what = o.AirdropStage ? 'Airdrop · ' + words(String(o.AirdropStage)) : (o.Type === 'Kills' ? orbitGoalName(o) : words(String(o.OperationName || o.Type || '')));
-        ctx.globalAlpha = i ? 0.45 : 1;
-        if ((plans || shown) && !i && Number.isFinite(here[0].cx)) {
-          const from = toScreen(here[0].cx, here[0].cy);
-          ctx.beginPath();
-          ctx.moveTo(from[0], from[1]);
-          ctx.lineTo(s[0], s[1]);
-          ctx.setLineDash([3 * scale, 6 * scale]);
-          ctx.lineWidth = 1.5 * scale;
-          ctx.strokeStyle = 'rgba(111, 188, 255, 0.75)';
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
+        const s = toScreen(o.X, o.Z), r = (shown ? 10 : 8) * scale, state = orbitGoalState(o, squad);
+        const what = orbitGoalName(o), status = orbitStateText(o, state);
+        ctx.globalAlpha = focus && !shown ? .38 : shown || state === 'active' ? 1 : .74;
         // the places the squad is to sweep (a rush), each a ring named over its top: what for, and by whom
         for (const p of rush ? list(o.RushPoints) : []) {
           if (!p || !Number.isFinite(p.X) || !Number.isFinite(p.Z)) continue;
           const at = toScreen(p.X, p.Z), rr = Math.max(4 * scale, (p.Radius || 0) * zoom);
           if (at[0] + rr < 0 || at[1] + rr < 0 || at[0] - rr > vw || at[1] - rr > vh) continue;
-          const done = /done|visited|complete/i.test(p.State || '');
+          const done = /done|visited|complete/i.test(p.State || ''), current = p.State === 'current';
           ctx.beginPath();
           ctx.arc(at[0], at[1], rr, 0, Math.PI * 2);
           ctx.lineWidth = 1.3 * scale;
-          ctx.strokeStyle = done ? 'rgba(61, 220, 90, 0.8)' : 'rgba(111, 188, 255, 0.8)';
+          ctx.strokeStyle = current ? orbitStateColors[state] : done ? '#94aa9d' : '#7999bd';
           ctx.stroke();
-          const label = 'ORBIT · ' + (what || T('Rush point')) + (here.length ? ' · ' + (here[0].t || ONE[here[0].c] || here[0].c) + (here.length > 1 ? ' +' + (here.length - 1) : '') : '');
+          const label = T('Squad {n}', { n: squad.SquadId }) + ' · ' + (p.Name || what || T('Rush point')) + (current ? ' · ' + status : '');
           ctx.font = Math.round(10.5 * scale) + 'px ' + FONT;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           ctx.lineWidth = 3 * scale;
           ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
           ctx.strokeText(label, at[0], at[1] - rr - 2 * scale);
-          ctx.fillStyle = done ? '#7ee89a' : '#bfe0ff';
+          ctx.fillStyle = current ? orbitStateColors[state] : '#bfe0ff';
           ctx.fillText(label, at[0], at[1] - rr - 2 * scale);
         }
         if (!plans && !shown) return;
@@ -13677,19 +13751,25 @@
         ctx.closePath();
         ctx.fillStyle = '#12314d';
         ctx.fill();
-        ctx.lineWidth = 2 * scale;
-        ctx.strokeStyle = '#6fbcff';
+        ctx.lineWidth = (shown ? 3 : 2) * scale;
+        ctx.strokeStyle = orbitStateColors[state];
         ctx.stroke();
         ctx.font = 'bold ' + Math.round(10 * scale) + 'px ' + FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#d7ecff';
         ctx.fillText(orbitLetter(o), s[0], s[1] + 0.5);
+        if (shown || state === 'active' || state === 'paused') {
+          const caption = T('Squad {n}', { n: squad.SquadId }) + ' · ' + status;
+          ctx.font = Math.round(11 * scale) + 'px ' + FONT;
+          ctx.lineWidth = 3 * scale; ctx.strokeStyle = '#101622';
+          ctx.strokeText(caption, s[0], s[1] + r * 2.1); ctx.fillStyle = orbitStateColors[state];
+          ctx.fillText(caption, s[0], s[1] + r * 2.1);
+        }
         thingsDrawn.push({ x: s[0], y: s[1], r: r * 1.4, tip: { title: 'ORBIT · ' + what,
-          lines: [o.OperationStep ? words(o.OperationStep) + (o.OperationStepCount ? ' (' + ((o.OperationStepIndex || 0) + 1) + '/' + o.OperationStepCount + ')' : '') : '',
-            o.QuestTitle || '', o.CampState ? words(o.CampState) : '', o.KillAmbush ? 'Ambush' : '',
-            T('Squad:') + ' ' + here.map(m => m.t || ONE[m.c] || m.c).slice(0, 6).join(', '),
-            i ? '' : goals.length > 1 ? T('…and {n} more', { n: goals.length - 1 }) : ''] } });
+          lines: [status, o.OperationStep ? words(o.OperationStep) + orbitStepCount(o) : '',
+            o.QuestTitle || '', o.CampFailure || o.OperationState || o.CampState || o.AirdropStage || '',
+            T('Squad:') + ' ' + here.map(m => m.t || ONE[m.c] || m.c).join(', ')] } });
       });
     }
     ctx.restore();
