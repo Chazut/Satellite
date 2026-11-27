@@ -7701,6 +7701,28 @@
     // when the panel comes down that far (a short Raid list doesn't)
     const low = left && left.getBoundingClientRect().bottom > window.innerHeight - 70;
     document.body.style.setProperty('--left-cover', (low ? left.offsetWidth + 8 : 0) + 'px');
+    edgeTabs();
+  }
+  // The live map's menu and Raid list, put away: a tab on the screen's edge brings each back, as Raid history's
+  // Details does (the menu's on the right and the list on the left, or the other way round when they're swapped)
+  function edgeTabs() {
+    if (HIST) return;
+    const swap = !!prefs.swap;
+    for (const [id, open, label, right, go] of [
+      ['edgeMenu', !$('panel').hidden, T('Menu'), !swap, () => togglePanel(true)],
+      ['edgeList', !$('side').hidden, T('Raid list'), swap, () => toggleSide(true)]]) {
+      let b = document.getElementById(id);
+      if (!b) {
+        b = document.createElement('button');
+        b.id = id;
+        b.type = 'button';
+        b.onclick = go;
+        document.body.appendChild(b);
+      }
+      b.className = 'ui edgeTab' + (right ? '' : ' left');
+      b.textContent = right ? '« ' + label : label + ' »';
+      b.hidden = open || phone.matches;
+    }
   }
   // a tab's key: opens the menu on it; pressed again, shuts the menu
   function openTab(name) {
@@ -11069,6 +11091,20 @@
     $('hpTop').prepend($('brand'), $('modeNav'));
     $('hpMapBar').prepend($('fit'), $('full'));
     $('hpTop').appendChild($('langBox'));
+    // the menu, as the live map's: here the panel beside the map, on its Settings (pressed again, put away)
+    const hpMenu = mk('button', '', '☰ ' + T('Menu'));
+    hpMenu.id = 'hpMenu';
+    hpMenu.type = 'button';
+    hpMenu.onclick = () => {
+      const shown = phone.matches ? document.body.classList.contains('hpPanes') : !prefs.hpSideOff;
+      const close = shown && prefs.hpTab === 'settings';
+      prefs.hpTab = 'settings';
+      if (phone.matches) { document.body.classList.remove('hpLegend'); document.body.classList.toggle('hpPanes', !close); } else prefs.hpSideOff = close;
+      save();
+      hpShow();
+      hpSideShow();
+    };
+    $('hpTop').appendChild(hpMenu);
     document.documentElement.classList.add('oneBar');
     $('sideHead').querySelector('b').textContent = T('Legend');
     hpLink($('histRaids'), '', 'list');
@@ -11116,6 +11152,10 @@
     $('replayBar').hidden = !onMap;
     hpSide.hidden = !onMap || (!!prefs.hpSideOff && !phone.matches);
     hpSideTab.hidden = !onMap || !prefs.hpSideOff || phone.matches;
+    if ($('hpMenu')) {
+      $('hpMenu').hidden = !onMap;
+      $('hpMenu').classList.toggle('on', onMap && prefs.hpTab === 'settings' && (phone.matches ? document.body.classList.contains('hpPanes') : !prefs.hpSideOff));
+    }
     if (!onMap) document.body.classList.remove('hpPanes', 'hpLegend');
     $('hpPanels').classList.toggle('on', document.body.classList.contains('hpPanes'));
     $('hpLegendBtn').classList.toggle('on', document.body.classList.contains('hpLegend'));

@@ -35,6 +35,7 @@
 - Raid history's legend says only what the marks mean (the Raid list under it already shows who's on the map and their teams), folded to begin with.
 - The menu's settings are grouped under plain headings in every tab, and Pick-ups worth at least is a value of its own (a page set to "as Worth at least" keeps what that was).
 - Loose loot on your wishlist has a blue star badge of its own, as found-in-raid needs have.
+- The live map's menu and Raid list, put away, leave a tab on the screen's edge to bring them back, as Raid history's Details does. Raid history has a Menu at the top right, opening its settings.
 - Prices (Loot > Filters) has "Most it sells for", the new default: the flea price or the best trader's, whichever pays more. Below the flea's unlock level, and for items that can't go on the flea, it's the best trader's that you have unlocked, at your loyalty level. "Trader only" is always the best trader's, "Flea only" always the flea's (as before), and "Handbook only" the handbook's.
 - The server adds the options a newer Satellite brings to `config.jsonc` when it starts, with their comments, keeping your own settings.
 - `LICENSE.md` covers the map scans too (`LICENSE-MAPS.md` is merged into it).

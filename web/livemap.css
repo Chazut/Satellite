@@ -1937,9 +1937,15 @@ html.hist #hpSide #squadPane { max-height: max(260px, calc(100vh - var(--hp-unde
 .hpSecBody .setGroup .row small { color: var(--dim); }
 .hpSecBody .setGroup #colorList { margin: 2px 0 6px; }
 /* put away: a tab on the right edge brings it back */
-#hpSideTab { position: fixed; right: 0; top: 50%; z-index: 2; transform: translateY(-50%); padding: 10px 8px; border: 1px solid var(--line-strong); border-right: 0; border-radius: 8px 0 0 8px;
-  background: var(--panel-solid); color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; writing-mode: vertical-rl; cursor: var(--cur-hand); box-shadow: var(--shadow); }
-#hpSideTab[hidden] { display: none; }
+/* (the live map's menu and Raid list put away, the same: .edgeTab, see edgeTabs) */
+#hpSideTab, .edgeTab { position: fixed; right: 0; top: 50%; z-index: 4; transform: translateY(-50%); height: auto; min-height: 0; padding: 16px 9px;
+  border: 1px solid var(--line-strong); border-right: 0; border-radius: 8px 0 0 8px; background: var(--panel-solid); color: var(--accent); font: inherit;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; writing-mode: vertical-rl; cursor: var(--cur-hand); box-shadow: var(--shadow); }
+#hpSideTab:hover, .edgeTab:hover { background: var(--hover); }
+.edgeTab.left { right: auto; left: 0; border-right: 1px solid var(--line-strong); border-left: 0; border-radius: 0 8px 8px 0; }
+#hpSideTab[hidden], .edgeTab[hidden] { display: none; }
+html.oneBar #hpTop #hpMenu { height: 30px; padding: 0 12px; }
+html.oneBar #hpTop #hpMenu[hidden] { display: none; }
 .hpSec { padding: 6px 12px; border-bottom: 1px solid var(--line); }
 .hpSec:last-child { border-bottom: 0; }
 .hpSec > summary { cursor: pointer; color: var(--bright); font-weight: 600; padding: 3px 0; }
@@ -2288,11 +2294,14 @@ html.oneBar #hp #brand .word, html:not(.hist) #bar > #brand .word { font-size: 1
    name by the logo goes and the search is a button until it's pressed. */
 @media (min-width: 701px) and (min-height: 521px) {
   html:not(.hist) #bar { flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
-  html:not(.hist) #barGrow { flex: 0.001 1 0; }
+  /* (the boxes grow first, to their most; the gap takes the rest, so the map's buttons, the language and the menu are
+     always at the right) */
+  html:not(.hist) #barGrow { flex: 1 1 0; }
   html:not(.hist) #bar > #status { flex: 1 1 120px; width: auto; min-width: 120px; max-width: 210px; }
   html:not(.hist) #bar > #session { flex: 1 1 100px; width: auto; min-width: 100px; max-width: 220px; }
   html:not(.hist) #bar > #map, html:not(.hist) #bar > #mapBtn { flex: 1 1 120px; width: auto; min-width: 120px; max-width: 220px; }
   html:not(.hist) #bar > #findBox { flex: 1 1 140px; width: auto; min-width: 140px; max-width: 260px; }
+  html:not(.hist) #bar > #status, html:not(.hist) #bar > #session, html:not(.hist) #bar > #map, html:not(.hist) #bar > #mapBtn, html:not(.hist) #bar > #findBox { flex-grow: 1000; }
 }
 @media (min-width: 701px) and (min-height: 521px) and (max-width: 1700px) {
   html:not(.hist) #bar > #fit .lbl, html:not(.hist) #bar > #reveal .lbl, html:not(.hist) #bar > #full .lbl, html:not(.hist) #bar > #options span { display: none; }
