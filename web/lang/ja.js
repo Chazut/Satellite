@@ -1396,7 +1396,7 @@ fumsLang({
 "Tick what to copy first.": "まずコピーするものにチェックを入れてください。",
 "What the marks mean": "マークの意味",
 "Grow with the zoom": "ズームに合わせて大きさを変える",
-"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom.": "マーカー、戦利品、そのラベルは、マップと同じようにズームインで大きく、ズームアウトで小さくなります（読みやすいよう控えめに、上限・下限あり）。マーカーの大きさは屋外で追従しているときの大きさです。オフ：どのズームでも同じ大きさ。",
+"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom.": "マーカー、戦利品、そのラベルは、マップと同じようにズームインで大きく、ズームアウトで小さくなります（読みやすいよう控えめに、上限・下限あり）。マーカーの大きさは中くらいのズームでの大きさです。オフ：どのズームでも同じ大きさ。",
 "Drop": "しずく",
 "Bigger me, bosses and friends": "自分・ボス・味方を大きく",
 "Your marker, bosses' and friends' drawn a little bigger than the rest, and whoever the map follows bigger again, to pick them out. Off: every person and bot the same size.": "自分、ボス、味方のマーカーを他より少し大きく、マップが追従している相手はさらに大きく表示して見分けやすくします。オフ：人とボットはすべて同じ大きさ。",

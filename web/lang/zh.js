@@ -1396,7 +1396,7 @@ fumsLang({
 "Tick what to copy first.": "请先勾选要复制的内容。",
 "What the marks mean": "标记的含义",
 "Grow with the zoom": "随缩放变化大小",
-"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom.": "标记、战利品及其标签会像地图一样，放大时变大、缩小时变小（幅度较小且有上下限，保持易读）。标记大小是在室外跟随时的大小。关闭：任何缩放下大小不变。",
+"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom.": "标记、战利品及其标签会像地图一样，放大时变大、缩小时变小（幅度较小且有上下限，保持易读）。标记大小是在中等缩放时的大小。关闭：任何缩放下大小不变。",
 "Drop": "水滴",
 "Bigger me, bosses and friends": "我、Boss 和队友更大",
 "Your marker, bosses' and friends' drawn a little bigger than the rest, and whoever the map follows bigger again, to pick them out. Off: every person and bot the same size.": "你的标记以及 Boss 和队友的标记比其他稍大，地图正在跟随的对象更大，便于辨认。关闭：所有人和 Bot 大小相同。",

@@ -1396,7 +1396,7 @@ fumsLang({
 "Tick what to copy first.": "먼저 복사할 것을 체크하세요.",
 "What the marks mean": "표시의 의미",
 "Grow with the zoom": "확대에 따라 크기 변경",
-"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom.": "마커, 전리품과 그 라벨이 지도처럼 확대하면 커지고 축소하면 작아집니다 (읽기 쉽도록 덜하게, 한도 안에서). 마커 크기는 야외에서 따라갈 때의 크기입니다. 끄면: 어느 배율에서나 같은 크기.",
+"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom.": "마커, 전리품과 그 라벨이 지도처럼 확대하면 커지고 축소하면 작아집니다 (읽기 쉽도록 덜하게, 한도 안에서). 마커 크기는 중간 배율에서의 크기입니다. 끄면: 어느 배율에서나 같은 크기.",
 "Drop": "물방울",
 "Bigger me, bosses and friends": "나, 보스, 아군 더 크게",
 "Your marker, bosses' and friends' drawn a little bigger than the rest, and whoever the map follows bigger again, to pick them out. Off: every person and bot the same size.": "내 마커와 보스, 아군의 마커를 나머지보다 조금 더 크게, 지도가 따라가는 대상은 더 크게 그려 알아보기 쉽게 합니다. 끄면: 모든 사람과 봇이 같은 크기.",

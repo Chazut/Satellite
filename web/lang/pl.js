@@ -1416,7 +1416,7 @@ fumsLang({
 "Tick what to copy first.": "Najpierw zaznacz, co skopiować.",
 "What the marks mean": "Co znaczą oznaczenia",
 "Grow with the zoom": "Rosną z przybliżeniem",
-"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom.": "Znaczniki, łup i ich podpisy rosną przy przybliżaniu i maleją przy oddalaniu, jak mapa (słabiej i w granicach, żeby dało się je czytać). Rozmiar znaczników to ich rozmiar przy śledzeniu na zewnątrz. Wyłączone: ten sam rozmiar przy każdym przybliżeniu.",
+"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom.": "Znaczniki, łup i ich podpisy rosną przy przybliżaniu i maleją przy oddalaniu, jak mapa (słabiej i w granicach, żeby dało się je czytać). Rozmiar znaczników to ich rozmiar przy średnim przybliżeniu. Wyłączone: ten sam rozmiar przy każdym przybliżeniu.",
 "Drop": "Kropla",
 "Bigger me, bosses and friends": "Ja, bossowie i przyjaciele więksi",
 "Your marker, bosses' and friends' drawn a little bigger than the rest, and whoever the map follows bigger again, to pick them out. Off: every person and bot the same size.": "Twój znacznik oraz znaczniki bossów i przyjaciół trochę większe od reszty, a ten, kogo śledzi mapa, jeszcze większy, żeby łatwo ich znaleźć. Wyłączone: wszyscy ludzie i boty tej samej wielkości.",

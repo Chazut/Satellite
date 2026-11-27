@@ -121,8 +121,9 @@
   const ZOOM_CLOSEST = 48;
   // Markers grow with the zoom (Settings > Markers, on to begin with): markers, loot and their labels grow as the
   // map is zoomed in and shrink as it's zoomed out, as the map itself does, only less (to the power ZOOM_GROW) and
-  // within limits so they stay readable. ZOOM_PLAIN pixels to the metre (following outdoors) is Marker size as set.
-  const ZOOM_PLAIN = 2.5, ZOOM_GROW = 0.6, ZOOM_SCALE = [0.6, 1.5];
+  // within limits so they stay readable. ZOOM_PLAIN pixels to the metre (between following outdoors and indoors) is
+  // Marker size as set: further out they're a little smaller, and only right in do they reach the most.
+  const ZOOM_PLAIN = 5, ZOOM_GROW = 0.45, ZOOM_SCALE = [0.6, 1.5];
   const zoomScale = () => prefs.worldScale === false ? 1 : Math.min(ZOOM_SCALE[1], Math.max(ZOOM_SCALE[0], Math.pow(zoom / ZOOM_PLAIN, ZOOM_GROW)));
 
   // a lock, by its kind (KeycardDoor: "Keycard door")

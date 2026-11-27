@@ -418,7 +418,7 @@ try { if (sessionStorage.getItem('swap')) { sessionStorage.removeItem('swap'); v
       <details class="group" data-group="labels" open>
         <summary>Markers</summary>
         <label class="row range"><span>Marker size <small id="scaleText"></small></span><input type="range" id="optScale" min="0.6" max="2.4" step="0.1"></label>
-        <label class="row sub" title="Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom."><input type="checkbox" id="optWorldScale"><span>Grow with the zoom</span></label>
+        <label class="row sub" title="Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom."><input type="checkbox" id="optWorldScale"><span>Grow with the zoom</span></label>
         <label class="row range" title="How every bot is drawn on the map: PMCs, scavs, bosses and the rest. Each one but the dot shows which way they face."><span>Bots' markers</span><select id="optBotShape">
         <option value="arrow">Arrow</option><option value="disc">Circle with a pointer</option><option value="dart">Circle with a dart</option><option value="drop">Drop</option><option value="chevron">Chevron</option><option value="cone">Dot with a view cone</option><option value="dot">Dot</option></select></label>
         <label class="row range" title="How you and your friends in a Fika raid are drawn on the map, so you can tell yourselves apart from the bots."><span>My and friends' markers</span><select id="optMeShape">

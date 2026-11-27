@@ -1408,7 +1408,7 @@ fumsLang({
 "Tick what to copy first.": "Marca primero qué copiar.",
 "What the marks mean": "Qué significan las marcas",
 "Grow with the zoom": "Crecer con el zoom",
-"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom.": "Los marcadores, el botín y sus etiquetas crecen al acercar y se encogen al alejar, como el mapa (menos, y con límites, para que se lean bien). Tamaño de los marcadores es su tamaño al seguir en exteriores. Desactivado: el mismo tamaño con cualquier zoom.",
+"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom.": "Los marcadores, el botín y sus etiquetas crecen al acercar y se encogen al alejar, como el mapa (menos, y con límites, para que se lean bien). Tamaño de los marcadores es su tamaño con un zoom intermedio. Desactivado: el mismo tamaño con cualquier zoom.",
 "Drop": "Gota",
 "Bigger me, bosses and friends": "Yo, jefes y amigos más grandes",
 "Your marker, bosses' and friends' drawn a little bigger than the rest, and whoever the map follows bigger again, to pick them out. Off: every person and bot the same size.": "Tu marcador y los de jefes y amigos, un poco más grandes que el resto, y al que sigue el mapa aún más, para distinguirlos. Desactivado: todas las personas y bots del mismo tamaño.",

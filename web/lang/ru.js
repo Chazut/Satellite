@@ -1416,7 +1416,7 @@ fumsLang({
 "Tick what to copy first.": "Сначала отметь, что копировать.",
 "What the marks mean": "Что значат отметки",
 "Grow with the zoom": "Меняться с масштабом",
-"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size following outdoors. Off: the same size at any zoom.": "Маркеры, добыча и их подписи растут при приближении и уменьшаются при отдалении, как карта (слабее и в пределах, чтобы оставаться читаемыми). Размер маркеров — их размер при слежении на улице. Выкл.: один размер при любом масштабе.",
+"Markers, loot and their labels grow as you zoom in and shrink as you zoom out, as the map does (less, and within limits, so they stay readable). Marker size is their size at a middle zoom. Off: the same size at any zoom.": "Маркеры, добыча и их подписи растут при приближении и уменьшаются при отдалении, как карта (слабее и в пределах, чтобы оставаться читаемыми). Размер маркеров — их размер при среднем масштабе. Выкл.: один размер при любом масштабе.",
 "Drop": "Капля",
 "Bigger me, bosses and friends": "Я, боссы и друзья крупнее",
 "Your marker, bosses' and friends' drawn a little bigger than the rest, and whoever the map follows bigger again, to pick them out. Off: every person and bot the same size.": "Твой маркер и маркеры боссов и друзей чуть крупнее остальных, а тот, за кем следит карта, ещё крупнее, чтобы их было легко найти. Выкл.: все люди и боты одного размера.",
