@@ -348,7 +348,7 @@
     orbitNames: false, orbitHear: true, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
-    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', hpEventsAll: true, hpActions: false, hpGestures: true, floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
+    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', hpEventsAll: true, hpActions: false, hpGestures: true, floatWorth: 0, chaseRing: true, nameScale: .8, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
       rosterMore: true, who: true, layout: true, spawnKinds: false, rosterRows: true, bots: true, orbitMap: false, feed: true, areas: false, boxKinds: true,
@@ -389,7 +389,7 @@
   // alertSound: a sound with each alert
   prefs.textScale = Math.min(2.4, Math.max(0.6, +prefs.textScale || 1));
   // nameScale, doingScale: names under markers, and what a bot is doing under its name, each on top of textScale
-  prefs.nameScale = Math.min(2, Math.max(0.5, +prefs.nameScale || 1));
+  prefs.nameScale = Math.min(2, Math.max(0.5, +prefs.nameScale || .8));
   prefs.doingScale = Math.min(2, Math.max(0.5, +prefs.doingScale || 1));
   // floatWorth: what a pick-up written on the map must be worth, apart from Worth at least (a page from before 1.1.0
   // may say -1, "as Worth at least": it takes what that's set to now)
@@ -4400,6 +4400,13 @@
     if (replay && bot && m.pid && prefs.hpGestures !== false && !prefs.hpNoEvents && !inArea(m) && modOn('COMET'))
       drawGestures(m, replay, x, y - r * 2.5 - 10 * scale, scale);
     if (bot && m.pid && (!replay || effects) && prefs.actionIcons !== false) {
+      const calls = replay?.signals.voices.get(m.pid);
+      const voice = replay ? (calls && calls[lastAt(calls, replay.at)]) : liveVoices.get(m.pid);
+      if (voice && (replay ? replay.at : performance.now()) - voice.t < SHARE_MS) {
+        const pic = voiceIcon(r * 2), size = pic.width / pixelRatio();
+        ctx.drawImage(pic, x - size - 6 * scale, y - hop - size - 6 * scale, size, size);
+        if (!replay) dirty = true;
+      }
       const contacts = replay?.sightings.get(m.pid);
       const last = contacts ? lastAt(contacts, replay.at) : -1;
       if (replay ? last >= 0 && replay.at - contacts[last].t < SIGHT_MS : performance.now() < liveSightUntil.get(m.pid)) {
@@ -4411,6 +4418,46 @@
     }
     drawn.push({ m, x, y: y - hop / 2, w: r * 2.6, h: r * 2.6 + hop });
   }
+
+  // The arrow points from the reporting bot to the squadmate who accepted the contact.
+  function drawSharedContacts(scale) {
+    if (!prefs.actionIcons || (replay && (prefs.hpNoPeople || prefs.hpNoEvents))) return;
+    const now = replay ? replay.at : performance.now();
+    if (!replay && liveShares.length) liveShares = liveShares.filter(s => now - s.t < SHARE_MS);
+    const shares = replay ? recentSignals(replay.signals.shares, now, SHARE_MS) : liveShares;
+    if (!shares.length) return;
+    const visible = new Map();
+    for (const m of live) if (m.pid && m.c !== 'Corpse' && !isHidden(m.c) && !inArea(m)
+      && Number.isFinite(m.cx) && !offFloor(m.cx, m.cy, m.cz)) visible.set(m.pid, m);
+    const sent = new Set();
+    ctx.save();
+    ctx.strokeStyle = '#d4a2ff'; ctx.fillStyle = '#d4a2ff'; ctx.lineWidth = 2 * scale;
+    for (const share of shares) {
+      const from = visible.get(share.from), to = visible.get(share.to);
+      if (!from || !to) continue;
+      const [x, y] = toScreen(from.cx, from.cy), [tx, ty] = toScreen(to.cx, to.cy);
+      const angle = Math.atan2(ty - y, tx - x), length = Math.hypot(tx - x, ty - y);
+      if (length > 9 * scale) {
+        const dx = Math.cos(angle), dy = Math.sin(angle), tipX = tx - dx * 6 * scale, tipY = ty - dy * 6 * scale;
+        ctx.setLineDash([4 * scale, 3 * scale]); ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(tipX, tipY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - (dx * 7 + dy * 4) * scale, tipY - (dy * 7 - dx * 4) * scale);
+        ctx.lineTo(tipX - (dx * 7 - dy * 4) * scale, tipY - (dy * 7 + dx * 4) * scale);
+        ctx.closePath(); ctx.fill();
+      }
+      if (!sent.has(share.from)) {
+        sent.add(share.from);
+        const pic = sharedIcon(16 * scale), size = pic.width / pixelRatio();
+        ctx.drawImage(pic, x + 6 * scale, y - size - 6 * scale, size, size);
+      }
+    }
+    ctx.restore();
+    if (!replay) dirty = true;
+  }
+
+  function voiceIcon(size) { return badge('♪', '#ffda8d', '#533713', '#533713', 'round', size); }
+  function sharedIcon(size) { return badge('i:special', '#e1b8ff', '#49235c', '#49235c', 'round', size); }
 
   // slanting stripes in a colour, to fill a shape with
   const stripes = {};
@@ -4907,8 +4954,8 @@
   const SHOT_MS = 900;
   let tracers = [];
   function takeShots(list, now) {
-    if (!Array.isArray(list) || (!prefs.shots && prefs.hitFlash === false)) return;
-    for (const s of list) {
+    if (!Array.isArray(list)) return;
+    if (prefs.shots || prefs.hitFlash !== false) for (const s of list) {
       if (!Array.isArray(s) || s.length < 5) continue;
       tracers.push({ who: s[0], a: [s[1], s[2]], b: [s[3], s[4]], at: now });
       // (a sixth: the marker of whoever it hit)
@@ -4916,10 +4963,11 @@
     }
     if (hitFlashes.length > 60) hitFlashes.splice(0, hitFlashes.length - 60);
     // a grenade going off (its fragments, all from one spot): a burst there, and an arc to it from the thrower
-    if (!replaySeeking && prefs.grenades !== false) {
+    if (!replaySeeking && !replay?.scan?.done && prefs.grenades !== false) {
       for (const b of blastsOf(list, id => { const m = liveById.get(id); return m && Number.isFinite(m.cx) ? [m.cx, m.cy] : null; })) {
         const thrower = b.who ? liveById.get(b.who) : null;
-        blastMarks.push({ x: b.x, y: b.y, at: now, fx: thrower ? thrower.cx : NaN, fy: thrower ? thrower.cy : NaN });
+        const inferred = { x: b.x, y: b.y, t: replay ? replay.at : now, pid: thrower?.pid, fx: thrower?.cx, fy: thrower?.cy };
+        if (!blastMarks.some(mark => mark.confirmed && sameBurst(mark, inferred))) blastMarks.push(inferred);
       }
       if (blastMarks.length > 30) blastMarks.splice(0, blastMarks.length - 30);
     }
@@ -5434,6 +5482,7 @@
     // the one pointed at: bigger, named, over the others
     if (top) drawMarker(top, true, scale);
     drawBotLabels(scale);
+    drawSharedContacts(scale);
     // the one the pointer is over in the Raid list: ringed; and the one followed, in blue
     // (Settings > Ring round the one followed: off, only the white one)
     for (const id of chased !== null && chased !== rosterOver && prefs.chaseRing !== false ? [rosterOver, chased] : [rosterOver]) {
@@ -5714,7 +5763,7 @@
     killEvents = [];
     eventsSeen = new Set();
     eventsRaid = '';
-    liveSightUntil.clear();
+    liveSightUntil.clear(); liveVoices.clear(); liveShares = [];
   }
 
   // a raid began, ended or moved on, or its location's map arrived: show that map
@@ -6776,12 +6825,36 @@
   // number in the raid, when on the raid's clock in ms, its kind, whose, their name, the rest). They come with the
   // full reports ("rid" the raid, "ev" the new ones); a page opened later asks the server for the raid so far.
   // So far only "comet.squad": what COMET has a bot doing with its squad, whenever that changes.
-  const SIGHT_MS = 1400, liveSightUntil = new Map();
+  const SIGHT_MS = 1400, SHARE_MS = 2400, liveSightUntil = new Map();
+  let liveShares = [];
+  const liveVoices = new Map();
   let squadEvents = [], eventsRaid = '', eventsSeen = new Set(), squadLogOpen = false;
   function addEvents(list, fresh, clock) {
     let added = false, killed = false, others = false;
     for (const e of list || []) {
       if (!e || !Number.isFinite(e.n) || eventsSeen.has(e.n) || !e.d) continue;
+      if (e.k === 'bot.share' || e.k === 'bot.voice' || e.k === 'grenade.blast') {
+        eventsSeen.add(e.n);
+        const age = clock - e.t, now = performance.now();
+        if (!replay && fresh && age >= 0) {
+          if (e.k === 'bot.share' && e.p && e.d.to && age < SHARE_MS) {
+            liveShares = liveShares.filter(s => now - s.t < SHARE_MS);
+            liveShares.push({ t: now - age, from: e.p, to: e.d.to });
+            dirty = true;
+          } else if (e.k === 'bot.voice' && e.p && e.d.phrase && age < SHARE_MS) {
+            liveVoices.set(e.p, { t: now - age, phrase: e.d.phrase });
+            dirty = true;
+          } else if (e.k === 'grenade.blast' && Array.isArray(e.d.at) && age < BLAST_MS) {
+            const b = blastEvent(e, now - age);
+            const who = b.pid && live.find(m => m.pid === b.pid);
+            b.fx = who?.cx; b.fy = who?.cy;
+            blastMarks = blastMarks.filter(old => old.confirmed || !sameBurst(old, b));
+            blastMarks.push(b);
+            dirty = true;
+          }
+        }
+        continue;
+      }
       if (e.k === 'bot.sight') {
         eventsSeen.add(e.n);
         const age = clock - e.t;
@@ -6843,7 +6916,7 @@
     const rid = d.raid && d.rid ? d.rid : '';
     if (rid !== eventsRaid) {
       eventsRaid = rid;
-      liveSightUntil.clear();
+      liveSightUntil.clear(); liveVoices.clear(); liveShares = [];
       squadEvents = [];
       otherEvents = [];
       ghostMarks = [];
@@ -9514,7 +9587,7 @@
               for (const e of report.ev || []) if (e && e.d && Number.isFinite(e.n)) {
                 // A gesture may have waited for the next full report. Both clocks include the loading screen here.
                 e.rt = t;
-                if ((e.k === 'bot.sight' || e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag' || e.k === 'orbit.main' || e.k === 'loot' || e.k === 'drop') && Number.isFinite(e.t) && Number.isFinite(report.clk))
+                if ((e.k === 'bot.sight' || e.k === 'bot.share' || e.k === 'bot.voice' || e.k === 'grenade.blast' || e.k === 'comet.gesture' || e.k === 'comet.activity' || e.k === 'comet.mag' || e.k === 'orbit.main' || e.k === 'loot' || e.k === 'drop') && Number.isFinite(e.t) && Number.isFinite(report.clk))
                   e.performedAt = Math.max(0, t - Math.max(0, report.clk - e.t));
                 events.push(e);
               }
@@ -9557,7 +9630,7 @@
     }
     whyOf.clear();
     const r = replay = { about, lead, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
-      next: 0, mainTimes, firstHunts, sightings: indexSightings(events, lead), hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
+      next: 0, mainTimes, firstHunts, sightings: indexSightings(events, lead), signals: indexMapSignals(events, lead), hasGestures, gestures: indexGestures(events, lead, hasGestures), activities: indexActivities(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
     // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
@@ -9920,7 +9993,11 @@
     // every shot, by whose it was; a sixth number in one says it hit somebody (a newer plugin's)
     const whereNow = id => { const tr = s.tracks.get(id); return tr && tr.x.length ? [tr.x[tr.x.length - 1], tr.y[tr.y.length - 1]] : null; };
     const shotsOf = (rows, t) => {
-      for (const b of blastsOf(rows, whereNow)) s.blasts.push({ t, x: b.x, y: b.y, who: b.who });
+      for (const b of blastsOf(rows, whereNow)) {
+        const from = whereNow(b.who), inferred = { t, x: b.x, y: b.y, who: b.who, pid: s.tracks.get(b.who)?.pid, fx: from?.[0], fy: from?.[1] };
+        const candidates = recentSignals(r.signals.blasts, t + 600, 1201);
+        if (!candidates.some(mark => sameBurst(mark, inferred))) s.blasts.push(inferred);
+      }
       for (const row of rows || []) {
         if (!Array.isArray(row) || row.length < 5) continue;
         s.shotLog.push([t, row[0]]);
@@ -9996,7 +10073,20 @@
       s.done = s.i >= r.lines.length;
       dirty = true;
       if (!s.done) setTimeout(more, 0);
-      else { buildTicks(r); hpPrint = ''; hpShow(); hpSideShow(); }
+      else {
+        const tracksByPid = new Map();
+        for (const track of s.tracks.values()) if (track.pid) tracksByPid.set(track.pid, track);
+        for (const b of r.signals.blasts) {
+          const tr = tracksByPid.get(b.pid);
+          if (tr) {
+            const at = tr.t.findLastIndex(t => t <= b.t);
+            if (at >= 0) { b.fx = tr.x[at]; b.fy = tr.y[at]; }
+          }
+          s.blasts.push(b);
+        }
+        s.blasts.sort((a, b) => a.t - b.t);
+        buildTicks(r); hpPrint = ''; hpShow(); hpSideShow();
+      }
     };
     more();
     return s;
@@ -10882,16 +10972,29 @@
     }
     return out;
   }
+  function sameBurst(a, b) {
+    return Math.abs(a.t - b.t) <= 600 && (!a.pid || !b.pid || a.pid === b.pid)
+      && Math.hypot(a.x - b.x, a.y - b.y) <= 2;
+  }
   let blastMarks = [];
   const BLAST_MS = 2600;
   function drawBlasts(scale) {
-    if (!blastMarks.length) return;
-    const now = performance.now();
-    blastMarks = blastMarks.filter(b => now - b.at < BLAST_MS);
-    if (prefs.grenades === false) { blastMarks = []; return; }
+    if (prefs.grenades === false) return;
+    const now = replay ? replay.at : performance.now();
+    if (!replay && blastMarks.length) blastMarks = blastMarks.filter(b => now - b.t < BLAST_MS);
+    let marks = blastMarks;
+    if (replay) {
+      if (replay.scan?.done) marks = recentSignals(replay.scan.blasts, now, BLAST_MS);
+      else {
+        const known = recentSignals(replay.signals.blasts, now, BLAST_MS);
+        blastMarks = blastMarks.filter(b => b.t <= now && now - b.t < BLAST_MS && !known.some(k => sameBurst(b, k)));
+        marks = blastMarks.length ? known.concat(blastMarks) : known;
+      }
+    }
+    if (!marks.length) return;
     ctx.save();
-    for (const b of blastMarks) {
-      const k = (now - b.at) / BLAST_MS, s = toScreen(b.x, b.y), r = Math.max(12 * scale, 7 * zoom) * (0.35 + 0.65 * Math.min(1, k * 3));
+    for (const b of marks) {
+      const k = (now - b.t) / BLAST_MS, s = toScreen(b.x, b.y), r = Math.max(12 * scale, 7 * zoom) * (0.35 + 0.65 * Math.min(1, k * 3));
       ctx.globalAlpha = 1 - k;
       if (Number.isFinite(b.fx)) {
         // thrown from here: an arc to where it went off
@@ -10916,6 +11019,13 @@
       ctx.arc(s[0], s[1], 3.2 * scale, 0, Math.PI * 2);
       ctx.fillStyle = '#fff3e0';
       ctx.fill();
+      if (b.name) {
+        ctx.font = 'bold ' + Math.round(12 * scale) + 'px ' + FONT;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.strokeStyle = '#23180b'; ctx.lineWidth = 3 * scale;
+        ctx.strokeText(b.name, s[0], s[1] - r - 3 * scale);
+        ctx.fillText(b.name, s[0], s[1] - r - 3 * scale);
+      }
     }
     ctx.restore();
     dirty = true;
@@ -11050,6 +11160,14 @@
     icon.getContext('2d').drawImage(sample, 0, 0);
     sight.append(icon, T('Spotted another bot'));
     keys.appendChild(sight);
+    const voice = mk('span'), note = voiceIcon(16), noteCanvas = note.cloneNode(false);
+    noteCanvas.getContext('2d').drawImage(note, 0, 0);
+    voice.append(noteCanvas, T('Voice call'));
+    keys.appendChild(voice);
+    const share = mk('span'), radio = sharedIcon(16), canvas = radio.cloneNode(false);
+    canvas.getContext('2d').drawImage(radio, 0, 0);
+    share.append(canvas, T('Contact shared'));
+    keys.appendChild(share);
     group.appendChild(keys);
     return group;
   }
@@ -12059,13 +12177,23 @@
         rows.push({ t: e.rt, who: name, kind: '', act: 'mag', text: (MAG_SAID[d.st] || d.st || '') + (d.i ? ' · ' + d.i : ''), at: d.at, id: e.p ? idOf(e.p) : null });
       }
     }
+    for (const [pid, calls] of r.signals.voices) {
+      const id = idOf(pid), bot = s.tracks.get(id);
+      for (const call of calls) rows.push({ t: call.t, who: bot?.name || pid, kind: bot?.c || '', act: 'voice',
+        text: spaced(call.phrase.replace(/^On(?=[A-Z])/, '')), at: null, id });
+    }
+    for (const share of r.signals.shares) {
+      const id = idOf(share.from), from = s.tracks.get(id), to = s.tracks.get(idOf(share.to));
+      rows.push({ t: share.t, who: from?.name || share.from, kind: from?.c || '', act: 'share',
+        text: (from?.name || share.from) + ' → ' + (to?.name || share.to), at: null, id });
+    }
     for (const b of s.blasts) {
-      const track = s.tracks.get(b.who);
-      rows.push({ t: b.t, who: track ? track.name || ONE[track.c] || track.c : '', kind: track ? track.c : '', act: 'grenade', text: T('Grenade went off'), at: [b.x, b.y], id: null });
+      const track = s.tracks.get(b.who) || (b.pid && s.tracks.get(idOf(b.pid)));
+      rows.push({ t: b.t, who: track ? track.name || ONE[track.c] || track.c : '', kind: track ? track.c : '', act: 'grenade', text: b.name ? T('Grenade went off') + ' · ' + b.name : T('Grenade went off'), at: [b.x, b.y], id: null });
     }
     return rows.sort((x, y) => x.t - y.t);
   }
-  const ACTS = { killed: T('killed'), looted: T('looted'), dropped: T('dropped'), threw: T('threw'), grenade: T('grenade'), left: T('left'), switch: T('switch'), door: T('door'), ghost: T('ghost'), mag: T('magazine') };
+  const ACTS = { voice: T('Voice call'), share: T('Contact shared'), killed: T('killed'), looted: T('looted'), dropped: T('dropped'), threw: T('threw'), grenade: T('grenade'), left: T('left'), switch: T('switch'), door: T('door'), ghost: T('ghost'), mag: T('magazine') };
   // what PBT made of one of its cheaters ("personality|cheat,cheat"), said
   const cheatSaid = s => {
     if (!s) return '';
@@ -12988,6 +13116,39 @@
     ['SwitchedDevicesOff', T('Switched tactical devices off')]
   ]);
   const GESTURE_MS = 3000, reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function indexMapSignals(events, lead) {
+    const shares = [], voices = new Map(), blasts = [], seen = new Set();
+    for (const e of events) {
+      if ((e.k !== 'bot.share' && e.k !== 'bot.voice' && e.k !== 'grenade.blast') || seen.has(e.n)) continue;
+      const t = e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead);
+      if (e.k === 'bot.share' && e.p && e.d.to && e.p !== e.d.to) shares.push({ t, from: e.p, to: e.d.to });
+      if (e.k === 'bot.voice' && e.p && e.d.phrase) {
+        if (!voices.has(e.p)) voices.set(e.p, []);
+        voices.get(e.p).push({ t, phrase: e.d.phrase });
+      }
+      if (e.k === 'grenade.blast' && Array.isArray(e.d.at)) blasts.push(blastEvent(e, t));
+      seen.add(e.n);
+    }
+    shares.sort((a, b) => a.t - b.t);
+    blasts.sort((a, b) => a.t - b.t);
+    for (const calls of voices.values()) calls.sort((a, b) => a.t - b.t);
+    return { shares, voices, blasts };
+  }
+
+  function blastEvent(e, t) {
+    return { t, pid: e.p, x: e.d.at[0], y: e.d.at[1], name: e.d.i || '', confirmed: true };
+  }
+
+  const noSignals = Object.freeze([]);
+  function recentSignals(track, time, duration) {
+    if (!track.length) return noSignals;
+    const end = lastAt(track, time);
+    if (end < 0 || time - track[end].t >= duration) return noSignals;
+    let first = end;
+    while (first >= 0 && time - track[first].t < duration) first--;
+    return track.slice(first + 1, end + 1);
+  }
+
   function indexSightings(events, lead) {
     const tracks = new Map(), seen = new Set();
     for (const e of events) {
@@ -14141,7 +14302,7 @@
           const y = s[1] + r * 2.1 + (captionVisible ? 13 * scale : 0);
           ctx.font = Math.round(11 * scale) + 'px ' + FONT;
           ctx.lineWidth = 3 * scale; ctx.strokeStyle = '#101622';
-          ctx.strokeText(detail, s[0], y); ctx.fillStyle = '#d7ecff';
+          ctx.strokeText(detail, s[0], y); ctx.fillStyle = orbitStateColors[state];
           ctx.fillText(detail, s[0], y);
         }
         thingsDrawn.push({ x: s[0], y: s[1], r: r * 1.4, tip: { title: 'ORBIT · ' + what,

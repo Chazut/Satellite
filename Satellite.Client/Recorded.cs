@@ -471,6 +471,42 @@ namespace Satellite.Client
             }
         }
 
+        // Squad callouts, including reloads and requests for help. Excludes pain and death sounds.
+        private static readonly HashSet<EPhraseTrigger> Callouts = new HashSet<EPhraseTrigger>
+        {
+            EPhraseTrigger.OnEnemyGrenade, EPhraseTrigger.OnGrenade, EPhraseTrigger.FollowMe,
+            EPhraseTrigger.Gogogo, EPhraseTrigger.Suppress, EPhraseTrigger.Covering,
+            EPhraseTrigger.Going, EPhraseTrigger.Regroup, EPhraseTrigger.Roger,
+            EPhraseTrigger.Negative, EPhraseTrigger.GetInCover, EPhraseTrigger.GetBack,
+            EPhraseTrigger.HoldPosition, EPhraseTrigger.OnYourOwn, EPhraseTrigger.Repeat,
+            EPhraseTrigger.Stop, EPhraseTrigger.Ready, EPhraseTrigger.OnPosition,
+            EPhraseTrigger.CoverMe, EPhraseTrigger.LostVisual, EPhraseTrigger.OnLostVisual,
+            EPhraseTrigger.Rat, EPhraseTrigger.OnFirstContact, EPhraseTrigger.OnRepeatedContact,
+            EPhraseTrigger.OnEnemyConversation, EPhraseTrigger.OnEnemyShot, EPhraseTrigger.SniperPhrase,
+            EPhraseTrigger.EnemyDown, EPhraseTrigger.GoodWork, EPhraseTrigger.OnFriendlyDown,
+            EPhraseTrigger.LootBody, EPhraseTrigger.LootGeneric, EPhraseTrigger.OnLoot,
+            EPhraseTrigger.CheckHim, EPhraseTrigger.OnWeaponReload, EPhraseTrigger.NeedMedkit,
+            EPhraseTrigger.NeedSniper, EPhraseTrigger.NeedHelp, EPhraseTrigger.OnSix,
+            EPhraseTrigger.LeftFlank, EPhraseTrigger.RightFlank, EPhraseTrigger.InTheFront,
+            EPhraseTrigger.NoisePhrase, EPhraseTrigger.OpenDoor, EPhraseTrigger.OnFight,
+            EPhraseTrigger.GoForward, EPhraseTrigger.UnderFire, EPhraseTrigger.NeedAmmo,
+            EPhraseTrigger.OnOutOfAmmo,
+        };
+
+        public static void VoicePlayed(object __instance, EPhraseTrigger __0, bool __runOriginal, bool __result)
+        {
+            if (!__runOriginal || !__result || !World.Watched || World.BrainsOff || Events.Raid.Length == 0
+                || !Callouts.Contains(__0)) return;
+            var player = Hooks.Get(__instance, "Player") as Player;
+            if (player == null || (player.AIData?.BotOwner?.BotsGroup?.MembersCount ?? 0) < 2) return;
+            Events.Add("bot.voice", player.ProfileId, player.Profile?.Nickname, Time.realtimeSinceStartup, to =>
+            {
+                to.Append("{\"phrase\":");
+                World.Text(to, __0.ToString());
+                to.Append('}');
+            });
+        }
+
         private static void BeforeSight(EnemyInfo __instance, bool __0, out bool __state)
         {
             __state = __0 && !__instance.IsVisible;

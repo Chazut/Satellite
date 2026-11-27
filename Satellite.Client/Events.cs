@@ -55,6 +55,7 @@ namespace Satellite.Client
             _raid = raid ? Guid.NewGuid().ToString("N") : "";
             _began = Time.realtimeSinceStartup;
             Brains.Forget();
+            ContactSharing.Forget();
             if (raid) CometLog.RaidStarted(_raid, _began);
             else
             {

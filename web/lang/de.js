@@ -1,5 +1,7 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Voice call": "Sprachmeldung",
+"Contact shared": "Kontakt weitergegeben",
 "Spotted another bot": "Anderen Bot gesichtet",
 "Moving": "In Bewegung",
 "All objectives done": "Alle Ziele abgeschlossen",
