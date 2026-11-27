@@ -25,7 +25,7 @@ internal static class CometDebugPage
                 if (line.StartsWith("c\t", StringComparison.Ordinal))
                 {
                     int end = line.IndexOf('\t', 2);
-                    if (!reports && end > 2 && int.TryParse(line.AsSpan(2, end - 2), out int key))
+                    if (end > 2 && int.TryParse(line.AsSpan(2, end - 2), out int key))
                         definitions[key] = line[(end + 1)..];
                     continue;
                 }
