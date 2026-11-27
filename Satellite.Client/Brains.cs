@@ -227,6 +227,8 @@ namespace Satellite.Client
         private static bool _saidUnread;
         private static bool _saidHeard;
 
+        internal static bool GestureEvents { get; private set; }
+
         private static void Listen(Type decisions)
         {
             try
@@ -240,6 +242,7 @@ namespace Satellite.Client
 
                 _listener = Hear;
                 published.AddEventHandler(null, _listener);
+                GestureEvents = decisions.GetField("GestureEventVersion", BindingFlags.Public | BindingFlags.Static)?.GetRawConstantValue() is int versionGestures && versionGestures >= 1;
             }
             catch (Exception)
             {
@@ -282,6 +285,12 @@ namespace Satellite.Client
                 {
                     return;
                 }
+            }
+            else if ((json[at + 1] == 'M' || json[at + 1] == 'D') && json.Length <= 2048)
+            {
+                // Confirmed one-shot gestures are small in both COMET replay modes. Ignore its planning traces.
+                if (json.IndexOf("\"stage\":\"performed\"", at, Math.Min(120, json.Length - at), StringComparison.Ordinal) < 0)
+                    return;
             }
             else if (json.Length > MostLength || !(json[at + 1] == 'S' && json[at + 2] == '0' || json[at + 1] == 'W' && json[at + 2] == '0' && json[at + 3] == '4'))
             {
@@ -499,6 +508,18 @@ namespace Satellite.Client
 
             var profileId = Word(said, "profileId");
             var feature = Word(said, "feature");
+            if (Word(said, "stage") == "performed" && profileId.Length > 0 && Amount(said, "realtime", out var performed))
+            {
+                var gesture = Word(said, "decision");
+                if (gesture.Length > 0)
+                    Events.Add("comet.gesture", profileId, Word(said, "name"), performed, to =>
+                    {
+                        to.Append("{\"action\":");
+                        World.Text(to, gesture);
+                        to.Append('}');
+                    });
+                return;
+            }
             if (feature == "W04")
             {
                 Magazine(said, profileId);

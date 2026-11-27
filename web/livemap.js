@@ -348,7 +348,7 @@
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
-    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', hpActions: false, floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
+    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', hpActions: false, hpGestures: true, floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
       rosterMore: true, who: true, layout: true, spawnKinds: false, rosterRows: true, bots: true, orbitMap: false, feed: true, areas: false, boxKinds: true,
@@ -4328,6 +4328,8 @@
       if (said) write(said.length > 30 ? said.slice(0, 29) + '…' : said, 9.5 * scale * prefs.doingScale, x, detailY,
         brain.ghost ? '#c2c5ca' : DOING_COL[brain.by] || '#dadcdf', away && !strong ? 0.55 : 0.95);
     }
+    if (replay && bot && m.pid && prefs.hpGestures !== false && !prefs.hpNoEvents && !inArea(m) && modOn('COMET'))
+      drawGestures(m, replay, x, y - r * 2.5 - 10 * scale, scale);
     drawn.push({ m, x, y, w: r * 2.6, h: r * 2.6 });
   }
 
@@ -9384,7 +9386,7 @@
     if (replay) leaveReplay();
     const times = [], lines = [], full = [], events = [], loot = [];
     // (where each of the raid's containers stood, as it loaded: see addMore; an older recording has none)
-    let spots = null;
+    let spots = null, hasGestures = false;
     for (let from = 0; from < text.length;) {
       let end = text.indexOf('\n', from);
       if (end < 0) end = text.length;
@@ -9397,9 +9399,19 @@
         }
         else if (Number.isFinite(t) && line.startsWith('{"t":"f')) {
           const whole = line.startsWith('{"t":"full"');
+          if (whole && !hasGestures) hasGestures = line.includes('"gestures":1');
           let fine = true;
           if (whole && line.includes('"ev":[')) {
-            try { for (const e of JSON.parse(line).ev || []) if (e && e.d && Number.isFinite(e.n)) { e.rt = t; events.push(e); } } catch (err) { fine = false; }
+            try {
+              const report = JSON.parse(line);
+              for (const e of report.ev || []) if (e && e.d && Number.isFinite(e.n)) {
+                // A gesture may have waited for the next full report. Both clocks include the loading screen here.
+                e.rt = t;
+                if (e.k === 'comet.gesture' && Number.isFinite(e.t) && Number.isFinite(report.clk))
+                  e.performedAt = Math.max(0, t - Math.max(0, report.clk - e.t));
+                events.push(e);
+              }
+            } catch (err) { fine = false; }
           }
           if (fine && !(whole && line.includes('"raid":false'))) { times.push(t); lines.push(line); full.push(whole); }
         }
@@ -9425,7 +9437,7 @@
     for (const e of events) e.t = e.rt;
     whyOf.clear();
     const r = replay = { about, lead, times, lines, full, events, total: Math.max(1, times[times.length - 1]), at: 0, playing: false, speed: REPLAY_SPEEDS.includes(prefs.hpSpeed) ? prefs.hpSpeed : 1,
-      next: 0, scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
+      next: 0, hasGestures, gestures: indexGestures(events, lead), scan: null, names: null, loot, lootAt: '', lootBaseAt: -2, lootBase: null, picks: null, spots };
     forgetSquads();
     blastMarks = [];
     // what the things picked up are worth: asked of the server (a recording doesn't hold prices)
@@ -9621,6 +9633,8 @@
     $('replayPeople').classList.toggle('on', !prefs.hpNoPeople);
     $('replayEvents').classList.toggle('on', !prefs.hpNoEvents);
     $('replayShots').classList.toggle('on', !!prefs.shots);
+    $('replayGestures').classList.toggle('on', prefs.hpGestures !== false);
+    $('replayGestures').setAttribute('aria-pressed', String(prefs.hpGestures !== false));
     $('replayOverlayToggle').setAttribute('aria-pressed', String(!!prefs.hpActions));
     $('replayOverlayToggle').classList.toggle('on', !!prefs.hpActions);
     $('replayDoing').classList.toggle('on', !!prefs.mapDoing);
@@ -9722,6 +9736,7 @@
   $('replaySpree').onclick = () => { prefs.lootSprees = !prefs.lootSprees; $('replaySpree').classList.toggle('on', prefs.lootSprees); save(); if (replay && replay.scan && replay.scan.done) buildSprees(replay); };
   // the cog's other switches: each flips one setting of the replay's map
   for (const [id, flip] of [['replayPeople', () => { prefs.hpNoPeople = !prefs.hpNoPeople; }], ['replayEvents', () => { prefs.hpNoEvents = !prefs.hpNoEvents; }],
+    ['replayGestures', () => { prefs.hpGestures = prefs.hpGestures === false; }],
     ['replayOverlayToggle', () => { prefs.hpActions = !prefs.hpActions; actionFrame = null; }],
     ['replayShots', () => { prefs.shots = !prefs.shots; }], ['replayDoing', () => { prefs.mapDoing = !prefs.mapDoing; }],
     ['replayFacing', () => { prefs.hpNoFacing = !prefs.hpNoFacing; }]]) {
@@ -12763,8 +12778,52 @@
     const hunt = squadHunt(m);
     return hunt ? T('Squad:') + ' ' + hunt : '';
   }
-  // Replay time is trimmed and sorted by whyLoad. Build the short action track once for the followed bot.
   // A proposal, a requested animation or crossing time while scrubbing is never evidence of execution.
+  const GESTURE_LABELS = new Map([
+    ['CornerPeek', T('Corner peek')], ['Prefire', T('Prefire')], ['Zigzag', T('Zigzag')],
+    ['TacticalJump', T('Tactical jump')], ['DoorwayJump', T('Doorway jump')], ['CoverFeint', T('Cover feint')],
+    ['FakeReload', T('Fake reload')], ['DoorwayPeek', T('Doorway peek')], ['FakeGrenade', T('Fake grenade')],
+    ['FakeHeal', T('Fake heal')], ['EnteredRoom', T('Entered room')]
+  ]);
+  const GESTURE_MS = 3000, reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function indexGestures(events, lead) {
+    const tracks = new Map(), seen = new Set();
+    for (const e of events) {
+      if (e.k !== 'comet.gesture' || !e.p || !e.d || !GESTURE_LABELS.has(e.d.action) || seen.has(e.n)) continue;
+      seen.add(e.n);
+      if (!tracks.has(e.p)) tracks.set(e.p, []);
+      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), name: GESTURE_LABELS.get(e.d.action) });
+    }
+    for (const track of tracks.values()) track.sort((a, b) => a.t - b.t);
+    return tracks;
+  }
+  function gestureTrack(r, pid, loadOld) {
+    if (r.hasGestures || r.gestures.size) return r.gestures.get(pid);
+    if (!loadOld) return r.legacyGestures?.get(pid);
+    // Older formats kept detailed evidence per bot. Reuse evidence already loaded, and load a followed bot on demand.
+    const got = whyLoad(r, pid);
+    if (got.state !== 'ok') return null;
+    if (r.legacyGestures?.has(pid)) return r.legacyGestures.get(pid);
+    const track = actionTrack(got.ev);
+    (r.legacyGestures ||= new Map()).set(pid, track);
+    return track;
+  }
+  function drawGestures(m, r, x, y, scale) {
+    const track = gestureTrack(r, m.pid, chased === m.id);
+    if (!track || !track.length) return;
+    const last = lastAt(track, r.at);
+    let row = 0;
+    for (let i = last; i >= 0 && r.at - track[i].t < GESTURE_MS; i--) {
+      // Two sources in an older debug recording may describe the same door jump.
+      let repeated = false;
+      for (let k = i + 1; k <= last; k++) if (track[k].name === track[i].name) { repeated = true; break; }
+      if (repeated) continue;
+      const age = (r.at - track[i].t) / GESTURE_MS;
+      const rise = reducedMotion.matches ? 0 : 15 * age;
+      write(track[i].name, 12 * scale, x, y - (rise + row * 16) * scale, '#ffd17c', Math.min(1, (1 - age) * 3));
+      row++;
+    }
+  }
   const actionTrackOf = new WeakMap();
   function actionTrack(events) {
     if (actionTrackOf.has(events)) return actionTrackOf.get(events);
@@ -12857,10 +12916,9 @@
       actionFrame = null;
       return;
     }
-    const got = modOn('COMET') ? whyLoad(r, m.pid) : null;
-    const track = got && got.state === 'ok' ? actionTrack(got.ev) : [];
+    const track = (modOn('COMET') && gestureTrack(r, m.pid, true)) || [];
     const last = lastAt(track, r.at), recent = [];
-    for (let i = last; i >= 0 && r.at - track[i].t < 3000; i--) {
+    for (let i = last; i >= 0 && r.at - track[i].t < GESTURE_MS; i--) {
       if (!recent.some(a => a.name === track[i].name)) recent.push(track[i]);
     }
     const printTime = recent.map(a => a.t).join(',');

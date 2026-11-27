@@ -1,5 +1,6 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Brief actions": "Actions brèves",
 "Corner peek": "Coup d'œil au coin",
 "Prefire": "Tir anticipé",
 "Zigzag": "Zigzag",

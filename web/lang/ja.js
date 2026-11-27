@@ -1,5 +1,6 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Brief actions": "短い行動",
 "Corner peek": "角からのぞく",
 "Prefire": "決め撃ち",
 "Zigzag": "ジグザグ移動",

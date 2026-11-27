@@ -1,5 +1,6 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Brief actions": "瞬时动作",
 "Corner peek": "从拐角探头",
 "Prefire": "提前开火",
 "Zigzag": "之字移动",

@@ -309,6 +309,7 @@ namespace Satellite.Client
                 feature = Peek(json, "feature");
                 stage = Peek(json, "stage");
                 trace = stage == "evaluated" ? CometActionSamples.Trace(feature) : null;
+                if (trace != null && Brains.GestureEvents) return null; // Confirmed actions ride the main recording.
                 if (!Wanted(feature, stage) && (trace == null || json.IndexOf("\"" + trace + "\":", StringComparison.Ordinal) < 0))
                 {
                     return null;
