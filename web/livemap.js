@@ -119,12 +119,12 @@
   const ZOOM_MIN_DIVIDER = 1.1;
   // as close as it goes: screen pixels to a metre
   const ZOOM_CLOSEST = 48;
-  // Markers grow with the zoom (Settings > Markers, on to begin with): markers, loot and their labels grow as the
+  // Markers grow with the zoom (Settings > Markers, off to begin with): markers, loot and their labels grow as the
   // map is zoomed in and shrink as it's zoomed out, as the map itself does, only less (to the power ZOOM_GROW) and
   // within limits so they stay readable. ZOOM_PLAIN pixels to the metre (between following outdoors and indoors) is
   // Marker size as set: further out they're a little smaller, and only right in do they reach the most.
   const ZOOM_PLAIN = 5, ZOOM_GROW = 0.45, ZOOM_SCALE = [0.6, 1.5];
-  const zoomScale = () => prefs.worldScale === false ? 1 : Math.min(ZOOM_SCALE[1], Math.max(ZOOM_SCALE[0], Math.pow(zoom / ZOOM_PLAIN, ZOOM_GROW)));
+  const zoomScale = () => prefs.worldScale !== true ? 1 : Math.min(ZOOM_SCALE[1], Math.max(ZOOM_SCALE[0], Math.pow(zoom / ZOOM_PLAIN, ZOOM_GROW)));
 
   // a lock, by its kind (KeycardDoor: "Keycard door")
   const lockName = kind => T({ Door: 'Door', Trunk: 'Trunk', KeycardDoor: 'Keycard door', Switch: 'lock|Switch', DoorSwitch: 'Door switch' }[kind] || 'Lock');
@@ -348,7 +348,7 @@
     orbitNames: false, orbitHear: false, orbitFights: false, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
     alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
-    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: true, sizeByKind: false,
+    latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', floatWorth: 0, chaseRing: true, nameScale: 1, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
       rosterMore: true, who: true, layout: true, spawnKinds: false, rosterRows: true, bots: true, orbitMap: false, feed: true, areas: false, boxKinds: true,
@@ -356,6 +356,8 @@
   // lootOff: the kinds of loot left off (see LOOT_KINDS). peek: what's in containers, bodies, airdrops and on bots is
   // shown. rosterFog: the Raid list names everyone seen this raid but not who's still alive. latin: names written in
   // Cyrillic are shown in Latin letters (bosses by their English names)
+  // worldScale: Grow with the zoom, off to begin with (a page that opened beta 6 before that had it on: off once)
+  if (!prefs.worldScaleOffOnce) { prefs.worldScale = false; prefs.worldScaleOffOnce = true; }
   // botShape, meShape: how bots, and you and your friends, are drawn (see MARKER_SHAPES)
   for (const k of ['botShape', 'meShape']) if (!['arrow', 'disc', 'dart', 'drop', 'chevron', 'cone', 'dot'].includes(prefs[k])) prefs[k] = 'arrow';
   if (!Array.isArray(prefs.lootOff)) prefs.lootOff = [];
