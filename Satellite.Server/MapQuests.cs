@@ -417,7 +417,7 @@ public partial class LiveMapRoute
             ["keys"] = KeysOf(pmc?.Inventory, session.Raid ? session.KeysCarried : null),
             ["wishG"] = wishGroups,
             ["friends"] = friends,
-            ["names"] = Names(named)
+            ["names"] = Names(named, session.Id)
         }.ToJsonString();
     }
 }

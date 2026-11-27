@@ -162,7 +162,7 @@ public partial class LiveMapRoute
 
     // The tally's numbers into a raid's about: "hurt", "bots", "loot" (what the player picked up is worth), "best" (the
     // dearest thing they picked up: {"i","v"}), and "st" (counted, so an older raid is counted once)
-    private void Tallied(JsonObject about, Tally tally)
+    private void Tallied(JsonObject about, Tally tally, string? sid = null)
     {
         about["hurt"] = (int)Math.Round(tally.Hurt);
         about["bots"] = tally.Bots.Count;
@@ -170,7 +170,7 @@ public partial class LiveMapRoute
         var best = "";
         if (tally.Loot.Count > 0)
         {
-            var names = Names(tally.Loot.Select(l => l.Tpl).Distinct());
+            var names = Names(tally.Loot.Select(l => l.Tpl).Distinct(), sid);
             foreach (var (tpl, name, count) in tally.Loot)
             {
                 var each = names[tpl]?["p"] is JsonValue p && p.TryGetValue<double>(out var price) ? price : 0;
@@ -796,7 +796,7 @@ public partial class LiveMapRoute
         // take from what was found)
         if (of.HadOn.Count > 0)
         {
-            var names = Names(of.HadOn.Select(o => o.Tpl).Distinct());
+            var names = Names(of.HadOn.Select(o => o.Tpl).Distinct(), of.Sid);
             double PriceOf(string tpl) => names[tpl]?["p"] is JsonValue p && p.TryGetValue<double>(out var price) ? price : 0;
             double carried = 0;
             foreach (var (tpl, count) in of.HadOn)
@@ -820,7 +820,7 @@ public partial class LiveMapRoute
             }
         }
 
-        Tallied(about, of.Tally);
+        Tallied(about, of.Tally, of.Sid);
 
         if (live)
         {

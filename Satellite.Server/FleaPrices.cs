@@ -37,34 +37,61 @@ public partial class LiveMapRoute
     private bool? _handbookOnly;
     private bool HandbookOnly() => _handbookOnly ??= File.Exists(HandbookFile);
 
-    // GET api/prices: {"handbook"}; POST ?handbook=1 prices by the handbook from now on, ?handbook=0 by the flea again
+    // Flea prices only, whatever a trader pays or whether the player can use the flea yet (how Satellite priced
+    // before 1.1.0): kept as the file "flea-prices". Trader prices only, the best the player's traders pay
+    // (SellPrices): "trader-prices". None of the files: "Most it sells for" (SellPrices).
+    private string FleaFile => Path.Combine(Folder, "flea-prices");
+    private bool? _fleaOnly;
+    private bool FleaOnly() => _fleaOnly ??= File.Exists(FleaFile);
+    private string TraderFile => Path.Combine(Folder, "trader-prices");
+    private bool? _traderOnly;
+    private bool TraderOnly() => _traderOnly ??= File.Exists(TraderFile);
+    private string PriceMode() => HandbookOnly() ? "handbook" : FleaOnly() ? "flea" : TraderOnly() ? "trader" : "most";
+
+    // GET api/prices: {"mode":"most"|"trader"|"flea"|"handbook","handbook"}; POST ?mode=.. prices that way from now on (an
+    // older page's ?handbook=1 or 0: by the handbook, or the flea)
     private string Pricing(HttpContext context, bool post)
     {
         if (post)
         {
-            var handbook = context.Request.Query["handbook"] == "1";
+            var mode = context.Request.Query["mode"].ToString() is { Length: > 0 } asked ? asked
+                : context.Request.Query["handbook"] == "1" ? "handbook" : "flea";
+            if (mode is not ("most" or "trader" or "flea" or "handbook"))
+            {
+                mode = "most";
+            }
+
             try
             {
-                if (handbook)
-                {
-                    File.WriteAllText(HandbookFile, "");
-                }
-                else if (File.Exists(HandbookFile))
-                {
-                    File.Delete(HandbookFile);
-                }
+                Keep(HandbookFile, mode == "handbook");
+                Keep(FleaFile, mode == "flea");
+                Keep(TraderFile, mode == "trader");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 logger.Warning($"[Satellite] Couldn't keep the price setting (only until the server restarts): {ex.Message}");
             }
 
-            _handbookOnly = handbook;
+            _handbookOnly = mode == "handbook";
+            _fleaOnly = mode == "flea";
+            _traderOnly = mode == "trader";
             // what was priced the other way is made again
             Interlocked.Increment(ref _fleaVersion);
         }
 
-        return new JsonObject { ["handbook"] = HandbookOnly() }.ToJsonString();
+        return new JsonObject { ["mode"] = PriceMode(), ["handbook"] = HandbookOnly() }.ToJsonString();
+
+        static void Keep(string file, bool on)
+        {
+            if (on)
+            {
+                File.WriteAllText(file, "");
+            }
+            else if (File.Exists(file))
+            {
+                File.Delete(file);
+            }
+        }
     }
 
     private static readonly HttpClient Flea = new(new HttpClientHandler

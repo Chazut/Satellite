@@ -836,7 +836,7 @@ details.group.sub > p { margin: 0 0 6px; font-size: 11.5px; color: var(--dim); }
 .chips .chip.df { grid-column: 1; }
 .chips .chip.ps { grid-column: 2; }
 .chips .chip.loot { grid-column: 4; text-align: right; }
-.chips .doing { grid-column: 3; display: flex; gap: 3px; min-width: 0; height: 18px; }
+.chips .doing { grid-column: 1 / 4; display: flex; gap: 3px; min-width: 0; height: 18px; }
 .chips.noPs .doing { grid-column: 2 / 4; }
 .chips .doing .chip { flex: 1 1 0; text-align: left; }
 /* what the one pressed wears and carries: where it's worn, what it is, what it's worth */
@@ -1581,8 +1581,8 @@ table.facts td:last-child { color: var(--bright); }
 .linkBtn:hover { text-decoration: underline; }
 table.board.sortable th { cursor: pointer; user-select: none; white-space: nowrap; }
 table.board.sortable th:hover, table.board th.sorted { color: var(--accent); }
-table.board td i.squadDot { width: 18px; height: 18px; margin: 0; }
-table.board tr.pick { cursor: pointer; }
+/* (inline-flex here too: the plain "table.board td i" dot rule further down would make it inline-block and drop the centring) */
+table.board td i.squadDot { display: inline-flex; vertical-align: middle; width: 18px; height: 18px; margin: 0; }table.board tr.pick { cursor: pointer; }
 table.board tr.pick:hover td { background: var(--hover); }
 table.board tr.open td { background: var(--accent-soft); }
 table.board td small { display: block; color: var(--dim); font-size: 11px; font-weight: 400; white-space: normal; }
@@ -1592,6 +1592,14 @@ table.board tr.detail td { padding: 8px 12px 10px 26px; background: rgba(255, 25
 table.board tr.detail .linkBtn { display: block; margin: 2px 0; text-decoration: none; }
 table.board tr.detail .linkBtn:hover { color: var(--accent); }
 table.board tr.detail > td > .linkBtn:first-child { color: var(--accent); margin-bottom: 6px; }
+/* (#hp's own button look, bordered and 32px tall, kept off these: they're plain lines of text) */
+#hp table.board tr.detail button.linkBtn { display: block; height: auto; margin: 2px 0; padding: 1px 0; border: 0; border-radius: 0; background: transparent; color: var(--text);
+  text-align: left; text-decoration: none; white-space: normal; }
+#hp table.board tr.detail button.linkBtn:hover { background: transparent; color: var(--accent); }
+#hp table.board tr.detail button.linkBtn.follow { margin: 0 0 6px; color: var(--accent); font-weight: 600; }
+#hp table.board tr.detail button.linkBtn.follow:hover { text-decoration: underline; }
+#hp table.board tr.detail button.linkBtn.bad { color: #ff8a80; }
+table.board tr.detail .noKills { font-size: 12px; }
 table.board .dim, .dim { color: var(--dim); }
 table.board td.acts { text-align: right; white-space: nowrap; }
 td.acts button, td.acts a.btn { height: 26px; padding: 0 9px; margin-left: 4px; }
@@ -1929,9 +1937,15 @@ html.hist #hpSide #squadPane { max-height: max(260px, calc(100vh - var(--hp-unde
 .hpSecBody .setGroup .row small { color: var(--dim); }
 .hpSecBody .setGroup #colorList { margin: 2px 0 6px; }
 /* put away: a tab on the right edge brings it back */
-#hpSideTab { position: fixed; right: 0; top: 50%; z-index: 2; transform: translateY(-50%); padding: 10px 8px; border: 1px solid var(--line-strong); border-right: 0; border-radius: 8px 0 0 8px;
-  background: var(--panel-solid); color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; writing-mode: vertical-rl; cursor: var(--cur-hand); box-shadow: var(--shadow); }
-#hpSideTab[hidden] { display: none; }
+/* (the live map's menu and Raid list put away, the same: .edgeTab, see edgeTabs) */
+#hpSideTab, .edgeTab { position: fixed; right: 0; top: 50%; z-index: 4; transform: translateY(-50%); height: auto; min-height: 0; padding: 16px 9px;
+  border: 1px solid var(--line-strong); border-right: 0; border-radius: 8px 0 0 8px; background: var(--panel-solid); color: var(--accent); font: inherit;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; writing-mode: vertical-rl; cursor: var(--cur-hand); box-shadow: var(--shadow); }
+#hpSideTab:hover, .edgeTab:hover { background: var(--hover); }
+.edgeTab.left { right: auto; left: 0; border-right: 1px solid var(--line-strong); border-left: 0; border-radius: 0 8px 8px 0; }
+#hpSideTab[hidden], .edgeTab[hidden] { display: none; }
+html.oneBar #hpTop #hpMenu { height: 30px; padding: 0 12px; }
+html.oneBar #hpTop #hpMenu[hidden] { display: none; }
 .hpSec { padding: 6px 12px; border-bottom: 1px solid var(--line); }
 .hpSec:last-child { border-bottom: 0; }
 .hpSec > summary { cursor: pointer; color: var(--bright); font-weight: 600; padding: 3px 0; }
@@ -2280,11 +2294,14 @@ html.oneBar #hp #brand .word, html:not(.hist) #bar > #brand .word { font-size: 1
    name by the logo goes and the search is a button until it's pressed. */
 @media (min-width: 701px) and (min-height: 521px) {
   html:not(.hist) #bar { flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
-  html:not(.hist) #barGrow { flex: 0.001 1 0; }
+  /* (the boxes grow first, to their most; the gap takes the rest, so the map's buttons, the language and the menu are
+     always at the right) */
+  html:not(.hist) #barGrow { flex: 1 1 0; }
   html:not(.hist) #bar > #status { flex: 1 1 120px; width: auto; min-width: 120px; max-width: 210px; }
   html:not(.hist) #bar > #session { flex: 1 1 100px; width: auto; min-width: 100px; max-width: 220px; }
   html:not(.hist) #bar > #map, html:not(.hist) #bar > #mapBtn { flex: 1 1 120px; width: auto; min-width: 120px; max-width: 220px; }
   html:not(.hist) #bar > #findBox { flex: 1 1 140px; width: auto; min-width: 140px; max-width: 260px; }
+  html:not(.hist) #bar > #status, html:not(.hist) #bar > #session, html:not(.hist) #bar > #map, html:not(.hist) #bar > #mapBtn, html:not(.hist) #bar > #findBox { flex-grow: 1000; }
 }
 @media (min-width: 701px) and (min-height: 521px) and (max-width: 1700px) {
   html:not(.hist) #bar > #fit .lbl, html:not(.hist) #bar > #reveal .lbl, html:not(.hist) #bar > #full .lbl, html:not(.hist) #bar > #options span { display: none; }
@@ -2415,6 +2432,10 @@ table.whyOptions tr.no td { color: var(--dim); }
   border: 0; border-radius: 4px; background: none; box-shadow: none; color: var(--dim); font-size: 12px; line-height: 1; cursor: var(--cur-hand); }
 .clearable > button.clearX:hover, #hp .clearable > button.clearX:hover { color: var(--bright); background: var(--hover); }
 .clearable > button.clearX[hidden], #hp .clearable > button.clearX[hidden] { display: none; }
+
+/* Raid history has its own page and its own settings: the live map's menu has no History tab and no replay
+   settings (the replay rows stay in the page, hidden, as the history page's settings panel mirrors them) */
+#panel button[data-tab="history"], #panel section[data-tab="history"], #panel details[data-group="replays"] { display: none !important; }
 
 .actionLegend { margin: 4px 0 8px 22px; font-size: 0.85em; }
 .actionLegend summary { cursor: pointer; }
