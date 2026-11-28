@@ -1,5 +1,9 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Container markers": "컨테이너 마커",
+"Container icons": "컨테이너 아이콘",
+"Small squares": "작은 사각형",
+"Container size": "컨테이너 마커 크기",
 "Voice call": "음성 신호",
 "Contact shared": "적 정보 공유",
 "Spotted another bot": "다른 봇 발견",

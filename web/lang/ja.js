@@ -1,5 +1,9 @@
 // Satellite's words in this language, keyed by the page's English (see web/lang.js). New words: python tools/lang_keys.py check.
 fumsLang({
+"Container markers": "コンテナマーカー",
+"Container icons": "コンテナアイコン",
+"Small squares": "小さな四角",
+"Container size": "コンテナマーカーの大きさ",
 "Voice call": "ボイスコール",
 "Contact shared": "敵情報を共有",
 "Spotted another bot": "別のボットを発見",

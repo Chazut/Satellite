@@ -347,7 +347,7 @@
     rosterShut: [], rosterGhosts: 'in', rosterHp: true, rosterDoing: true, rosterSlim: false, mapDoing: true, healthAll: true,
     orbitNames: false, orbitHear: true, orbitFights: true, lootCell: 60, areaR: 70, roofLoot: true, roofTotals: true, roofTotalsUnder: false, feedNames: 'all', feedBg: 70, feedRows: 5,
     feedPos: 'free', feedAt: { l: false, t: false, x: 0.143, y: 0.0064 }, eventsPos: { x: 0.135, y: 0.039, v: 2 }, keepZoom: true, feedKeep: true, feedFolded: false, feedBox: true, textScale: 0.9, mapLight: 100, alertSound: false, seenDead: true,
-    alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], peek: true, rosterFog: false,
+    alerts: [], has: null, seenInfected: false, rosterNear: false, bestMore: false, lootOff: [], boxOff: [], containerStyle: 'icon', containerScale: 1, peek: true, rosterFog: false,
     latin: true, botShape: 'arrow', meShape: 'arrow', hpTab: 'events', hpEventsAll: true, hpActions: false, hpGestures: true, floatWorth: 0, chaseRing: true, nameScale: .8, doingScale: 1, tipGear: true, tipCarry: true, secureShown: false, wishMarks: true, modTeams: true, worldScale: false, sizeByKind: false,
     // the menu's groups, open or folded
     groups: { labels: true, show: true, key: true, quests: true, view: true, loot: true, alerts: true, roster: true, lootKinds: true, lootMore: true, lootKey: true,
@@ -360,6 +360,8 @@
   for (const k of ['botShape', 'meShape']) if (!['arrow', 'disc', 'dart', 'drop', 'chevron', 'cone', 'dot'].includes(prefs[k])) prefs[k] = 'arrow';
   if (!Array.isArray(prefs.lootOff)) prefs.lootOff = [];
   // boxOff: the sorts of container left off the map (see BOX_GLYPH)
+  if (prefs.containerStyle !== 'square') prefs.containerStyle = 'icon';
+  prefs.containerScale = Math.max(.5, Math.min(2, Number(prefs.containerScale) || 1));
   if (!Array.isArray(prefs.boxOff)) prefs.boxOff = [];
   // rosterShut: the groups of the Raid list folded away (a kind, or 'Ghosts'). rosterGhosts: ORBIT's ghosts in a group
   // of their own ('own'), with their kind ('in') or not listed ('hide'). lootCell, areaR: how big a rough area of loot
@@ -2910,7 +2912,7 @@
   const badges = new Map();
   function badge(glyph, fill, rim, ink, form, size) {
     const ratio = pixelRatio();
-    const px = Math.max(6, Math.round(size * ratio));
+    const px = Math.max(form === 'tile' ? 2 : 6, Math.round(size * ratio));
     const key = [glyph, fill, rim, ink, form, px].join('|');
     let c = badges.get(key);
     if (c) return c;
@@ -2932,7 +2934,8 @@
         if (i) g.lineTo(mid + d * Math.cos(a), mid + d * Math.sin(a)); else g.moveTo(mid + d * Math.cos(a), mid + d * Math.sin(a));
       }
       g.closePath();
-    } else if (g.roundRect) g.roundRect(mid - half, mid - half, px, px, px * 0.24);
+    } else if (form === 'tile') g.rect(mid - half, mid - half, px, px);
+    else if (g.roundRect) g.roundRect(mid - half, mid - half, px, px, px * 0.24);
     else g.rect(mid - half, mid - half, px, px);
     g.lineJoin = 'round';
     g.lineWidth = Math.max(3, px * 0.3);
@@ -3263,11 +3266,16 @@
         const s = onScreen(b.p[0], b.p[1]);
         if (!s) continue;
         const rim = forQuest ? LAYERS.quest.col : forFir ? LAYERS.firItems.col : worth ? worthCol(total) : '#7c7f8f';
-        put(s, b.p, badge(BOX_GLYPH[(names[b.tpl] || {}).c] || 'i:boxCrate', '#1a1a24', rim, SPAWN_INK, 'square', size));
-        if (match || forQuest) ring(s, size * 0.85);
-        else if (forFir) ring(s, size * 0.85, LAYERS.firItems.col);
-        else if (forWish) ring(s, size * 0.85, WISH_COL);
-        if (forWish) star(s, size * 0.85);
+        const square = prefs.containerStyle === 'square';
+        const markSize = size * prefs.containerScale * (square ? .4 : 1);
+        const icon = square ? badge('', rim, rim, '', 'tile', markSize)
+          : badge(BOX_GLYPH[(names[b.tpl] || {}).c] || 'i:boxCrate', '#1a1a24', rim, SPAWN_INK, 'square', markSize);
+        put(s, b.p, icon);
+        const ringRadius = Math.max(5, markSize * .85);
+        if (match || forQuest) ring(s, ringRadius);
+        else if (forFir) ring(s, ringRadius, LAYERS.firItems.col);
+        else if (forWish) ring(s, ringRadius, WISH_COL);
+        if (forWish) star(s, ringRadius);
         // (what the box by the pointer lists: worked out only when the container is pointed at)
         const listed = () => {
           const lines = (counted || []).slice().sort((a, c) => worthOf(c[0], c[1]) - worthOf(a[0], a[1])).slice(0, 10)
@@ -3289,7 +3297,7 @@
           }
           return lines;
         };
-        thingsDrawn.push({ x: s[0], y: s[1], r: size / 2, tip: { title: nameOf(b.tpl) + (total ? ' · ' + roubles(total) : ''), tint: tintOf(b.tpl), get lines() { return listed(); } } });
+        thingsDrawn.push({ x: s[0], y: s[1], r: Math.max(4, markSize / 2), tip: { title: nameOf(b.tpl) + (total ? ' · ' + roubles(total) : ''), tint: tintOf(b.tpl), get lines() { return listed(); } } });
       }
 
       // Where loose loot can spawn: a hollow ring each, in the colour of the dearest thing it can spawn of the kinds
@@ -3664,7 +3672,9 @@
     const font = 'bold ' + px + 'px ' + FONT, line = Math.max(2, px * 0.28), pad = Math.ceil(line / 2 + 1);
     if (!wordRuler) wordRuler = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     wordRuler.font = font;
-    const w = Math.ceil(wordRuler.measureText(text).width + pad * 2), h = Math.ceil(px * 1.4 + pad * 2);
+    wordRuler.textBaseline = 'top';
+    const metrics = wordRuler.measureText(text);
+    const w = Math.ceil(metrics.width + pad * 2), h = Math.ceil(px * 1.4 + pad * 2);
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.ceil(w * ratio));
     c.height = Math.max(1, Math.ceil(h * ratio));
@@ -3679,7 +3689,11 @@
     g.fillStyle = col;
     g.strokeText(text, w / 2, pad);
     g.fillText(text, w / 2, pad);
-    pic = { c, w, h, pad };
+    // Bot label rows share the transparent sprite margins. Keep the visible outline
+    // in the placement bounds, including accents and descenders at custom text sizes.
+    const inkTop = Math.floor(-(metrics.actualBoundingBoxAscent ?? 0) - line / 2);
+    const inkBottom = Math.ceil((metrics.actualBoundingBoxDescent ?? px) + line / 2);
+    pic = { c, w, h, pad, inkTop, inkBottom };
     wordPics.set(key, pic);
     if (wordPics.size > WORD_PICS) wordPics.delete(wordPics.keys().next().value);
     return pic;
@@ -4052,8 +4066,9 @@
         }
         const pic = wordPic(line.text, line.px * prefs.textScale, inkOf(line.col), ratio);
         block.width = Math.max(block.width, pic.w);
-        line.top = block.height;
-        block.height += pic.h - pic.pad;
+        if (block.height) block.height += 1 / ratio;
+        line.top = block.height - pic.inkTop;
+        block.height += pic.inkBottom - pic.inkTop;
       }
     }
     function fits(box, block) {
@@ -4403,16 +4418,15 @@
       const calls = replay?.signals.voices.get(m.pid);
       const voice = replay ? (calls && calls[lastAt(calls, replay.at)]) : liveVoices.get(m.pid);
       if (voice && (replay ? replay.at : performance.now()) - voice.t < SHARE_MS) {
-        const pic = voiceIcon(r * 2), size = pic.width / pixelRatio();
-        ctx.drawImage(pic, x - size - 6 * scale, y - hop - size - 6 * scale, size, size);
+        const pic = actionPic('voice', ACTION_RADIUS * scale);
+        ctx.drawImage(pic.c, x - pic.w - 6 * scale, y - hop - pic.w - 6 * scale, pic.w, pic.w);
         if (!replay) dirty = true;
       }
       const contacts = replay?.sightings.get(m.pid);
       const last = contacts ? lastAt(contacts, replay.at) : -1;
       if (replay ? last >= 0 && replay.at - contacts[last].t < SIGHT_MS : performance.now() < liveSightUntil.get(m.pid)) {
-        const question = badge('?', '#baf4ff', '#0d3450', '#0d3450', 'round', r * 2);
-        const size = question.width / pixelRatio();
-        ctx.drawImage(question, x - size / 2, y - hop - r * 1.6 - size, size, size);
+        const pic = actionPic('sight', ACTION_RADIUS * scale);
+        ctx.drawImage(pic.c, x - pic.w / 2, y - hop - r * 1.6 - pic.w, pic.w, pic.w);
         if (!replay) dirty = true;
       }
     }
@@ -4448,16 +4462,13 @@
       }
       if (!sent.has(share.from)) {
         sent.add(share.from);
-        const pic = sharedIcon(16 * scale), size = pic.width / pixelRatio();
-        ctx.drawImage(pic, x + 6 * scale, y - size - 6 * scale, size, size);
+        const pic = actionPic('share', ACTION_RADIUS * scale);
+        ctx.drawImage(pic.c, x + 6 * scale, y - pic.w - 6 * scale, pic.w, pic.w);
       }
     }
     ctx.restore();
     if (!replay) dirty = true;
   }
-
-  function voiceIcon(size) { return badge('♪', '#ffda8d', '#533713', '#533713', 'round', size); }
-  function sharedIcon(size) { return badge('i:special', '#e1b8ff', '#49235c', '#49235c', 'round', size); }
 
   // slanting stripes in a colour, to fill a shape with
   const stripes = {};
@@ -8985,7 +8996,7 @@
     save();
     setTurn(turnFor(map.loc));
   };
-  for (const [id, key] of [['optBotShape', 'botShape'], ['optMeShape', 'meShape']]) {
+  for (const [id, key] of [['optBotShape', 'botShape'], ['optMeShape', 'meShape'], ['optContainerStyle', 'containerStyle']]) {
     $(id).value = prefs[key];
     $(id).onchange = e => { prefs[key] = e.target.value; save(); dirty = true; };
   }
@@ -9127,7 +9138,7 @@
   // text size and map brightness
   $('optTextScale').value = prefs.textScale;
   $('optTextScale').oninput = e => { prefs.textScale = +e.target.value || 1; save(); sizesSaid(); dirty = true; };
-  for (const [id, key] of [['optNameScale', 'nameScale'], ['optDoingScale', 'doingScale']]) {
+  for (const [id, key] of [['optNameScale', 'nameScale'], ['optDoingScale', 'doingScale'], ['optContainerScale', 'containerScale']]) {
     $(id).value = prefs[key];
     $(id).oninput = e => { prefs[key] = +e.target.value || 1; save(); sizesSaid(); dirty = true; };
   }
@@ -9286,6 +9297,7 @@
   $('optScale').value = prefs.scale;
   // marker and text size, each with its size in percent beside it (100%: as usual)
   const sizesSaid = () => { $('scaleText').textContent = Math.round(prefs.scale * 100) + '%'; $('textScaleText').textContent = Math.round(prefs.textScale * 100) + '%';
+    $('containerScaleText').textContent = Math.round(prefs.containerScale * 100) + '%';
     $('nameScaleText').textContent = Math.round(prefs.nameScale * 100) + '%'; $('doingScaleText').textContent = Math.round(prefs.doingScale * 100) + '%'; };
   $('optScale').oninput = e => { prefs.scale = +e.target.value || 1; save(); sizesSaid(); dirty = true; };
   sizesSaid();
@@ -11079,7 +11091,8 @@
     FirstAid: 'heal', PostCombatMedical: 'heal', Stims: 'heal', Cover: 'cover', PostCombatCover: 'cover' };
   const ACTION_OF_SAIN = { Reload: 'reload', FirstAid: 'heal', Surgery: 'heal', Stims: 'heal', ThrowGrenade: 'grenade', Retreat: 'back', RunAway: 'back',
     RushEnemy: 'push', MoveToEngage: 'push', SeekCover: 'cover', ShiftCover: 'cover' };
-  const ACTION_COL = { push: '#e0483f', back: '#3d8bff', reload: '#e0a63a', heal: '#3fbf5f', grenade: '#ff8a1c', cover: '#7d8796' };
+  const ACTION_RADIUS = 5.4;
+  const ACTION_COL = { sight: '#baf4ff', voice: '#ffda8d', share: '#e1b8ff', push: '#e0483f', back: '#3d8bff', reload: '#e0a63a', heal: '#3fbf5f', grenade: '#ff8a1c', cover: '#7d8796' };
   function actionOf(m) {
     const sain = modOn('SAIN') && typeof m.dc === 'string' && m.dc.startsWith('SAIN:') ? ACTION_OF_SAIN[m.dc.slice(5)] : null;
     // (reloading, healing and a grenade say most, whatever the move is)
@@ -11109,7 +11122,19 @@
     g.lineWidth = Math.max(1.2, d * 0.24);
     g.lineCap = g.lineJoin = 'round';
     g.beginPath();
-    if (kind === 'push' || kind === 'back') {
+    if (kind === 'sight' || kind === 'voice') {
+      g.fillStyle = kind === 'sight' ? '#0d3450' : '#533713';
+      g.font = 'bold ' + d * 1.65 + 'px ' + FONT;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(kind === 'sight' ? '?' : '♪', 0, 0);
+    } else if (kind === 'share') {
+      g.strokeStyle = '#49235c';
+      g.scale(d / 13, d / 13);
+      g.translate(-12, -12);
+      g.lineWidth = 2.6;
+      for (const [path] of ICONS.special) g.stroke(new Path2D(path));
+    } else if (kind === 'push' || kind === 'back') {
       // two chevrons: on (pointing up), or back (pointing down)
       const s = kind === 'push' ? 1 : -1;
       for (const y of [-0.35, 0.35]) { g.moveTo(-k * 0.8, (y + 0.45 * s) * k); g.lineTo(0, (y - 0.35 * s) * k); g.lineTo(k * 0.8, (y + 0.45 * s) * k); }
@@ -11147,27 +11172,14 @@
     group.appendChild(mk('summary', '', T('Action icon key')));
     const keys = mk('div');
     for (const [kind, word] of [['push', T('Pushing')], ['back', T('Falling back')], ['reload', T('Reloading')],
-      ['heal', T('Healing')], ['grenade', T('Throwing a grenade')], ['cover', T('Taking cover')]]) {
+      ['heal', T('Healing')], ['grenade', T('Throwing a grenade')], ['cover', T('Taking cover')],
+      ['sight', T('Spotted another bot')], ['voice', T('Voice call')], ['share', T('Contact shared')]]) {
       const item = mk('span'), icon = document.createElement('canvas'), pic = actionPic(kind, 8);
       icon.width = icon.height = pic.c.width;
       icon.getContext('2d').drawImage(pic.c, 0, 0);
       item.append(icon, word);
       keys.appendChild(item);
     }
-    const sight = mk('span');
-    const sample = badge('?', '#baf4ff', '#0d3450', '#0d3450', 'round', 16);
-    const icon = sample.cloneNode(false);
-    icon.getContext('2d').drawImage(sample, 0, 0);
-    sight.append(icon, T('Spotted another bot'));
-    keys.appendChild(sight);
-    const voice = mk('span'), note = voiceIcon(16), noteCanvas = note.cloneNode(false);
-    noteCanvas.getContext('2d').drawImage(note, 0, 0);
-    voice.append(noteCanvas, T('Voice call'));
-    keys.appendChild(voice);
-    const share = mk('span'), radio = sharedIcon(16), canvas = radio.cloneNode(false);
-    canvas.getContext('2d').drawImage(radio, 0, 0);
-    share.append(canvas, T('Contact shared'));
-    keys.appendChild(share);
     group.appendChild(keys);
     return group;
   }
@@ -11186,7 +11198,7 @@
   }
   function drawDoing(scale) {
     if (prefs.actionIcons === false) return;
-    const d = 5.4 * scale;
+    const d = ACTION_RADIUS * scale;
     for (const m of live) {
       if (!m.dyn || m.c === 'Corpse' || m.gh || !Number.isFinite(m.cx) || isHidden(m.c) || inArea(m) || !hasDetails(m)) continue;
       if (HIST && prefs.hpNoPeople) return;
@@ -12633,7 +12645,7 @@
     ['onMap', T('On the map'), ['optShots', 'optLootFloats', 'optFloatWorth', 'optHitFlash', 'optKillLines', 'optGrenades', 'optSwitches', 'optKillKeep', 'optTrailMs', 'optMinimap']],
     ['orbit', T('ORBIT on the map'), ['optOrbitMain', 'optOrbitRush', 'optOrbitTactics', 'optOrbitLines', 'optOrbitNames', 'optOrbitFights', 'optOrbitHear', 'optOrbitField', 'optPhobosField']],
     ['floors', T('Floors'), ['optFloorOnly', 'optFloorDim', 'optFloorGrey', 'optFloorHide', 'optOtherLoot']],
-    ['loot', T('Loot'), ['optPrices', 'optWorth', 'optPeek', 'optWishMarks', 'optTipGear', 'optTipCarry', 'optSecureShown', 'optItemNames', 'optModTints', 'optRoofLoot', 'optRoofTotals', 'optRoofTotalsUnder']],
+    ['loot', T('Loot'), ['optContainerStyle', 'optContainerScale', 'optPrices', 'optWorth', 'optPeek', 'optWishMarks', 'optTipGear', 'optTipCarry', 'optSecureShown', 'optItemNames', 'optModTints', 'optRoofLoot', 'optRoofTotals', 'optRoofTotalsUnder']],
     ['feed', T('Kill feed'), ['optFeed', 'optFeedMine', 'optFeedPmc', 'optFeedBoss', 'optFeedAi', 'optFeedNames', 'optFeedRows', 'optFeedKeep', 'optFeedBox', 'optFeedBg']],
     ['screen', T('Screen'), ['optMapLight', 'optTurn', 'optLowPower']],
     ['colours', T('Colours'), []]];
@@ -12646,7 +12658,7 @@
     ['onMap', T('On the map'), ['shots', 'lootFloats', 'floatWorth', 'hitFlash', 'killLines', 'grenades', 'switches', 'killKeep', 'trailMs', 'minimap']],
     ['orbit', T('ORBIT on the map'), ['orbitMain', 'orbitRush', 'orbitTactics', 'orbitLines', 'orbitNames', 'orbitFights', 'orbitHear', 'orbitField', 'phobosField']],
     ['floors', T('Floors'), ['floorOnly', 'floorDim', 'floorGrey', 'floorHide', 'otherLoot']],
-    ['loot', T('Loot'), ['worth', 'peek', 'wishMarks', 'tipGear', 'tipCarry', 'secureShown', 'itemNames', 'modTints', 'roofLoot', 'roofTotals', 'roofTotalsUnder']],
+    ['loot', T('Loot'), ['containerStyle', 'containerScale', 'worth', 'peek', 'wishMarks', 'tipGear', 'tipCarry', 'secureShown', 'itemNames', 'modTints', 'roofLoot', 'roofTotals', 'roofTotalsUnder']],
     ['feed', T('Kill feed'), ['feed', 'feedMine', 'feedPmc', 'feedBoss', 'feedAi', 'feedNames', 'feedRows', 'feedKeep', 'feedBox', 'feedBg']],
     ['screen', T('Screen'), ['mapLight', 'turns', 'lowPower']],
     ['colours', T('Colours'), ['cols']]];
