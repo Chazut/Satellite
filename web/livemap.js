@@ -5774,7 +5774,7 @@
     killEvents = [];
     eventsSeen = new Set();
     eventsRaid = '';
-    liveSightUntil.clear(); liveVoices.clear(); liveShares = [];
+    liveSightUntil.clear(); liveLastSight.clear(); liveVoices.clear(); liveShares = [];
   }
 
   // a raid began, ended or moved on, or its location's map arrived: show that map
@@ -6836,7 +6836,22 @@
   // number in the raid, when on the raid's clock in ms, its kind, whose, their name, the rest). They come with the
   // full reports ("rid" the raid, "ev" the new ones); a page opened later asks the server for the raid so far.
   // So far only "comet.squad": what COMET has a bot doing with its squad, whenever that changes.
-  const SIGHT_MS = 1400, SHARE_MS = 2400, liveSightUntil = new Map();
+  const SIGHT_MS = 1400, SIGHT_REARM_MS = 5000, SHARE_MS = 2400;
+  const liveSightUntil = new Map(), liveLastSight = new Map();
+  // A brief loss of visibility is still the same encounter. Remember the last report,
+  // but only the start of a contact pulses the marker.
+  function startsSightContact(lastSight, observer, target, time) {
+    if (!observer || !target || !Number.isFinite(time)) return false;
+    let targets = lastSight.get(observer);
+    if (!targets) {
+      targets = new Map();
+      lastSight.set(observer, targets);
+    }
+    const last = targets.get(target);
+    if (last !== undefined && time <= last) return false;
+    targets.set(target, time);
+    return last === undefined || time - last >= SIGHT_REARM_MS;
+  }
   let liveShares = [];
   const liveVoices = new Map();
   let squadEvents = [], eventsRaid = '', eventsSeen = new Set(), squadLogOpen = false;
@@ -6869,8 +6884,9 @@
       if (e.k === 'bot.sight') {
         eventsSeen.add(e.n);
         const age = clock - e.t;
-        if (!replay && fresh && e.d.target && e.p && age >= 0 && age < SIGHT_MS) {
-          liveSightUntil.set(e.p, performance.now() + SIGHT_MS - age);
+        if (!replay && startsSightContact(liveLastSight, e.p, e.d.target, e.t) && fresh && age >= 0 && age < SIGHT_MS) {
+          const until = performance.now() + SIGHT_MS - age;
+          liveSightUntil.set(e.p, Math.max(liveSightUntil.get(e.p) || 0, until));
           dirty = true;
         }
         continue;
@@ -6927,7 +6943,7 @@
     const rid = d.raid && d.rid ? d.rid : '';
     if (rid !== eventsRaid) {
       eventsRaid = rid;
-      liveSightUntil.clear(); liveVoices.clear(); liveShares = [];
+      liveSightUntil.clear(); liveLastSight.clear(); liveVoices.clear(); liveShares = [];
       squadEvents = [];
       otherEvents = [];
       ghostMarks = [];
@@ -13164,12 +13180,16 @@
   function indexSightings(events, lead) {
     const tracks = new Map(), seen = new Set();
     for (const e of events) {
-      if (e.k !== 'bot.sight' || !e.p || !e.d.target || seen.has(e.n)) continue;
+      if (e.k !== 'bot.sight' || !e.p || !e.d?.target || seen.has(e.n)) continue;
       seen.add(e.n);
       if (!tracks.has(e.p)) tracks.set(e.p, []);
-      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead) });
+      tracks.get(e.p).push({ t: e.performedAt == null ? e.rt : Math.max(0, e.performedAt - lead), target: e.d.target });
     }
-    for (const track of tracks.values()) track.sort((a, b) => a.t - b.t);
+    const lastSight = new Map();
+    for (const [observer, track] of tracks) {
+      track.sort((a, b) => a.t - b.t);
+      tracks.set(observer, track.filter(e => startsSightContact(lastSight, observer, e.target, e.t)));
+    }
     return tracks;
   }
   function markerHop(track, time, radius) {
